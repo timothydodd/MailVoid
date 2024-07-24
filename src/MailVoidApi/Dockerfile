@@ -9,18 +9,18 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["MailVoidWeb/MailVoidWeb.csproj", "MailVoidWeb/"]
+COPY ["MailVoidApi/MailVoidApi.csproj", "MailVoidApi/"]
 COPY ["MailVoidCommon/MailVoidCommon.csproj", "MailVoidCommon/"]
-RUN dotnet restore "./MailVoidWeb/MailVoidWeb.csproj"
+RUN dotnet restore "./MailVoidApi/MailVoidApi.csproj"
 COPY . .
-WORKDIR "/src/MailVoidWeb"
-RUN dotnet build "./MailVoidWeb.csproj" -c $BUILD_CONFIGURATION -o /app/build
+WORKDIR "/src/MailVoidApi"
+RUN dotnet build "./MailVoidApi.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./MailVoidWeb.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./MailVoidApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "MailVoidWeb.dll"]
+ENTRYPOINT ["dotnet", "MailVoidApi.dll"]
