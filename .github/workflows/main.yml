@@ -24,13 +24,15 @@ jobs:
     - name: Build and push MailVoidApi
       uses: docker/build-push-action@v3
       with:
-        context: ./src/MailVoidApi
+        context: ./src
+        file: ./src/MailVoidApi/Dockerfile
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidapi:latest
 
     - name: Build and push MailVoidWeb
       uses: docker/build-push-action@v3
       with:
-        context: ./src/MailVoidWeb
+        context: ./src
+        file: ./src/MailVoidWeb/Dockerfile
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidweb:latest

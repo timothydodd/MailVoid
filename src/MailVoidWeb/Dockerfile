@@ -9,8 +9,8 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["src/MailVoidWeb/MailVoidWeb.csproj", "MailVoidWeb/"]
-COPY ["src/MailVoidCommon/MailVoidCommon.csproj", "MailVoidCommon/"]
+COPY ["MailVoidWeb/MailVoidWeb.csproj", "MailVoidWeb/"]
+COPY ["MailVoidCommon/MailVoidCommon.csproj", "MailVoidCommon/"]
 RUN dotnet restore "./MailVoidWeb/MailVoidWeb.csproj"
 COPY . .
 WORKDIR "/src/MailVoidWeb"

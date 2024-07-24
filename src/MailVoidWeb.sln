@@ -5,9 +5,14 @@ VisualStudioVersion = 17.10.35027.167
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MailVoidWeb", "MailVoidWeb\MailVoidWeb.csproj", "{46FE6509-34EF-4F44-A62F-0D975DB52FE0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MailVoidCommon", "MailVoidCommon\MailVoidCommon.csproj", "{274613CB-F384-4053-A226-EC1A39EA5EEC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MailVoidCommon", "MailVoidCommon\MailVoidCommon.csproj", "{274613CB-F384-4053-A226-EC1A39EA5EEC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MailVoidApi", "MailVoidApi\MailVoidApi.csproj", "{3C87D35D-304F-483D-9A70-35047B12948C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MailVoidApi", "MailVoidApi\MailVoidApi.csproj", "{3C87D35D-304F-483D-9A70-35047B12948C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "github", "github", "{EE73BCAA-E137-4FEE-986C-7517FA93B709}"
+	ProjectSection(SolutionItems) = preProject
+		..\.github\workflows\main.yml = ..\.github\workflows\main.yml
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
