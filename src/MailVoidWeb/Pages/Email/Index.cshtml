@@ -1,0 +1,51 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Mail";
+}
+
+
+<div class="container d-flex flex-column flex-grow-1">
+    <div class="row">
+        <div class="col-md-3">
+            <h3>Mailboxes</h3>
+            <form method="get">
+                <ul class="list-group">
+                    @foreach (var mailbox in Model.MailViewModel.Mailboxes)
+                    {
+                        <li class="list-group-item">
+                            <button type="submit" name="SelectedMailbox" value="@mailbox" class="btn btn-link">@mailbox</button>
+                        </li>
+                    }
+                </ul>
+            </form>
+        </div>
+        <div class="col-md-9">
+            <h3>Emails</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Subject</th>
+                        <th>Created On</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var email in Model.MailViewModel.Emails)
+                    {
+                        <tr>
+                            <td>@email.From</td>
+                            <td>@email.To</td>
+                            <td>
+                                <a asp-page="./Details" asp-route-id="@email.Id">@email.Subject</a>
+                            </td>
+                            <td>@email.CreatedOn</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
