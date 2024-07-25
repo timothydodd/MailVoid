@@ -22,7 +22,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
     - name: Build and push MailVoidApi
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v6.5.0
       with:
         context: ./src
         file: ./src/MailVoidApi/Dockerfile
