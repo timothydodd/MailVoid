@@ -7,11 +7,12 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: ./src
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
-
+      uses: actions/checkout@v3
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
 
@@ -24,8 +25,8 @@ jobs:
     - name: Build and push MailVoidApi
       uses: docker/build-push-action@v6.5.0
       with:
-        context: ./src
-        file: ./src/MailVoidApi/Dockerfile
+        context: ./
+        file: ./MailVoidApi/Dockerfile
         push: true
         tags: |
           ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidapi:latest
@@ -34,8 +35,8 @@ jobs:
     - name: Build and push MailVoidWeb
       uses: docker/build-push-action@v3
       with:
-        context: ./src
-        file: ./src/MailVoidWeb/Dockerfile
+        context: ./
+        file: ./MailVoidWeb/Dockerfile
         push: true
         tags: |
           ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidweb:latest
