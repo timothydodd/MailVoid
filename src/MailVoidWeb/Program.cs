@@ -52,6 +52,7 @@ namespace MailVoidWeb
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
+
             app.UseResponseCaching();
             app.UseResponseCompression();
             app.UseRouting();
@@ -59,7 +60,6 @@ namespace MailVoidWeb
             app.UseAuthorization();
 
             app.MapRazorPages();
-            app.MapFallbackToPage("/Email/Index");
             // Map controllers
             app.UseHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });
 
