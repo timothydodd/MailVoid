@@ -12,8 +12,7 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        // Add controller support
-        builder.Services.AddControllers();
+
 
         builder.Services.AddMemoryCache();
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -68,7 +67,8 @@ public class Program
             options.Authority = Authority;
             options.Audience = Audience;
         });
-
+        // Add controller support
+        builder.Services.AddControllers();
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
         var app = builder.Build();
         if (app.Environment.IsDevelopment())
@@ -79,6 +79,7 @@ public class Program
         app.UseResponseCaching();
         app.UseResponseCompression();
         app.UseAuthorization();
+        app.UseAuthentication();
         // Map controllers
         app.MapControllers();
         app.UseHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });

@@ -3,6 +3,7 @@ using MailVoidCommon;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace MailVoidWeb.Controllers;
+
 [ApiController]
 [Route("api/webhook")]
 public class WebhookController : ControllerBase
@@ -20,12 +21,16 @@ public class WebhookController : ControllerBase
     {
 
         _logger.LogInformation(JsonSerializer.Serialize(email));
-        var to = email.Envelope?.To?.FirstOrDefault();
+        var envelope = JsonSerializer.Deserialize<Envelope>(email?.Envelope ?? "", new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+        var to = envelope?.To?.FirstOrDefault();
         if (to == null)
         {
             return Ok();
         }
-        var from = email.Envelope?.From;
+        var from = envelope.From;
         if (from == null)
         {
             return Ok();

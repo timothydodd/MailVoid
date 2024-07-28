@@ -13,7 +13,7 @@ public class EmailModel
     public string? SPF { get; set; }
     public string? Attachments { get; set; }
     public string? Subject { get; set; }
-    public Envelope? Envelope { get; set; }
+    public string? Envelope { get; set; }
     public string? Charsets { get; set; }
     public DateTime? CreatedOn { get; set; }
     public string? Spam_Score { get; set; }
@@ -21,7 +21,7 @@ public class EmailModel
 //{"to":["tdodd@dbmk2.com"],"from":"tdodd@me.com"}
 public class Envelope
 {
-    public required List<string> To { get; set; }
-    public required string From { get; set; }
+    public List<string>? To { get; set; }
+    public string? From { get; set; }
 }
 
