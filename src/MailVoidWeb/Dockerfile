@@ -23,8 +23,8 @@ FROM nginx:alpine
 # Copy the built Angular application from the previous stage
 COPY --from=build app/dist/mail-void/browser /usr/share/nginx/html
 
-COPY  nginx.conf /etc/nginx/nginx.conf
-
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY default.conf /etc/nginx/conf.d/default.conf
 
 #RUN chmod +x /usr/share/nginx/html/replace-env-vars.sh
 

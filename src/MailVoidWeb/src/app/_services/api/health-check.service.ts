@@ -11,6 +11,6 @@ export class HealthCheckService {
   getHealth() {
     // Parameter to ignore auth token (anonymous is allowed)
     const params = new InterceptorHttpParams({ ignoreAdmin: false, noToken: true });
-    return this.http.get<any>(`${environment.apiUrl}/health`, { params: params });
+    return this.http.get<any>(`${environment.apiUrl}/api/health`, { params: params });
   }
 }

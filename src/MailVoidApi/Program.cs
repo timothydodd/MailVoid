@@ -81,7 +81,7 @@ public class Program
         app.UseAuthorization();
         // Map controllers
         app.MapControllers();
-        app.UseHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });
+        app.UseHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });
 
 
         app.Run();
