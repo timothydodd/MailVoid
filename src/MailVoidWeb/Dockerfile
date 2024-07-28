@@ -17,8 +17,8 @@ RUN npm run build --prod
 # Stage 2: Serve the application using Nginx
 FROM nginx:alpine
 
-COPY replace-env-vars.sh /etc/nginx/nginx.conf
-COPY nginx.conf /usr/share/nginx/html
+COPY replace-env-vars.sh /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
 # Copy the built Angular application from the previous stage
 COPY --from=build app/dist/mail-void/browser /usr/share/nginx/html
 RUN chmod +x /usr/share/nginx/html/replace-env-vars.sh
