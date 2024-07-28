@@ -34,7 +34,7 @@ jobs:
     - name: Build and push MailVoidWeb
       uses: docker/build-push-action@v6.5.0
       with:
-        context: ./src/
+        context: ./src/MailVoidWeb/
         file: ./src/MailVoidWeb/Dockerfile
         push: true
         tags: |
