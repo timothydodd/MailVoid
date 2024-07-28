@@ -39,9 +39,27 @@ public class Program
             options.EnableForHttps = true;
         });
         builder.Services.AddSingleton<TimedCache>();
+
+        var origins = builder.Configuration.GetValue<string>("CorsOrigins")?.Split(',');
+        if (origins is not null)
+        {
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowSpecificDomains",
+                    policy =>
+                    {
+                        policy.WithOrigins(origins) // Specify the allowed domains
+                                            .AllowAnyHeader()
+                                            .AllowAnyMethod()
+                                            .SetIsOriginAllowed(x => true)
+                                            .AllowCredentials();
+                    });
+            });
+        }
+
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
         var app = builder.Build();
-
+        app.UseCors("AllowSpecificDomains");
         app.UseStaticFiles();
         app.UseResponseCaching();
         app.UseResponseCompression();

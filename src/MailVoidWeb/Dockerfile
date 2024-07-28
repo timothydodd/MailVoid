@@ -1,27 +1,31 @@
-#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# Stage 1: Build the Angular application
+FROM node:18 AS build
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER app
+# Set working directory
 WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG BUILD_CONFIGURATION=Release
-WORKDIR /src
-COPY ["MailVoidWeb/MailVoidWeb.csproj", "MailVoidWeb/"]
-COPY ["MailVoidCommon/MailVoidCommon.csproj", "MailVoidCommon/"]
-RUN dotnet restore "./MailVoidWeb/MailVoidWeb.csproj"
+# Install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy the rest of the application code
 COPY . .
-WORKDIR "/src/MailVoidWeb"
-RUN dotnet build "./MailVoidWeb.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./MailVoidWeb.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+# Build the application
+RUN npm run build --prod
+
+# Stage 2: Serve the application using Nginx
+FROM nginx:alpine
+
+COPY replace-env-vars.sh /usr/share/nginx/html
+COPY nginx.conf /usr/share/nginx/html
+# Copy the built Angular application from the previous stage
+COPY --from=build app/dist/mail-void/browser /usr/share/nginx/html
+RUN chmod +x /usr/share/nginx/html/replace-env-vars.sh
 
 
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "MailVoidWeb.dll"]
+# Expose port 80
+EXPOSE 80
+
+# Start Nginx
+CMD ["/usr/share/nginx/html/replace-env-vars.sh","nginx", "-g", "daemon off;"]
