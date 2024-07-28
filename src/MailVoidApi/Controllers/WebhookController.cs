@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace MailVoidWeb.Controllers;
 [ApiController]
-[Route("external/api/webhook")]
+[Route("api/webhook")]
 public class WebhookController : ControllerBase
 {
     private readonly ILogger<WebhookController> _logger;

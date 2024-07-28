@@ -1,8 +1,10 @@
 ﻿using MailVoidCommon;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace MailVoidApi.Controllers;
+[Authorize]
 [ApiController]
 [Route("api/mail")]
 public class MailController : ControllerBase

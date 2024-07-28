@@ -1,5 +1,6 @@
 ﻿using System.IO.Compression;
 using MailVoidCommon;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
@@ -56,11 +57,25 @@ public class Program
                     });
             });
         }
+        var Authority = builder.Configuration.GetValue<string>("Auth:Authority");
+        var Audience = builder.Configuration.GetValue<string>("Auth:Audience");
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        }).AddJwtBearer(options =>
+        {
+            options.Authority = Authority;
+            options.Audience = Audience;
+        });
 
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
         var app = builder.Build();
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
         app.UseCors("AllowSpecificDomains");
-        app.UseStaticFiles();
         app.UseResponseCaching();
         app.UseResponseCompression();
         app.UseAuthorization();

@@ -1,0 +1,56 @@
+<div class="main-wrap">
+  <div class="error-message l-window">
+    <div class="l-header">
+      <h2>Error</h2>
+    </div>
+
+    <ng-container>
+      @switch (this.errorCode) {
+        @case (this.errorCodes.UserLogin) {
+          <h3>Login Issue</h3>
+          <p>There was an issue logging into your account.</p>
+        }
+        @case (this.errorCodes.UserBlocked) {
+          <h3>Inactive Account</h3>
+          <p>Your account is currently inactive.</p>
+        }
+        @case (this.errorCodes.Timeout) {
+          <h3>Connection Issue</h3>
+          <p>Please check your internet connection and try again.</p>
+        }
+        @case (this.errorCodes.UserAccess) {
+          <h3>Access Denied</h3>
+          <p>Your account doesn't have the proper permissions to view this site.</p>
+        }
+        @default {
+          <h3>Unknown Issue</h3>
+          <p>An Unknown error has occured. Please try again.</p>
+        }
+      }
+    </ng-container>
+    @if (showHealthCheck) {
+      <div class="status-box">
+        <h4>Connection Status</h4>
+        <div class="split" style>
+          <div>App Server</div>
+          @if (this.healthData) {
+            @if (isHealthy) {
+              <lucide-icon name="circle-check"></lucide-icon>
+            }
+            @if (!isHealthy) {
+              <lucide-icon name="circle-x"></lucide-icon>
+            }
+          }
+          @if (!this.healthData) {
+            <i>
+              <div class="spinner-loader"></div>
+            </i>
+          }
+        </div>
+      </div>
+    }
+    @if (showLogin) {
+      <button class="btn btn-primary" (click)="btnRelogin()">Login</button>
+    }
+  </div>
+</div>
