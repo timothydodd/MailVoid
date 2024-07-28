@@ -3,7 +3,6 @@ using MailVoidCommon;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 
 namespace MailVoidApi;
 
@@ -12,10 +11,6 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        Log.Logger = new LoggerConfiguration()
-.WriteTo.Console()
-.CreateLogger();
-        builder.Host.UseSerilog();
         // Add controller support
         builder.Services.AddControllers();
 
@@ -39,7 +34,12 @@ public class Program
             options.EnableForHttps = true;
         });
         builder.Services.AddSingleton<TimedCache>();
-
+        builder.Services.AddLogging(configure => configure.AddSimpleConsole(options =>
+        {
+            options.IncludeScopes = false;
+            options.SingleLine = true;
+            options.TimestampFormat = "hh:mm:ss ";
+        }));
         var origins = builder.Configuration.GetValue<string>("CorsOrigins")?.Split(',');
         if (origins is not null)
         {
@@ -69,19 +69,7 @@ public class Program
         app.UseHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });
 
 
-        try
-        {
-            Log.Information("Starting web host");
-            app.Run();
-        }
-        catch (Exception ex)
-        {
-            Log.Fatal(ex, "Host terminated unexpectedly");
-        }
-        finally
-        {
-            Log.CloseAndFlush();
-        }
+        app.Run();
     }
 
 }

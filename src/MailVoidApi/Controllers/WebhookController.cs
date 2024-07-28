@@ -1,7 +1,7 @@
-﻿using MailVoidCommon;
+﻿using System.Text.Json;
+using MailVoidCommon;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
 namespace MailVoidWeb.Controllers;
 [ApiController]
 [Route("external/api/webhook")]
@@ -19,6 +19,7 @@ public class WebhookController : ControllerBase
     public async Task<IActionResult> EmailWebhook([FromForm] EmailModel email)
     {
 
+        _logger.LogInformation(JsonSerializer.Serialize(email));
         var to = email.Envelope?.To?.FirstOrDefault();
         if (to == null)
         {
