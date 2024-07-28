@@ -13,7 +13,7 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-
+        builder.Services.AddControllers();
         builder.Services.AddMemoryCache();
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -34,12 +34,12 @@ public class Program
             options.EnableForHttps = true;
         });
         builder.Services.AddSingleton<TimedCache>();
-        builder.Services.AddLogging(configure => configure.AddSimpleConsole(options =>
+        builder.Services.AddLogging(logging =>
         {
-            options.IncludeScopes = false;
-            options.SingleLine = true;
-            options.TimestampFormat = "hh:mm:ss ";
-        }));
+            logging.AddConsole();
+            logging.AddDebug();
+        });
+
         var origins = builder.Configuration.GetValue<string>("CorsOrigins")?.Split(',');
         if (origins is not null)
         {
@@ -66,9 +66,35 @@ public class Program
         {
             options.Authority = Authority;
             options.Audience = Audience;
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger.LogError("Authentication failed.", context.Exception);
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger.LogError("OnChallenge error", context.Error, context.ErrorDescription);
+                    return Task.CompletedTask;
+                },
+                OnMessageReceived = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger.LogInformation("Message received: {0}", context.Token);
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger.LogInformation("Token validated");
+                    return Task.CompletedTask;
+                }
+            };
         });
-        // Add controller support
-        builder.Services.AddControllers();
+
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
         var app = builder.Build();
         if (app.Environment.IsDevelopment())
@@ -78,8 +104,8 @@ public class Program
         app.UseCors("AllowSpecificDomains");
         app.UseResponseCaching();
         app.UseResponseCompression();
-        app.UseAuthorization();
         app.UseAuthentication();
+        app.UseAuthorization();
         // Map controllers
         app.MapControllers();
         app.UseHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });
