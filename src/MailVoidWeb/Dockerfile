@@ -24,7 +24,7 @@ FROM nginx:alpine
 COPY --from=build app/dist/mail-void/browser /usr/share/nginx/html
 
 # Copy the default Nginx configuration file
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY ./nginx.conf /etc/nginx/nginx.conf
 
 #RUN chmod +x /usr/share/nginx/html/replace-env-vars.sh
 
