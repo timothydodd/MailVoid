@@ -14,6 +14,9 @@ export class MailService {
   getEmail(id: string) {
     return this.http.get<Mail>(`${environment.apiUrl}/api/mail/${id}`);
   }
+  deleteBoxes(options: FilterOptions | undefined) {
+    return this.http.delete(`${environment.apiUrl}/api/mail/boxes`, { body: options });
+  }
 }
 export interface FilterOptions {
   to: string;

@@ -11,4 +11,32 @@ body {
 
 .btn-link {
     cursor: pointer;
+    padding: 0;
+}
+
+.flex-row {
+    display: flex;
+    flex-direction: row;
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+//bootstrap
+
+.borderless-menu {
+    .dropdown-menu {
+        padding: 0;
+        font-size: 13px;
+    }
+
+    .dropdown-toggle::after {
+        display: none;
+    }
+
+    .btn {
+        border: none;
+    }
 }

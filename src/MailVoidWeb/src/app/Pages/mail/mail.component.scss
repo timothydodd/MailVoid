@@ -1,0 +1,19 @@
+.container {
+    gap: 20px;
+
+    .left-side {
+        display: flex;
+        flex-direction: column;
+        min-width: 10%;
+        max-width: 30%;
+        overflow-x: hidden;
+
+    }
+
+    .right-side {
+        display: flex;
+        flex-direction: column;
+        min-width: 70%;
+        overflow-x: hidden;
+    }
+}

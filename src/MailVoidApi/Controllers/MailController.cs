@@ -58,7 +58,22 @@ public class MailController : ControllerBase
 
         }).ToListAsync();
     }
+    [HttpDelete("boxes")]
+    public async Task<IActionResult> DeleteBox([FromBody] FilterOptions options)
+    {
+        var email = await _dbContext.Mail.Where(m => m.To == options.To).ToListAsync();
+        if (!email.Any())
+        {
+            return NotFound();
+        }
+
+        _dbContext.Mail.RemoveRange(email);
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+
+    }
 }
+
 public class FilterOptions
 {
     public required string To { get; set; }
