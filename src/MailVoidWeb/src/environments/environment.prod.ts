@@ -3,11 +3,11 @@ export const environment = {
   cache: {
     logging: false,
   },
-  apiUrl: 'https://void.dbmk2.com',
+  apiUrl: '${API_URL}',
   auth0: {
-    domain: 'dev-fgsthtfl2egy63uu.us.auth0.com',
-    client_id: '09VPqGTDbVX3Nsgwpf07j8EQ99AHD6kq',
-    redirect_uri: 'https://void.dbmk2.com/authorize',
-    audience: 'https://void.dbmk2.com',
+    domain: '${AUTH_DOMAIN}',
+    client_id: '${AUTH_ID}',
+    redirect_uri: '${AUTH_REDIRECT}',
+    audience: '${AUTH_AUDIENCE}',
   },
 };

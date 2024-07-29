@@ -9,10 +9,10 @@ export const environment = {
   },
   apiUrl: 'http://localhost:5133',
   auth0: {
-    domain: 'your-auth0-domain',
-    client_id: 'your-auth0-client-id',
-    redirect_uri: 'your-redirect-uri',
-    audience: 'your-audience',
+    domain: 'dev-fgsthtfl2egy63uu.us.auth0.com',
+    client_id: '09VPqGTDbVX3Nsgwpf07j8EQ99AHD6kq',
+    redirect_uri: 'http://localhost:6200/authorize',
+    audience: 'https://void.dbmk2.com',
   },
 };
 
