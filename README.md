@@ -7,10 +7,10 @@ MailVoid is a simple yet powerful tool designed for developers who need to manag
  This project is currently in prototype status. Please be aware that things might change often
 
 ## Features
-API: Built with C# .NET 8, the API contains endpoints for the web frontend and an endpoint that receives webhook events from SendGrid.
-Frontend: A simple web view of the different mailboxes received from a particular domain, coded in Angular 18.
-Authentication: Uses Auth0 for authentication, which can be easily swapped for your own preferred method.
-Database: Requires a MySQL database to store emails.
+- API: Built with C# .NET 8, the API contains endpoints for the web frontend and an endpoint that receives webhook events from SendGrid.
+- Frontend: A simple web view of the different mailboxes received from a particular domain, coded in Angular 18.
+- Authentication: Uses Auth0 for authentication, which can be easily swapped for your own preferred method.
+- Database: Requires a MySQL database to store emails.
 
 ## Requirements
 .NET 8
