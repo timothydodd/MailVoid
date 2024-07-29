@@ -1,51 +1,50 @@
+
+
 # MailVoid
-MailVoid is a simple yet powerful tool designed for developers who need to manage multiple test emails without the hassle of creating multiple email accounts. This project is built using .NET 8 and consists of two main components: an API that handles webhook events from SendGrid's email parser API, and a Razor Web API that displays all emails sent to your specified domain. This can be extremely useful for testing and development purposes.
+MailVoid is a simple yet powerful tool designed for developers who need to manage multiple test emails without the hassle of creating multiple email accounts.
 
 ## Features
-Webhook Listener: Captures and processes emails sent via SendGrid's email parser API, making it easy to handle incoming test emails dynamically.
-Email Display: A Razor Web interface that lists all emails received by the domain, providing a consolidated view of your test emails.
-## Prerequisites
-Before setting up MailVoid, you will need:
+API: Built with C# .NET 8, the API contains endpoints for the web frontend and an endpoint that receives webhook events from SendGrid.
+Frontend: A simple web view of the different mailboxes received from a particular domain, coded in Angular 18.
+Authentication: Uses Auth0 for authentication, which can be easily swapped for your own preferred method.
+Database: Requires a MySQL database to store emails.
 
-- .NET 8
-- MySQL Database
+## Requirements
+.NET 8
+MySQL
+Angular 18
+SendGrid account
+Auth0 account (optional, for authentication)
 
-## Getting Started
-Step 1: Clone the Repository
+## Setup
+
+Backend
+- Clone the repository:
 ``` bash
-git clone https://github.com/yourgithubusername/MailVoid.git
-cd MailVoid
+git clone https://github.com/timothydodd/MailVoid.git
 ```
 
-# Step 2: Set Up the Database
-Create a MySQL database named MailVoidDB and import the initial schema (found in the db directory of this repository).
-
-# Step 3: Configure Your Environment
-Copy the .env.example file to .env and update it with your database connection details and other configurations.
-
-# Step 4: Run the Applications
-Navigate to the API and Web projects and run them using the following commands:
-
+- Navigate to the API project directory:
 ``` bash
-cd src\MailVoidApi
-dotnet run
+cd src/MailVoidApi
+```
 
-cd src\MailVoidWeb
+- Update the appsettings.json file with your MySQL and auth0 config.
+```
 dotnet run
 ```
 
-## Usage
-Once both applications are running:
-
-The API will listen for incoming webhook events at http://localhost:8080/api/mail.
-You can view the received emails at http://localhost:8081.
-
-## Contributing
-Contributions are welcome! Please fork the repository and submit pull requests to the main branch.
-
-## License
-Distributed under the MIT License. See LICENSE for more information.
-
-## Acknowledgements
-SendGrid for their email parser API
-.NET community for continuous support
+## Frontend
+- Navigate to the Web project directory:
+```
+cd MailVoid/src/MailVoidWeb
+```
+- Update the environment.ts file with your Auth0 configuration (if using).
+- Install Angular dependencies:
+  ```
+  npm install
+  ```
+- Run the Angular project:
+  ```
+  npm start
+  ```
