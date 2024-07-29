@@ -48,3 +48,18 @@ cd MailVoid/src/MailVoidWeb
   ```
   npm start
   ```
+  
+## Usage
+1. Access the frontend at http://localhost:6200.
+2. Log in using Auth0 (or your preferred authentication method).
+3. View and manage the emails received from your specified domain.
+ 
+##Contributing
+Contributions are welcome! Please open an issue or submit a pull request.
+
+License
+This project is licensed under the MIT License.
+
+Acknowledgments
+SendGrid
+Auth0
