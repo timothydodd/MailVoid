@@ -51,6 +51,7 @@ public class MailController : ControllerBase
             Id = x.Id,
             To = x.To,
             From = x.From,
+            FromName = x.FromName,
             Subject = x.Subject,
             Text = "",
             CreatedOn = x.CreatedOn
