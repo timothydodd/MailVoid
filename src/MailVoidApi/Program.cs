@@ -9,6 +9,7 @@ namespace MailVoidApi;
 
 public class Program
 {
+    [Obsolete]
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
@@ -36,7 +37,11 @@ public class Program
         builder.Services.AddSingleton<TimedCache>();
         builder.Services.AddLogging(logging =>
         {
-            logging.AddConsole();
+            logging.AddConsole(c =>
+            {
+                c.Format = Microsoft.Extensions.Logging.Console.ConsoleLoggerFormat.Systemd;
+            });
+
             logging.AddDebug();
         });
 
