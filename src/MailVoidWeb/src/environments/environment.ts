@@ -8,12 +8,6 @@ export const environment = {
     logging: false,
   },
   apiUrl: 'http://localhost:5133',
-  auth0: {
-    domain: 'your-auth0-domain',
-    client_id: 'your-auth0-client-id',
-    redirect_uri: 'your-redirect-uri',
-    audience: 'your-audience',
-  },
 };
 
 /*

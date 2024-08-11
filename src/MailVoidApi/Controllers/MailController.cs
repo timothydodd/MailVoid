@@ -1,7 +1,9 @@
 ﻿using MailVoidCommon;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using ServiceStack.Data;
+using ServiceStack.OrmLite;
+using ServiceStack.OrmLite.Dapper;
 
 namespace MailVoidApi.Controllers;
 [Authorize]
@@ -10,67 +12,65 @@ namespace MailVoidApi.Controllers;
 public class MailController : ControllerBase
 {
     private readonly ILogger<MailController> _logger;
-    private readonly MailDbContext _dbContext;
-    public MailController(ILogger<MailController> logger, MailDbContext dbContext)
+    private readonly IDbConnectionFactory _dbFactory;
+    public MailController(ILogger<MailController> logger, IDbConnectionFactory dbFactory)
     {
         _logger = logger;
-        _dbContext = dbContext;
+        _dbFactory = dbFactory;
     }
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMail(long id)
     {
-        var email = await _dbContext.Mail.FindAsync(id);
-        if (email == null)
+        using (var db = _dbFactory.OpenDbConnection())
         {
-            return NotFound();
+            var email = await db.SingleByIdAsync<Mail>(id);
+            if (email == null)
+            {
+                return NotFound();
+            }
+            return Ok(email);
         }
-        return Ok(email);
     }
     [HttpGet("boxes")]
     public async Task<IEnumerable<string>> GetBoxes()
     {
-        var boxes = await _dbContext.Mail
-                            .Select(m => m.To)
-                            .Distinct()
-                            .ToListAsync();
-        return boxes;
+        using (var db = _dbFactory.OpenDbConnection())
+        {
+            var boxes = await db.SelectAsync<string>("SELECT DISTINCT Mail.To FROM Mail");
+            return boxes;
+        }
 
     }
     [HttpPost]
-    public async Task<IEnumerable<Mail>> GetMails([FromBody] FilterOptions? options)
+    public IEnumerable<Mail> GetMails([FromBody] FilterOptions? options)
     {
 
 
-        // Get emails based on the selected mailbox
-        var emails = string.IsNullOrEmpty(options?.To)
-        ? _dbContext.Mail : _dbContext.Mail.Where(m => m.To == options.To);
-
-
-        return await emails.Select(x => new Mail()
+        using (var db = _dbFactory.OpenDbConnection())
         {
-            Id = x.Id,
-            To = x.To,
-            From = x.From,
-            FromName = x.FromName,
-            Subject = x.Subject,
-            Text = "",
-            CreatedOn = x.CreatedOn
 
-        }).ToListAsync();
+            var query = "select Id,Mail.To,Mail.From,FromName,ToOthers,Subject,CreatedOn FROM Mail";
+            if (!string.IsNullOrEmpty(options?.To))
+            {
+                query += " WHERE Mail.To = @To";
+            }
+
+            return db.Query<Mail>(query, new { To = options?.To });
+        }
     }
     [HttpDelete("boxes")]
     public async Task<IActionResult> DeleteBox([FromBody] FilterOptions options)
     {
-        var email = await _dbContext.Mail.Where(m => m.To == options.To).ToListAsync();
-        if (!email.Any())
+        if (options == null || string.IsNullOrEmpty(options.To))
+            return BadRequest();
+
+        using (var db = _dbFactory.OpenDbConnection())
         {
-            return NotFound();
+
+            var query = "DELETE FROM Mail WHERE Mail.To = @To";
+            await db.ExecuteAsync(query, new { To = options.To });
+            return Ok();
         }
-
-        _dbContext.Mail.RemoveRange(email);
-        await _dbContext.SaveChangesAsync();
-        return Ok();
-
     }
 }
 

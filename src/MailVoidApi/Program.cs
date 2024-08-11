@@ -1,9 +1,17 @@
-﻿using System.IO.Compression;
+﻿using System.Data;
+using System.IO.Compression;
+using System.Text;
+using MailVoidApi.Common;
+using MailVoidApi.Data;
+using MailVoidApi.Services;
 using MailVoidCommon;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using ServiceStack.Data;
+using ServiceStack.OrmLite;
+using ServiceStack.OrmLite.Dapper;
 
 namespace MailVoidApi;
 
@@ -12,65 +20,72 @@ public class Program
     [Obsolete]
     public static void Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        var builder = WebApplication.CreateSlimBuilder(args);
+        builder.Services.AddRequestDecompression();
+        builder.Services.AddResponseCompression(options =>
+        {
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+            {
+            "application/json"
+        });
+        });
+        builder.Services.ConfigureHttpJsonOptions(options =>
+        {
+            options.SerializerOptions.TypeInfoResolver = new ApiJsonSerializerContext();
 
+        });
+
+        builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
+        builder.Services.AddHostedService<BackgroundWorkerService>();
         builder.Services.AddControllers();
         builder.Services.AddMemoryCache();
-        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
         if (connectionString is null)
         {
             throw new InvalidOperationException("Connection string not found");
         }
-        builder.Services.AddDbContext<MailDbContext>(options =>
-        options.UseMySQL(connectionString));
-        builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
-        builder.Services.AddResponseCaching();
-        builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
-        builder.Services.AddResponseCompression(options =>
-        {
-            options.Providers.Add<BrotliCompressionProvider>();
-            options.Providers.Add<GzipCompressionProvider>();
-            options.EnableForHttps = true;
-        });
-        builder.Services.AddSingleton<TimedCache>();
+        var dbFactory = new OrmLiteConnectionFactory(connectionString, MySqlDialect.Provider);
+
+        builder.Services.AddSingleton<IDbConnectionFactory>(dbFactory);
+        builder.Services.AddTransient<IDbConnection>(sp => sp.GetRequiredService<IDbConnectionFactory>().OpenDbConnection());
+
+
+        builder.Services.AddScoped<DatabaseInitializer>();
+        builder.Services.AddSingleton<PasswordService>();
+        builder.Services.AddSingleton<AuthService>();
         builder.Services.AddLogging(logging =>
         {
-            logging.AddConsole(c =>
+            logging.AddSimpleConsole(c =>
             {
-                c.Format = Microsoft.Extensions.Logging.Console.ConsoleLoggerFormat.Systemd;
+                c.SingleLine = true;
+                c.IncludeScopes = false;
+                c.TimestampFormat = "HH:mm:ss ";
             });
 
             logging.AddDebug();
         });
-
-        var origins = builder.Configuration.GetValue<string>("CorsOrigins")?.Split(',');
-        if (origins is not null)
-        {
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("AllowSpecificDomains",
-                    policy =>
-                    {
-                        policy.WithOrigins(origins) // Specify the allowed domains
-                                            .AllowAnyHeader()
-                                            .AllowAnyMethod()
-                                            .SetIsOriginAllowed(x => true)
-                                            .AllowCredentials();
-                    });
-            });
-        }
-        var Authority = builder.Configuration.GetValue<string>("Auth:Authority");
-        var Audience = builder.Configuration.GetValue<string>("Auth:Audience");
         builder.Services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         }).AddJwtBearer(options =>
         {
-            options.Authority = Authority;
-            options.Audience = Audience;
+            var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtSettings["Issuer"],
+                ValidAudience = jwtSettings["Audience"],
+
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Secret"]))
+            };
             options.Events = new JwtBearerEvents
             {
                 OnAuthenticationFailed = context =>
@@ -100,13 +115,71 @@ public class Program
             };
         });
 
+        builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
+        builder.Services.AddResponseCaching();
+        builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
+
+        builder.Services.AddSingleton<TimedCache>();
+        builder.Services.AddLogging(logging =>
+        {
+            logging.AddSimpleConsole(c =>
+            {
+                c.SingleLine = true;
+                c.IncludeScopes = false;
+                c.TimestampFormat = "HH:mm:ss ";
+            });
+
+            logging.AddDebug();
+        });
+        builder.Services.Configure<BackgroundTaskQueueOptions>(options =>
+        {
+            options.Capacity = 100; // Set a default or load from configuration
+        });
+
+
+        var origins = builder.Configuration.GetValue<string>("CorsOrigins")?.Split(',');
+        if (origins is not null)
+        {
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("MailVoidOrigins",
+                    policy =>
+                    {
+                        policy.WithOrigins(origins) // Specify the allowed domains
+                                            .AllowAnyHeader()
+                                            .AllowAnyMethod()
+                                            .SetIsOriginAllowed(x => true)
+                                            .AllowCredentials();
+                    });
+            });
+        }
+        else
+        {
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("MailVoidOrigins",
+                builder => builder
+                    .AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader());
+            });
+        }
+
+
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
+        SqlMapper.AddTypeHandler(new DateTimeHandler());
         var app = builder.Build();
         if (app.Environment.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
         }
-        app.UseCors("AllowSpecificDomains");
+        using (var scope = app.Services.CreateScope())
+        {
+            var dbInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+            dbInitializer.CreateTable();
+        }
+        app.UseCors("MailVoidOrigins");
+
         app.UseResponseCaching();
         app.UseResponseCompression();
         app.UseAuthentication();

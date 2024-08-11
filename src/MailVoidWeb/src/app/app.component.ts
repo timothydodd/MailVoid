@@ -1,20 +1,30 @@
-import { Component, inject } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { AuthService } from './_services/auth.service';
+import { NgbModal, NgbModule } from '@ng-bootstrap/ng-bootstrap';
+import { LoginComponent } from './_components/login/login.component';
+import { UserMenuComponent } from './_components/user-menu/user-menu.component';
+import { AuthService } from './_services/auth-service';
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NgbModule],
+  imports: [RouterOutlet, LoginComponent, NgbModule, UserMenuComponent, UserMenuComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
 export class AppComponent {
   title = 'MailVoid';
 
-  authService = inject(AuthService);
+  modalService = inject(NgbModal);
+  private authService = inject(AuthService);
+
+  loggedIn = signal(false);
   constructor() {
-    this.authService.checkLogin().pipe(takeUntilDestroyed()).subscribe();
+    this.authService.isLoggedIn.subscribe((loggedIn) => {
+      this.loggedIn.update(() => loggedIn);
+      if (!loggedIn) {
+        LoginComponent.showModal(this.modalService);
+      }
+    });
   }
 }

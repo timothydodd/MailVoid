@@ -7,7 +7,7 @@ import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { LucideAngularModule } from 'lucide-angular';
 import { take } from 'rxjs';
 import { HealthCheckService } from '../../_services/api/health-check.service';
-import { AuthService } from '../../_services/auth.service';
+import { AuthService } from '../../_services/auth-service';
 
 @Component({
   selector: 'app-error-page',
