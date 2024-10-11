@@ -57,17 +57,6 @@ public class Program
         builder.Services.AddScoped<DatabaseInitializer>();
         builder.Services.AddSingleton<PasswordService>();
         builder.Services.AddSingleton<AuthService>();
-        builder.Services.AddLogging(logging =>
-        {
-            logging.AddSimpleConsole(c =>
-            {
-                c.SingleLine = true;
-                c.IncludeScopes = false;
-                c.TimestampFormat = "HH:mm:ss ";
-            });
-
-            logging.AddDebug();
-        });
         builder.Services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

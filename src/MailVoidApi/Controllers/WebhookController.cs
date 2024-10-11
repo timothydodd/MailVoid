@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MailVoidApi.Common;
 using MailVoidApi.Services;
 using MailVoidCommon;
@@ -29,7 +30,7 @@ public class WebhookController : ControllerBase
 
         _taskQueue.QueueBackgroundWorkItem(async token =>
         {
-            _logger.LogInformation(JsonSerializer.Serialize(email));
+            _logger.LogInformation("Received email for  {0}", email?.Envelope);
             var envelope = JsonSerializer.Deserialize<Envelope>(email?.Envelope ?? "", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
@@ -56,7 +57,10 @@ public class WebhookController : ControllerBase
             {
                 text = email.Html;
             }
-
+            if (!string.IsNullOrEmpty(text))
+            {
+                text = Regex.Replace(text, @"\p{IsCombiningDiacriticalMarks}+", string.Empty, RegexOptions.Compiled);
+            }
             float.TryParse(email.Spam_Score, out float score);
             if (score > 4.5)
             {
@@ -85,6 +89,8 @@ NOT EXISTS (SELECT 1 FROM Mail Where Id=@Id)";
                     CreatedOn = email?.CreatedOn ?? DateTime.UtcNow
                 });
             }
+            // Replace email text unicode into non-unicode text
+
         });
         return Ok();
     }
