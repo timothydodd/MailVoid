@@ -42,20 +42,20 @@ public class MailController : ControllerBase
 
     }
     [HttpPost]
-    public IEnumerable<Mail> GetMails([FromBody] FilterOptions? options)
+    public async Task<IActionResult> GetMails([FromBody] FilterOptions? options)
     {
 
 
         using (var db = _dbFactory.OpenDbConnection())
         {
 
-            var query = "select Id,Mail.To,Mail.From,FromName,ToOthers,Subject,CreatedOn FROM Mail";
+            var query = "select * FROM Mail";
             if (!string.IsNullOrEmpty(options?.To))
             {
                 query += " WHERE Mail.To = @To";
             }
 
-            return db.Query<Mail>(query, new { To = options?.To });
+            return Ok(await db.QueryAsync<Mail>(query, new { To = options?.To }));
         }
     }
     [HttpDelete("boxes")]
@@ -68,7 +68,7 @@ public class MailController : ControllerBase
         {
 
             var query = "DELETE FROM Mail WHERE Mail.To = @To";
-            await db.ExecuteAsync(query, new { To = options.To });
+            await db.ExecuteAsync(query, new { options.To });
             return Ok();
         }
     }
@@ -76,7 +76,7 @@ public class MailController : ControllerBase
 
 public class FilterOptions
 {
-    public required string To { get; set; }
+    public string? To { get; set; }
 }
 public class MailViewModel
 {

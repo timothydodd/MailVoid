@@ -23,6 +23,7 @@ public class DatabaseInitializer
         {
             db.CreateTableIfNotExists<Mail>();
             db.CreateTableIfNotExists<Contact>();
+            db.CreateTableIfNotExists<MailGroup>();
             if (db.CreateTableIfNotExists<User>())
             {
                 var user = new User

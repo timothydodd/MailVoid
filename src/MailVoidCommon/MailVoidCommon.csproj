@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.MySql" Version="8.0.1" />
-  <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
+  <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.10" />
     <PackageReference Include="MySql.Data" Version="9.0.0" />
     <PackageReference Include="ServiceStack.OrmLite.MySql" Version="8.4.0" />
