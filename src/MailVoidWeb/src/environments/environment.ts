@@ -7,7 +7,7 @@ export const environment = {
   cache: {
     logging: false,
   },
-  apiUrl: 'http://localhost:5133',
+  apiUrl: 'https://void.dbmk2.com',
 };
 
 /*

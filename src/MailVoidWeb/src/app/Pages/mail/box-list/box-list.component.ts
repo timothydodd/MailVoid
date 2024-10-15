@@ -45,6 +45,7 @@ export class BoxListComponent {
   selectedBox = model<string | null>();
   deleteEvent = output<string>();
   clickBox(box: string) {
+    debugger;
     this.selectedBox.set(box);
   }
   deleteClick(item: string) {

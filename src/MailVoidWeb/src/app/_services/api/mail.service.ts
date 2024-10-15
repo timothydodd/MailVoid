@@ -9,6 +9,7 @@ export class MailService {
     return this.http.get<string[]>(`${environment.apiUrl}/api/mail/boxes`);
   }
   getEmails(options: FilterOptions | undefined) {
+    if (!options) options = { to: null };
     return this.http.post<Mail[]>(`${environment.apiUrl}/api/mail`, options);
   }
   getEmail(id: string) {
@@ -19,7 +20,7 @@ export class MailService {
   }
 }
 export interface FilterOptions {
-  to: string;
+  to: string | null;
 }
 export interface Mail {
   id: number;

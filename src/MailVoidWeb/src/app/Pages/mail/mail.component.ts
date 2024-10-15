@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { switchMap } from 'rxjs';
+import { catchError, of, switchMap } from 'rxjs';
 import { FilterOptions, Mail, MailService } from '../../_services/api/mail.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
@@ -62,7 +62,9 @@ export class MailComponent {
     toObservable(this.selectedBox)
       .pipe(
         switchMap((selectedBox) =>
-          this.mailService.getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined)
+          this.mailService
+            .getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined)
+            .pipe(catchError(() => of([])))
         ),
         takeUntilDestroyed()
       )

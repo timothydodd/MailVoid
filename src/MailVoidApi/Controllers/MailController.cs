@@ -42,10 +42,10 @@ public class MailController : ControllerBase
 
     }
     [HttpPost]
-    public async Task<IActionResult> GetMails([FromBody] FilterOptions? options)
+    public async Task<IActionResult> GetMails([FromBody] FilterOptions? options = null)
     {
 
-
+        options ??= new FilterOptions();
         using (var db = _dbFactory.OpenDbConnection())
         {
 
