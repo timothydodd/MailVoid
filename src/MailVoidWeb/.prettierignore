@@ -3,4 +3,3 @@ coverage
 e2e
 node_modules
 dist
-package-lock.json

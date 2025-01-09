@@ -68,7 +68,7 @@ export class MailComponent {
           this.mailService.getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined).pipe(
             map((emails) => {
               return emails.sort((a, b) => {
-                return new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime();
+                     return new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime();
               });
             }),
             catchError(() => of([]))
