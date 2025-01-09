@@ -2,18 +2,21 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { catchError, of, switchMap } from 'rxjs';
+import { LucideAngularModule } from 'lucide-angular';
+import { catchError, map, of, switchMap } from 'rxjs';
 import { FilterOptions, Mail, MailService } from '../../_services/api/mail.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
 @Component({
   selector: 'app-mail',
   standalone: true,
-  imports: [CommonModule, BoxListComponent],
+  imports: [CommonModule, BoxListComponent, LucideAngularModule],
   template: `
     <div class="container d-flex flex-row flex-grow-1">
       <div class="left-side">
-        <h3>Mailboxes</h3>
+        <div class="tool-bar">
+          <button class="btn btn-icon align-self-end"><lucide-icon name="cog"></lucide-icon></button>
+        </div>
         <app-box-list
           [mailboxes]="mailboxes()"
           [(selectedBox)]="selectedBox"
@@ -62,9 +65,14 @@ export class MailComponent {
     toObservable(this.selectedBox)
       .pipe(
         switchMap((selectedBox) =>
-          this.mailService
-            .getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined)
-            .pipe(catchError(() => of([])))
+          this.mailService.getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined).pipe(
+            map((emails) => {
+              return emails.sort((a, b) => {
+                return new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime();
+              });
+            }),
+            catchError(() => of([]))
+          )
         ),
         takeUntilDestroyed()
       )

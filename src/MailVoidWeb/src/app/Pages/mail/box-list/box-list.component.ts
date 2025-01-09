@@ -8,10 +8,10 @@ import { LucideAngularModule } from 'lucide-angular';
   standalone: true,
   imports: [CommonModule, LucideAngularModule, NgbModule],
   template: `
-    <ul class="list-group">
+
       @if (mailboxView()) {
         @for (item of mailboxView(); track item.id) {
-          <li class="list-group-item">
+          <div class="list-group-item">
             <button class="btn btn-link" (click)="clickBox(item.name)">{{ item.name }}</button>
             <div ngbDropdown class="borderless-menu" placement="bottom-right" hover-stop-propagation>
               <button class="btn btn-outline-primary" ngbDropdownToggle click-stop-propagation>
@@ -20,11 +20,11 @@ import { LucideAngularModule } from 'lucide-angular';
               <div ngbDropdownMenu>
                 <button ngbDropdownItem click-stop-propagation (click)="deleteClick(item.name)">Delete</button>
               </div>
-            </div>
-          </li>
-        }
+                 </div>
+          </div>
+              }
       }
-    </ul>
+ 
   `,
   styleUrl: './box-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -1,6 +1,7 @@
 ﻿using MailVoidCommon;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using ServiceStack.Data;
 using ServiceStack.OrmLite;
 using ServiceStack.OrmLite.Dapper;
@@ -42,7 +43,7 @@ public class MailController : ControllerBase
 
     }
     [HttpPost]
-    public async Task<IActionResult> GetMails([FromBody] FilterOptions? options = null)
+    public async Task<IActionResult> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
     {
 
         options ??= new FilterOptions();

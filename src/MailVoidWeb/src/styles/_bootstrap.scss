@@ -1,0 +1,14 @@
+.borderless-menu {
+    .dropdown-menu {
+        padding: 0;
+        font-size: 13px;
+    }
+
+    .dropdown-toggle::after {
+        display: none;
+    }
+
+    .btn {
+        border: none;
+    }
+}

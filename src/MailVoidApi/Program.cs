@@ -57,6 +57,7 @@ public class Program
         builder.Services.AddScoped<DatabaseInitializer>();
         builder.Services.AddSingleton<PasswordService>();
         builder.Services.AddSingleton<AuthService>();
+
         builder.Services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

@@ -18,6 +18,8 @@ public class Mail
     public required string Subject { get; set; }
     public string? Charsets { get; set; }
     public DateTime CreatedOn { get; set; }
+    [Index]
+    public string? MailGroupPath { get; set; }
 }
 
 public class Contact

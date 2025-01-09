@@ -1,5 +1,6 @@
 :host {
-  display: contents;
+  display: flex;
+  flex-direction: column;
 
   .list-group-item {
     display: flex;

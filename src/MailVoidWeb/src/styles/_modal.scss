@@ -1,0 +1,14 @@
+.full-width-modal {
+
+    .modal-content,
+    .modal-dialog {
+        width: 95vw;
+        max-width: 95vw;
+        // overflow: hidden;
+        border-width: 0px;
+    }
+
+    .modal-content {
+        box-shadow: 3.8px 7.5px 7.5px hsl(0deg 0% 0% / 0.38);
+    }
+}

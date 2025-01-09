@@ -17,3 +17,10 @@
         overflow-x: hidden;
     }
 }
+
+.tool-bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    padding: 0px 10px;
+}

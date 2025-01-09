@@ -1,0 +1,33 @@
+.btn.btn-icon {
+    border: none;
+    background-color: unset;
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: unset;
+    margin: unset;
+    display: grid;
+    place-items: center;
+}
+
+.btn.btn-icon:hover {
+    color: var(--bs-primary);
+    border: none;
+    background-color: unset;
+}
+
+.image-button {
+    padding: 0;
+    border: none;
+    background-color: transparent;
+}
+
+.image-button img {
+    display: block;
+    max-width: 100%;
+    /* Makes the image responsive */
+}
+
+.btn-link {
+    cursor: pointer;
+    padding: 0;
+}
