@@ -21,8 +21,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 
 
 COPY . .
-RUN chmod +x ./api/replace_vars.sh
-RUN ./api/replace_vars.sh ./MailVoidWeb/src/environments
+RUN chmod +x ./MailVoidApi/replace_vars.sh
+RUN ./MailVoidApi/replace_vars.sh ./MailVoidWeb/src/environments
 
 WORKDIR "/src/MailVoidApi"
 RUN dotnet build "./MailVoidApi.csproj" -c $BUILD_CONFIGURATION -o /app/build
