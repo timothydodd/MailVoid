@@ -28,5 +28,5 @@ jobs:
         file: ./src/MailVoidApi/Dockerfile
         push: true
         tags: |
-          ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidapi:latest
-          ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidapi:${{ github.sha }}
+          ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidweb:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/mailvoidweb:${{ github.sha }}
