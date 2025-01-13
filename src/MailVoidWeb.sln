@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35027.167
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MailVoidCommon", "MailVoidCommon\MailVoidCommon.csproj", "{274613CB-F384-4053-A226-EC1A39EA5EEC}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MailVoidApi", "MailVoidApi\MailVoidApi.csproj", "{3C87D35D-304F-483D-9A70-35047B12948C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "github", "github", "{EE73BCAA-E137-4FEE-986C-7517FA93B709}"
@@ -12,20 +10,24 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "github", "github", "{EE73BC
 		..\.github\workflows\main.yml = ..\.github\workflows\main.yml
 	EndProjectSection
 EndProject
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "void-web", "MailVoidWeb\void-web.esproj", "{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{274613CB-F384-4053-A226-EC1A39EA5EEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{274613CB-F384-4053-A226-EC1A39EA5EEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{274613CB-F384-4053-A226-EC1A39EA5EEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{274613CB-F384-4053-A226-EC1A39EA5EEC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3C87D35D-304F-483D-9A70-35047B12948C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3C87D35D-304F-483D-9A70-35047B12948C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3C87D35D-304F-483D-9A70-35047B12948C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3C87D35D-304F-483D-9A70-35047B12948C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

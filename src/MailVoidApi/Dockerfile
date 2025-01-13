@@ -10,9 +10,20 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["MailVoidApi/MailVoidApi.csproj", "MailVoidApi/"]
-COPY ["MailVoidCommon/MailVoidCommon.csproj", "MailVoidCommon/"]
+COPY ["MailVoidWeb/void-web.esproj", "MailVoidWeb/"]
 RUN dotnet restore "./MailVoidApi/MailVoidApi.csproj"
+
+# Install Node.js and Angular CLI
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g @angular/cli@18
+
+
+
 COPY . .
+RUN chmod +x ./api/replace_vars.sh
+RUN ./api/replace_vars.sh ./MailVoidWeb/src/environments
+
 WORKDIR "/src/MailVoidApi"
 RUN dotnet build "./MailVoidApi.csproj" -c $BUILD_CONFIGURATION -o /app/build
 

@@ -4,7 +4,7 @@ using System.Text;
 using MailVoidApi.Common;
 using MailVoidApi.Data;
 using MailVoidApi.Services;
-using MailVoidCommon;
+using MailVoidWeb;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
@@ -20,7 +20,7 @@ public class Program
     [Obsolete]
     public static void Main(string[] args)
     {
-        var builder = WebApplication.CreateSlimBuilder(args);
+        var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddRequestDecompression();
         builder.Services.AddResponseCompression(options =>
         {
@@ -41,7 +41,8 @@ public class Program
         builder.Services.AddHostedService<BackgroundWorkerService>();
         builder.Services.AddControllers();
         builder.Services.AddMemoryCache();
-
+        // Register HttpContextAccessor
+        builder.Services.AddHttpContextAccessor();
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
         if (connectionString is null)
@@ -108,7 +109,8 @@ public class Program
         builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
         builder.Services.AddResponseCaching();
         builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
-
+        builder.Services.AddScoped<MailGroupService>();
+        builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddSingleton<TimedCache>();
         builder.Services.AddLogging(logging =>
         {
@@ -174,9 +176,11 @@ public class Program
         app.UseResponseCompression();
         app.UseAuthentication();
         app.UseAuthorization();
-        // Map controllers
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
         app.MapControllers();
         app.UseHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });
+        app.MapFallbackToFile("/index.html");
 
 
         app.Run();

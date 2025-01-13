@@ -2,8 +2,10 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, map, of, switchMap } from 'rxjs';
+import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
 import { FilterOptions, Mail, MailService } from '../../_services/api/mail.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
@@ -15,7 +17,9 @@ import { BoxListComponent } from './box-list/box-list.component';
     <div class="container d-flex flex-row flex-grow-1">
       <div class="left-side">
         <div class="tool-bar">
-          <button class="btn btn-icon align-self-end"><lucide-icon name="cog"></lucide-icon></button>
+          <button class="btn btn-icon align-self-end" (click)="openMailSettings()">
+            <lucide-icon name="cog"></lucide-icon>
+          </button>
         </div>
         <app-box-list
           [mailboxes]="mailboxes()"
@@ -60,6 +64,7 @@ export class MailComponent {
   mailboxes = signal<string[] | null>(null);
   emails = signal<Mail[] | null>(null);
   selectedBox = signal<string | null>(null);
+  ngbModal = inject(NgbModal);
 
   constructor() {
     toObservable(this.selectedBox)
@@ -68,7 +73,7 @@ export class MailComponent {
           this.mailService.getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined).pipe(
             map((emails) => {
               return emails.sort((a, b) => {
-                     return new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime();
+                return new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime();
               });
             }),
             catchError(() => of([]))
@@ -80,6 +85,9 @@ export class MailComponent {
         this.emails.set(selectedBox);
       });
     this.refreshMail();
+  }
+  openMailSettings() {
+    MailSettingsModalComponent.showModal(this.ngbModal).subscribe();
   }
   refreshMail() {
     this.mailService.getMailboxes().subscribe((mailboxes) => {

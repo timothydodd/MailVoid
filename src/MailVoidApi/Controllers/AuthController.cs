@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 using MailVoidApi.Services;
-using MailVoidCommon.Data.Models;
+using MailVoidWeb.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ServiceStack.Data;

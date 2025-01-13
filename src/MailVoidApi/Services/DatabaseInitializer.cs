@@ -1,6 +1,6 @@
 ﻿using MailVoidApi.Services;
-using MailVoidCommon;
-using MailVoidCommon.Data.Models;
+using MailVoidWeb;
+using MailVoidWeb.Data.Models;
 using ServiceStack.Data;
 using ServiceStack.OrmLite;
 

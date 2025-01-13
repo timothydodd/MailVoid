@@ -1,6 +1,6 @@
 ﻿using ServiceStack.DataAnnotations;
 
-namespace MailVoidCommon.Data.Models;
+namespace MailVoidWeb.Data.Models;
 
 public class User
 {

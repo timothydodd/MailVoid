@@ -18,6 +18,12 @@ export class MailService {
   deleteBoxes(options: FilterOptions | undefined) {
     return this.http.delete(`${environment.apiUrl}/api/mail/boxes`, { body: options });
   }
+  getMailGroups() {
+    return this.http.get<MailGroup[]>(`${environment.apiUrl}/api/mail/groups`);
+  }
+  saveMailGroup(mailGroup: MailGroup) {
+    return this.http.post<MailGroup>(`${environment.apiUrl}/api/mail/groups`, mailGroup);
+  }
 }
 export interface FilterOptions {
   to: string | null;
@@ -31,4 +37,12 @@ export interface Mail {
   subject: string;
   charsets: string | null;
   createdOn: string;
+}
+
+export interface MailGroup {
+  id: number;
+  path: string;
+  rules: string | null;
+  ownerUserId: string;
+  isPublic: boolean;
 }

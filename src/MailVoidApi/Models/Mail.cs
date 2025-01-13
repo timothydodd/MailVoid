@@ -1,6 +1,6 @@
 ﻿using ServiceStack.DataAnnotations;
 
-namespace MailVoidCommon;
+namespace MailVoidWeb;
 
 
 public class Mail

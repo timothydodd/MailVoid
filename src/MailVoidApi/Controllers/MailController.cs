@@ -1,4 +1,5 @@
-﻿using MailVoidCommon;
+﻿using MailVoidApi.Services;
+using MailVoidWeb;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -14,10 +15,14 @@ public class MailController : ControllerBase
 {
     private readonly ILogger<MailController> _logger;
     private readonly IDbConnectionFactory _dbFactory;
-    public MailController(ILogger<MailController> logger, IDbConnectionFactory dbFactory)
+    private readonly MailGroupService _mailGroupService;
+    private readonly IUserService _userService;
+    public MailController(ILogger<MailController> logger, IDbConnectionFactory dbFactory, MailGroupService mailGroupService, IUserService userService)
     {
         _logger = logger;
         _dbFactory = dbFactory;
+        _mailGroupService = mailGroupService;
+        _userService = userService;
     }
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMail(long id)
@@ -73,8 +78,58 @@ public class MailController : ControllerBase
             return Ok();
         }
     }
-}
+    [HttpGet("groups")]
+    public async Task<IActionResult> GetMailGroups()
+    {
+        using (var db = _dbFactory.OpenDbConnection())
+        {
+            var groups = await db.SelectAsync<MailGroup>();
+            return Ok(groups);
+        }
+    }
+    [HttpPost("groups")]
+    public async Task<IActionResult> SaveMailGroup([FromBody] MailGroupRequest groupRequest)
+    {
 
+        var group = groupRequest.ToMailGroup(_userService.GetUserId());
+        if (group.Id == 0)
+        {
+            using (var db = _dbFactory.OpenDbConnection())
+            {
+
+                group.Id = await db.InsertAsync(group);
+            }
+        }
+        else
+        {
+            using (var db = _dbFactory.OpenDbConnection())
+            {
+                var query = "UPDATE MailGroup SET Path = @Path, Rules = @Rules WHERE Id = @Id";
+                await db.ExecuteAsync(query, group);
+            }
+        }
+        await _mailGroupService.UpdateMailsByMailGroupPattern(group);
+        return Ok();
+    }
+
+}
+public record MailGroupRequest
+{
+    public long? Id { get; set; }
+    public required string Path { get; set; }
+    public required string Rules { get; set; }
+
+    public MailGroup ToMailGroup(Guid userId)
+    {
+        return new MailGroup()
+        {
+            Id = Id ?? 0,
+            Path = Path,
+            Rules = Rules,
+            OwnerUserId = userId
+        };
+    }
+}
 public class FilterOptions
 {
     public string? To { get; set; }

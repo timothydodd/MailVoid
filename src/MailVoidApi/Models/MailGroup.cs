@@ -1,7 +1,7 @@
-﻿using MailVoidCommon.Data.Models;
+﻿using MailVoidWeb.Data.Models;
 using ServiceStack.DataAnnotations;
 
-namespace MailVoidCommon
+namespace MailVoidWeb
 {
     public class MailGroup
     {
@@ -10,7 +10,6 @@ namespace MailVoidCommon
         public long Id { get; set; }
         [Index(Unique = true)]
         public required string Path { get; set; }
-        [Index(Unique = true)]
         public string? Rules { get; set; }
         [References(typeof(User))]
         public required Guid OwnerUserId { get; set; }

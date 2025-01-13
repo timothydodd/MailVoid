@@ -1,4 +1,4 @@
-﻿using MailVoidCommon.Data.Models;
+﻿using MailVoidWeb.Data.Models;
 using Microsoft.AspNetCore.Identity;
 
 namespace MailVoidApi.Services;

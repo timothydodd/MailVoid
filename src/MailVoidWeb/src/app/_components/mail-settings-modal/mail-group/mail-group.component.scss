@@ -1,0 +1,14 @@
+:host {
+  display: flex;
+  flex-direction: row;
+
+  .mail-group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+  }
+}

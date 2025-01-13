@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 
-namespace MailVoidCommon;
+namespace MailVoidWeb;
 public class TimedCache
 {
     private readonly IMemoryCache _cache;

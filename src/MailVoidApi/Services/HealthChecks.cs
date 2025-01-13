@@ -4,7 +4,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 
 
-namespace MailVoidCommon;
+namespace MailVoidWeb;
 
 public static class HealthCheck
 {
