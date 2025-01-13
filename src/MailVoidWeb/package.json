@@ -9,7 +9,8 @@
     "test": "ng test",
     "local": "ng serve --configuration local",
     "lint": "eslint . --ext .ts,.html",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prod": "ng build --configuration production"
   },
   "private": true,
   "dependencies": {
