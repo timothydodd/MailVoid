@@ -33,8 +33,10 @@ cd src/MailVoidApi
 
 - Update the appsettings.json file with your MySQL and JwtSettings config the Secret must be a SymmetricSecurityKey.
 ```
-dotnet run
+dotnet run 
 ```
+This will also run the front end.
+
 
 ## Frontend
 - Navigate to the Web project directory:
