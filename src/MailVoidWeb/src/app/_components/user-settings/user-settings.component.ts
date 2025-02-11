@@ -16,6 +16,7 @@ import { ChangePasswordComponent } from './change-password/change-password.compo
       <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" (click)="closeClick()"></button>
     </div>
     <div class="modal-body  d-flex flex-column gap20">
+      <
       <h5>Change Password</h5>
       @if (changePassword()) {
         <app-change-password (saveEvent)="changePassword.set(false)"></app-change-password>

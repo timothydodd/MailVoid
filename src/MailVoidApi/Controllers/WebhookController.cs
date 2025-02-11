@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using MailVoidApi.Common;
 using MailVoidApi.Services;
-using MailVoidWeb;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ServiceStack.Data;
@@ -17,11 +16,13 @@ public class WebhookController : ControllerBase
     private readonly ILogger<WebhookController> _logger;
     private readonly IDbConnectionFactory _dbFactory;
     private readonly IBackgroundTaskQueue _taskQueue;
-    public WebhookController(ILogger<WebhookController> logger, IBackgroundTaskQueue taskQueue, IDbConnectionFactory dbFactory)
+    private readonly IMailGroupService _mailGroupService;
+    public WebhookController(ILogger<WebhookController> logger, IBackgroundTaskQueue taskQueue, IDbConnectionFactory dbFactory, IMailGroupService mailGroupService)
     {
         _logger = logger;
         _taskQueue = taskQueue;
         _dbFactory = dbFactory;
+        _mailGroupService = mailGroupService;
     }
     [AllowAnonymous]
     [HttpPost("mail")]
@@ -75,9 +76,9 @@ SELECT @Id,@To,@From,@FromName,@ToOthers,@Text,@IsHtml,@Subject,@Charsets,@Creat
 WHERE
 NOT EXISTS (SELECT 1 FROM Mail Where Id=@Id)";
 
-                await db.ExecuteAsync(query, new
+                var mail = new Mail()
                 {
-                    email.Id,
+                    Id = email.Id,
                     To = to,
                     From = fromContact.From,
                     FromName = fromContact.Name,
@@ -87,7 +88,9 @@ NOT EXISTS (SELECT 1 FROM Mail Where Id=@Id)";
                     Subject = email?.Subject ?? "",
                     Charsets = email?.Charsets ?? "",
                     CreatedOn = email?.CreatedOn ?? DateTime.UtcNow
-                });
+                };
+                await _mailGroupService.SetMailPath(mail);
+                await db.ExecuteAsync(query, mail);
             }
             // Replace email text unicode into non-unicode text
 

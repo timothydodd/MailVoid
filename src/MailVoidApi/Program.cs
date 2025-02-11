@@ -109,7 +109,7 @@ public class Program
         builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
         builder.Services.AddResponseCaching();
         builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
-        builder.Services.AddScoped<MailGroupService>();
+        builder.Services.AddScoped<IMailGroupService, MailGroupService>();
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddSingleton<TimedCache>();
         builder.Services.AddLogging(logging =>

@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbModal, NgbModalOptions, NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { LucideAngularModule } from 'lucide-angular';
-import { from } from 'rxjs';
+import { from, tap } from 'rxjs';
 import { AuthService } from '../../_services/auth-service';
 
 @Component({
@@ -48,7 +48,7 @@ export class LoginComponent {
   login() {
     this.authService.login(this.userName, this.password).subscribe({
       next: () => {
-        this.activeModal.close();
+        this.closeClick();
       },
       error: (error) => {
         const message = error.status == 401 ? 'Invalid UserName or Password' : 'An error occurred';
@@ -64,7 +64,7 @@ export class LoginComponent {
 
     const modalRef = modalService.open(LoginComponent, modalOption);
 
-    return from(modalRef.result as Promise<ReasonResponse>);
+    return from(modalRef.result as Promise<ReasonResponse>).pipe(tap(() => modalService.dismissAll()));
   }
 }
 export interface ReasonResponse {

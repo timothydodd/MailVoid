@@ -1,4 +1,5 @@
-﻿using MailVoidApi.Services;
+﻿using MailVoidApi.Common;
+using MailVoidApi.Services;
 using MailVoidWeb;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,9 +16,10 @@ public class MailController : ControllerBase
 {
     private readonly ILogger<MailController> _logger;
     private readonly IDbConnectionFactory _dbFactory;
-    private readonly MailGroupService _mailGroupService;
+    private readonly IMailGroupService _mailGroupService;
     private readonly IUserService _userService;
-    public MailController(ILogger<MailController> logger, IDbConnectionFactory dbFactory, MailGroupService mailGroupService, IUserService userService)
+
+    public MailController(ILogger<MailController> logger, IDbConnectionFactory dbFactory, IMailGroupService mailGroupService, IUserService userService)
     {
         _logger = logger;
         _dbFactory = dbFactory;
@@ -38,30 +40,53 @@ public class MailController : ControllerBase
         }
     }
     [HttpGet("boxes")]
-    public async Task<IEnumerable<string>> GetBoxes()
+    public async Task<IEnumerable<MailBox>> GetBoxes()
     {
         using (var db = _dbFactory.OpenDbConnection())
         {
-            var boxes = await db.SelectAsync<string>("SELECT DISTINCT Mail.To FROM Mail");
-            return boxes;
+            var boxes = await db.SelectAsync<Mail>("SELECT DISTINCT Mail.To,Mail.MailGroupPath FROM Mail");
+            return boxes.Select(x =>
+            {
+                return new MailBox()
+                {
+                    Name = x.To,
+                    Path = x.MailGroupPath
+                };
+            });
         }
 
     }
     [HttpPost]
-    public async Task<IActionResult> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
+    public async Task<PagedResults<Mail>> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
     {
+        var results = new PagedResults<Mail>();
+
 
         options ??= new FilterOptions();
         using (var db = _dbFactory.OpenDbConnection())
         {
 
+
+            var p = new
+            {
+                To = options.To,
+                Offset = (options.Page - 1) * options.PageSize,
+                PageSize = options.PageSize
+            };
             var query = "select * FROM Mail";
-            if (!string.IsNullOrEmpty(options?.To))
+            if (!string.IsNullOrEmpty(options.To))
             {
                 query += " WHERE Mail.To = @To";
             }
+            if (options.PageSize == 1)
+            {
+                var countQuery = $"Select Count(b.*) From ({query}) as b";
+                results.TotalCount = await db.QuerySingleAsync<long>(query, p);
+            }
+            query += " ORDER BY CreatedOn DESC LIMIT @PageSize OFFSET @Offset";
 
-            return Ok(await db.QueryAsync<Mail>(query, new { To = options?.To }));
+            results.Items = await db.QueryAsync<Mail>(query, p);
+            return results;
         }
     }
     [HttpDelete("boxes")]
@@ -132,10 +157,13 @@ public record MailGroupRequest
 }
 public class FilterOptions
 {
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 50;
     public string? To { get; set; }
 }
-public class MailViewModel
+public class MailBox
 {
-    public required List<string> Mailboxes { get; set; }
-    public required List<Mail> Emails { get; set; }
+    public string? Path { get; set; }
+    public required string Name { get; set; }
+
 }

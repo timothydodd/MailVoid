@@ -4,9 +4,9 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { LucideAngularModule } from 'lucide-angular';
-import { catchError, map, of, switchMap } from 'rxjs';
+import { catchError, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
-import { FilterOptions, Mail, MailService } from '../../_services/api/mail.service';
+import { FilterOptions, Mail, MailBoxGroups, MailService } from '../../_services/api/mail.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
 @Component({
@@ -61,7 +61,7 @@ import { BoxListComponent } from './box-list/box-list.component';
 export class MailComponent {
   router = inject(Router);
   mailService = inject(MailService);
-  mailboxes = signal<string[] | null>(null);
+  mailboxes = signal<MailBoxGroups[] | null>(null);
   emails = signal<Mail[] | null>(null);
   selectedBox = signal<string | null>(null);
   ngbModal = inject(NgbModal);
@@ -70,19 +70,14 @@ export class MailComponent {
     toObservable(this.selectedBox)
       .pipe(
         switchMap((selectedBox) =>
-          this.mailService.getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined).pipe(
-            map((emails) => {
-              return emails.sort((a, b) => {
-                return new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime();
-              });
-            }),
-            catchError(() => of([]))
-          )
+          this.mailService
+            .getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined)
+            .pipe(catchError(() => of({ items: null, totalCount: 0 })))
         ),
         takeUntilDestroyed()
       )
       .subscribe((selectedBox) => {
-        this.emails.set(selectedBox);
+        this.emails.set(selectedBox?.items);
       });
     this.refreshMail();
   }
