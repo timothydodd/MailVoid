@@ -8,6 +8,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "github", "github", "{EE73BCAA-E137-4FEE-986C-7517FA93B709}"
 	ProjectSection(SolutionItems) = preProject
 		..\.github\workflows\main.yml = ..\.github\workflows\main.yml
+		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "void-web", "MailVoidWeb\void-web.esproj", "{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}"
