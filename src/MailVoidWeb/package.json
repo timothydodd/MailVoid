@@ -31,7 +31,7 @@
     "@ng-select/ng-select": "^14.2.6",
     "bootstrap": "^5.3.5",
     "date-fns": "^4.1.0",
-    "lucide-angular": "^0.487.0",
+    "lucide-angular": "^0.488.0",
     "ngx-toastr": "^19.0.0",
     "ngx-valdemort": "^13.0.0",
     "ngxtension": "^5.0.0",
