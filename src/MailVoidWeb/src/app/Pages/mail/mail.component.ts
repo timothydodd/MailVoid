@@ -2,7 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
@@ -12,49 +11,55 @@ import { BoxListComponent } from './box-list/box-list.component';
 @Component({
   selector: 'app-mail',
   standalone: true,
-  imports: [CommonModule, BoxListComponent, LucideAngularModule],
+  imports: [CommonModule, BoxListComponent, LucideAngularModule, MailSettingsModalComponent],
   template: `
-    <div class="container d-flex flex-row flex-grow-1">
+    <div class="container d-flex flex-row flex-grow">
       <div class="left-side">
-        <div class="tool-bar">
-          <button class="btn btn-icon align-self-end" (click)="openMailSettings()">
-            <lucide-icon name="cog"></lucide-icon>
-          </button>
+        <div class="section-card">
+          <div class="section-header">
+            <button class="btn btn-icon align-self-end" (click)="mailSettings.show()">
+              <lucide-icon name="cog"></lucide-icon>
+            </button>
+          </div>
+          <div class="section-body">
+            <app-box-list
+              [mailboxes]="mailboxes()"
+              [(selectedBox)]="selectedBox"
+              (deleteEvent)="deleteBox($event)"
+            ></app-box-list>
+          </div>
         </div>
-        <app-box-list
-          [mailboxes]="mailboxes()"
-          [(selectedBox)]="selectedBox"
-          (deleteEvent)="deleteBox($event)"
-        ></app-box-list>
       </div>
-      <div class="right-side">
-        <h3>Emails</h3>
-        <table class="table table-striped">
-          <thead>
-            <tr>
-              <th>From</th>
-              <th>To</th>
-              <th>Subject</th>
-              <th>Created On</th>
-            </tr>
-          </thead>
-          <tbody>
-            @if (emails()) {
-              @for (email of emails(); track email.id) {
-                <tr>
-                  <td>{{ email.from }}</td>
-                  <td>{{ email.to }}</td>
-                  <td>
-                    <a class="btn-link" (click)="clickMail(email)">{{ email.subject }}</a>
-                  </td>
-                  <td>{{ email.createdOn | date: 'short' }}</td>
-                </tr>
+      <div class="right-side ">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>Subject</th>
+                <th>Created On</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (emails()) {
+                @for (email of emails(); track email.id) {
+                  <tr (click)="clickMail(email)">
+                    <td>{{ email.from }}</td>
+                    <td>{{ email.to }}</td>
+                    <td>
+                      {{ email.subject }}
+                    </td>
+                    <td>{{ email.createdOn | date: 'short' }}</td>
+                  </tr>
+                }
               }
-            }
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
+    <app-mail-settings-modal #mailSettings></app-mail-settings-modal>
   `,
   styleUrl: './mail.component.scss',
 })
@@ -64,7 +69,6 @@ export class MailComponent {
   mailboxes = signal<MailBoxGroups[] | null>(null);
   emails = signal<Mail[] | null>(null);
   selectedBox = signal<string | null>(null);
-  ngbModal = inject(NgbModal);
 
   constructor() {
     toObservable(this.selectedBox)
@@ -81,9 +85,7 @@ export class MailComponent {
       });
     this.refreshMail();
   }
-  openMailSettings() {
-    MailSettingsModalComponent.showModal(this.ngbModal).subscribe();
-  }
+
   refreshMail() {
     this.mailService.getMailboxes().subscribe((mailboxes) => {
       this.mailboxes.set(mailboxes);

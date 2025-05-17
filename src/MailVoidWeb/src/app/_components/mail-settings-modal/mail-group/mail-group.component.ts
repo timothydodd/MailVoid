@@ -1,14 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import {
-  AbstractControl,
-  FormArray,
-  FormControl,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-  ValidationErrors,
-  ValidatorFn,
-  Validators,
+    AbstractControl,
+    FormArray,
+    FormControl,
+    FormGroup,
+    FormsModule,
+    ReactiveFormsModule,
+    ValidationErrors,
+    ValidatorFn,
+    Validators,
 } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ValdemortModule } from 'ngx-valdemort';
@@ -18,7 +18,7 @@ import { InputSwitchComponent } from '../../input-switch/input-switch.component'
   selector: 'app-mail-group',
   imports: [ReactiveFormsModule, FormsModule, ValdemortModule, InputSwitchComponent, NgSelectModule],
   template: `
-    <div class="flex-column gap20 flex-grow-1">
+    <div class="flex-column gap20 flex-grow">
       <div class="toolbar">
         <button class="btn btn-primary" (click)="newForm()">Add</button>
       </div>
@@ -30,7 +30,7 @@ import { InputSwitchComponent } from '../../input-switch/input-switch.component'
         }
       </div>
     </div>
-    <div class="flex-column gap20 flex-grow-1">
+    <div class="flex-column gap20 flex-grow">
       @if (selectedMailGroup(); as mg) {
         <div [formGroup]="mg">
           <div class="control-row">

@@ -1,14 +1,9 @@
-.borderless-menu {
-    .dropdown-menu {
-        padding: 0;
-        font-size: 13px;
-    }
+.dropdown-item.active-link {
+    background-color: var(--primary);
+    color: white;
+}
 
-    .dropdown-toggle::after {
-        display: none;
-    }
-
-    .btn {
-        border: none;
-    }
+.dropdown-item:hover {
+    background-color: var(--secondary);
+    color: white;
 }

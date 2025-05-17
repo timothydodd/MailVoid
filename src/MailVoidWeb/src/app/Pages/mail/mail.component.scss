@@ -1,4 +1,5 @@
 .container {
+    padding-top: 20px;
     gap: 20px;
 
     .left-side {
@@ -6,21 +7,18 @@
         flex-direction: column;
         min-width: 10%;
         max-width: 30%;
-        overflow-x: hidden;
-
+     
+    .section-body{
+        padding: 5px;
+    
+    }
     }
 
     .right-side {
         display: flex;
         flex-direction: column;
-        min-width: 70%;
-        overflow-x: hidden;
+  
+        
     }
 }
 
-.tool-bar {
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-end;
-    padding: 0px 10px;
-}

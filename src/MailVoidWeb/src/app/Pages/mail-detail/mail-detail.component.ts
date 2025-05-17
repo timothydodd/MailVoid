@@ -10,43 +10,51 @@ import { Mail, MailService } from '../../_services/api/mail.service';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './mail-detail.component.html',
-  styleUrl: './mail-detail.component.scss'
+  styleUrl: './mail-detail.component.scss',
 })
 export class MailDetailComponent {
-
-  mail = signal<Mail|null>(null);
+  mail = signal<Mail | null>(null);
   mailService = inject(MailService);
-private route = inject(ActivatedRoute);
-  emailContent =viewChild<ElementRef<HTMLIFrameElement>>('emailContent');
-  constructor(){
-        this.route.paramMap
-        .pipe(filter(x=>!!x.get('id')), switchMap(x=>this.mailService.getEmail(<string>x.get('id'))),takeUntilDestroyed()).subscribe(d => {
-          this.mail.set(d);
-    });
+  private route = inject(ActivatedRoute);
+  emailContent = viewChild<ElementRef<HTMLIFrameElement>>('emailContent');
+  constructor() {
+    this.route.paramMap
+      .pipe(
+        filter((x) => !!x.get('id')),
+        switchMap((x) => this.mailService.getEmail(<string>x.get('id'))),
+        takeUntilDestroyed()
+      )
+      .subscribe((d) => {
+        this.mail.set(d);
+      });
     var mailItem = toObservable(this.mail).pipe(takeUntilDestroyed());
 
-    toObservable(this.emailContent).pipe(filter(x=>!!x),take(1),
-      switchMap((emailContent) =>{
+    toObservable(this.emailContent)
+      .pipe(
+        filter((x) => !!x),
+        take(1),
+        switchMap((emailContent) => {
+          return mailItem.pipe(
+            filter((x) => !!x),
+            take(1),
+            map((x) => {
+              return {
+                emailContent,
+                mail: x,
+              };
+            })
+          );
+        }),
+        takeUntilDestroyed()
+      )
 
-        return mailItem.pipe(filter(x=>!!x),take(1),map((x)=>{
-        
-          return {
-            emailContent,
-            mail:x
-          }
-        }));
-      }),
-      takeUntilDestroyed())
-    
-    .subscribe((x) => {
-
-      var emailContent = x?.emailContent.nativeElement;
-      if(x.mail?.isHtml)
-      {
-      emailContent?.contentWindow?.document.open();
-      emailContent?.contentWindow?.document.write(x.mail.text);
-      emailContent?.contentWindow?.document.close();
-      }
-    });
+      .subscribe((x) => {
+        var emailContent = x?.emailContent.nativeElement;
+        if (x.mail?.isHtml) {
+          emailContent?.contentWindow?.document.open();
+          emailContent?.contentWindow?.document.write(x.mail.text);
+          emailContent?.contentWindow?.document.close();
+        }
+      });
   }
 }

@@ -1,14 +1,22 @@
 :host {
-  display: flex;
-  flex-direction: column;
-
+  color: var(--secondary);
+display: contents;
   .list-group-item {
     display: flex;
     flex-direction: row;
-    justify-content: start;
+    justify-content: space-between;
     padding: 5px;
   }
-
+  .btn-link{
+    color: rgb(197, 197, 197);
+    font-size: medium;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    &:hover{
+      color: var(--primary);
+    }
+  }
   .borderless-menu {
     margin-left: auto;
   }

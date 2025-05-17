@@ -1,47 +1,45 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
 
-import { NgbModal, NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { LucideAngularModule } from 'lucide-angular';
 import { take } from 'rxjs';
 import { AuthService, User } from '../../_services/auth-service';
+import { ClickOutsideDirective } from '../../_services/click-outside.directive';
+import { ModalService } from '../modal/modal.service';
 import { UserSettingsComponent } from '../user-settings/user-settings.component';
 
 @Component({
   selector: 'app-user-menu',
   standalone: true,
-  imports: [CommonModule, NgbModule, LucideAngularModule, UserSettingsComponent],
+  imports: [CommonModule, LucideAngularModule, UserSettingsComponent, ClickOutsideDirective],
   template: `
     @if (user()) {
-      <div class="dropdown" ngbDropdown display="dynamic" #userMenu="ngbDropdown">
-        <a class="dropdown-toggle" id="avatar-dd" ngbDropdownToggle>
-          <div class="avatar-wrap">
-            <div class="avatar" style="width: 40px">
-              <lucide-icon name="user"></lucide-icon>
-            </div>
-          </div>
-        </a>
-        <div aria-labelledby="avatar-dd" class="user-menu" ngbDropdownMenu>
-          <div class="mainMenu">
-            <div class="user-menu-info">
-              <div class="avatar-spacer">
-                <div class="avatar-wrap">
-                  <div class="avatar" style="width: 80px">
-                    <lucide-icon name="user"></lucide-icon>
-                  </div>
+      <button type="button" class="btn-icon" (click)="isOpen.set(!isOpen())">
+        <lucide-angular name="square-menu"></lucide-angular>
+      </button>
+      @if (isOpen()) {
+        <div class="menu" appClickOutside (clickOutside)="isOpen.set(false)" [delayTime]="200">
+          <div class="user-menu-info">
+            <div class="avatar-spacer">
+              <div class="avatar-wrap">
+                <div class="avatar" style="width: 80px">
+                  <lucide-icon name="user"></lucide-icon>
                 </div>
               </div>
-              <div class="basic-info">
-                <div class="u-name">{{ user()?.userName }}</div>
-              </div>
+            </div>
+            <div class="basic-info">
+              <div class="u-name">{{ user()?.userName }}</div>
             </div>
           </div>
-          <div class="dropdown-divider"></div>
-          <button class="dropdown-item" (click)="Settings()">Settings</button>
-          <div class="dropdown-divider"></div>
-          <button class="dropdown-item" (click)="logOut()">LogOut</button>
+
+          <div class="divider"></div>
+          <button dropdown-item (click)="settings.show()">Settings</button>
+          <div class="divider"></div>
+          <button dropdown-item (click)="logOut()">LogOut</button>
         </div>
-      </div>
+      }
+
+      <app-user-settings #settings></app-user-settings>
     }
   `,
   styleUrl: './user-menu.component.scss',
@@ -49,9 +47,11 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
 })
 export class UserMenuComponent {
   authService = inject(AuthService);
-  modalService = inject(NgbModal);
+  modalService = inject(ModalService);
+  modalFooter = viewChild<TemplateRef<any>>('modalFooter');
+  modalBody = viewChild<TemplateRef<any>>('modalBody');
   user = signal<User | null>(null);
-
+  isOpen = signal(false);
   constructor() {
     this.authService
       .getUser()
@@ -60,9 +60,7 @@ export class UserMenuComponent {
         this.user.update(() => user);
       });
   }
-  Settings() {
-    UserSettingsComponent.showModal(this.modalService);
-  }
+
   logOut() {
     this.authService.logout();
   }

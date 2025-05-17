@@ -1,0 +1,11 @@
+:host {
+  display: block;
+  position: relative;
+  .menu{
+    position: absolute;
+    width: auto;
+    top: 20px;
+    right: 0;
+    padding: 5px;
+  }
+}

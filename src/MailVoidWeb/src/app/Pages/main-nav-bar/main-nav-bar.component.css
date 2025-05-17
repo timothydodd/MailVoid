@@ -1,0 +1,37 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bGDark);
+}
+.container{
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0px;
+}
+
+.btn-icon::after {
+  content: none;
+  display: none;
+}
+@media screen and (max-width: 768px) {
+  :host {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 0;
+    position: relative;
+    gap: 20px;
+  }
+  :host app-main-menu {
+    position: absolute;
+    top: 18px;
+    right: 10px;
+  }
+  ::ng-deep app-share-link-display {
+    display: block;
+    width: 100%;
+  }
+}
