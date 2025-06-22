@@ -1,10 +1,12 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.IO.Compression;
 using System.Text;
+using MailVoidApi.Authentication;
 using MailVoidApi.Data;
 using MailVoidApi.Services;
 using MailVoidWeb;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
@@ -67,7 +69,8 @@ public class Program
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        }).AddJwtBearer(options =>
+        })
+        .AddJwtBearer(options =>
         {
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
             options.TokenValidationParameters = new TokenValidationParameters
@@ -108,6 +111,17 @@ public class Program
                     return Task.CompletedTask;
                 }
             };
+        })
+        .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>("ApiKey", options => { });
+
+        // Add authorization policies
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy("ApiKey", policy =>
+            {
+                policy.AuthenticationSchemes.Add("ApiKey");
+                policy.RequireAuthenticatedUser();
+            });
         });
 
         builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);

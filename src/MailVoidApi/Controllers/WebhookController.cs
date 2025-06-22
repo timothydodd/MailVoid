@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.RegularExpressions;
+using MailVoidApi.Authentication;
 using MailVoidApi.Common;
 using MailVoidApi.Data;
 using MailVoidApi.Services;
@@ -24,7 +25,7 @@ public class WebhookController : ControllerBase
         _context = context;
         _mailGroupService = mailGroupService;
     }
-    [AllowAnonymous]
+    [ApiKey]
     [HttpPost("mail")]
     public IActionResult EmailWebhook([FromForm] EmailModel email)
     {

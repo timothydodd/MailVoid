@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
-import { ClickOutsideDirective } from '../../../../_services/click-outside.directive';
 import { MailService } from '../../../../_services/api/mail.service';
+import { ClickOutsideDirective } from '../../../../_services/click-outside.directive';
 
 @Component({
   selector: 'app-box-menu',
@@ -18,7 +18,7 @@ import { MailService } from '../../../../_services/api/mail.service';
           </button>
         } @else {
           <button dropdown-item (click)="unclaimClick()">
-            <lucide-angular name="inbox-x" size="16"></lucide-angular>
+            <lucide-angular name="upload" size="16"></lucide-angular>
             Release Mailbox
           </button>
         }
@@ -33,33 +33,33 @@ import { MailService } from '../../../../_services/api/mail.service';
 })
 export class BoxMenuComponent {
   private mailService = inject(MailService);
-  
+
   isOpen = signal(false);
   item = input.required<string>();
   groupName = input<string>('');
   deleteEvent = output<string>();
   claimEvent = output<string>();
   unclaimEvent = output<string>();
-  
+
   isEmailClaimed() {
     return this.groupName() === 'My Boxes';
   }
-  
+
   deleteClick() {
     this.deleteEvent.emit(this.item());
     this.close();
   }
-  
+
   claimClick() {
     this.claimEvent.emit(this.item());
     this.close();
   }
-  
+
   unclaimClick() {
     this.unclaimEvent.emit(this.item());
     this.close();
   }
-  
+
   close() {
     this.isOpen.set(false);
   }

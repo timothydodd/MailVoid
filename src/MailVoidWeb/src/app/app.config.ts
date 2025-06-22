@@ -4,7 +4,23 @@ import { provideRouter } from '@angular/router';
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
 import { JwtModule } from '@auth0/angular-jwt';
-import { Cog, EllipsisVertical, Inbox, LucideAngularModule, SquareMenu, User, X } from 'lucide-angular';
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Cog,
+  EllipsisVertical,
+  Inbox,
+  LucideAngularModule,
+  Pencil,
+  PlusCircle,
+  SquareMenu,
+  Trash2,
+  UploadIcon,
+  User,
+  X
+} from 'lucide-angular';
 import { provideToastr } from 'ngx-toastr';
 import { environment } from '../environments/environment';
 import { JwtInterceptor } from './_services/jwt-interceptor';
@@ -34,7 +50,24 @@ export const appConfig: ApplicationConfig = {
         },
       })
     ),
-    importProvidersFrom(LucideAngularModule.pick({ EllipsisVertical, X, User, Cog, SquareMenu, Inbox })),
+    importProvidersFrom(
+      LucideAngularModule.pick({
+        EllipsisVertical,
+        X,
+        User,
+        Cog,
+        SquareMenu,
+        Inbox,
+        ChevronDown,
+        ChevronUp,
+        ChevronLeft,
+        ChevronRight,
+        PlusCircle,
+        Pencil,
+        Trash2,
+        UploadIcon,
+      })
+    ),
     provideToastr(),
   ],
 };

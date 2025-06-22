@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  mailvoid-smtp:
+    build: .
+    container_name: mailvoid-smtp-server
+    ports:
+      - "2525:25"  # Map to 2525 on host to avoid conflicts
+    environment:
+      - SmtpServer__Port=25
+      - SmtpServer__Name=MailVoid SMTP Server
+      - MailVoidApi__BaseUrl=http://host.docker.internal:5133
+      - MailVoidApi__WebhookEndpoint=/api/webhook/mail
+      - MailVoidApi__ApiKey=${MAILVOID_API_KEY}
+      - Logging__LogLevel__Default=Information
+    restart: unless-stopped
+    networks:
+      - mailvoid-network
+
+networks:
+  mailvoid-network:
+    driver: bridge

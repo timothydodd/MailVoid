@@ -19,6 +19,7 @@
 // Shiki
 // Only applied if using a defined Shiki theme
 
+// ng-select theme variables
 $ng-select-input-text: #f8f8f2;
 $ng-select-highlight: #bd93f9;
 $ng-select-primary-text: #f8f8f2;
@@ -27,14 +28,12 @@ $ng-select-border: #191A21;
 $ng-select-bg: #424450;
 $ng-select-selected: #343746;
 $ng-select-dropdown-optgroup-marked: $ng-select-input-text;
-
-//$ng-select-marked-text: $ng-select-primary-text;
-//$ng-select-dropdown-optgroup-text: $ng-select-primary-text;
 $ng-select-dropdown-option-text: $ng-select-primary-text;
-//$ng-select-dropdown-optgroup-marked: $ng-select-input-text;
 
+// Import base ng-select theme
+@import "@ng-select/ng-select/themes/default.theme.css";
 
-
+// Import custom ng-select overrides
 @import "../src/styles/ng-select.scss";
 
 

@@ -5,7 +5,9 @@
       "Bash(export PATH=\"$HOME/.dotnet:$PATH\")",
       "Bash(dotnet build)",
       "Bash(timeout:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(dotnet new:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

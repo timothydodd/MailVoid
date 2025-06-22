@@ -23,12 +23,13 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
                   <button class="mailbox-button" (click)="clickBox(item)" [title]="item">
                     <span class="mailbox-name">{{ item }}</span>
                   </button>
-                  <app-box-menu 
-                    [item]="item" 
+                  <app-box-menu
+                    [item]="item"
                     [groupName]="group.groupName"
                     (deleteEvent)="deleteEvent.emit($event)"
                     (claimEvent)="claimEvent.emit($event)"
-                    (unclaimEvent)="unclaimEvent.emit($event)">
+                    (unclaimEvent)="unclaimEvent.emit($event)"
+                  >
                   </app-box-menu>
                 </div>
               }
@@ -51,28 +52,28 @@ export class BoxListComponent {
   deleteEvent = output<string>();
   claimEvent = output<string>();
   unclaimEvent = output<string>();
-  
+
   sortedMailboxes = computed(() => {
     const mb = this.mailboxes();
     if (!mb) return null;
-    
+
     return [...mb].sort((a, b) => {
       // Put ungrouped items (empty or default group names) at the bottom
       const aIsUngrouped = !a.groupName || a.groupName === 'Ungrouped' || a.groupName === '';
       const bIsUngrouped = !b.groupName || b.groupName === 'Ungrouped' || b.groupName === '';
-      
+
       if (aIsUngrouped && !bIsUngrouped) return 1;
       if (!aIsUngrouped && bIsUngrouped) return -1;
-      
+
       // Both are grouped or both are ungrouped, sort alphabetically
       return a.groupName.localeCompare(b.groupName);
     });
   });
-  
+
   clickBox(box: string) {
     this.selectedBox.set(box);
   }
-  
+
   deleteClick(item: string) {
     console.log('Deleted: ', item);
     this.deleteEvent.emit(item);

@@ -43,25 +43,37 @@ type SortDirection = 'asc' | 'desc';
                 <th class="sortable" (click)="toggleSort('from')">
                   From
                   @if (sortColumn() === 'from') {
-                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                    <lucide-icon
+                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                      size="14"
+                    ></lucide-icon>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('to')">
                   To
                   @if (sortColumn() === 'to') {
-                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                    <lucide-icon
+                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                      size="14"
+                    ></lucide-icon>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('subject')">
                   Subject
                   @if (sortColumn() === 'subject') {
-                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                    <lucide-icon
+                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                      size="14"
+                    ></lucide-icon>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('createdOn')">
                   Created On
                   @if (sortColumn() === 'createdOn') {
-                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                    <lucide-icon
+                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                      size="14"
+                    ></lucide-icon>
                   }
                 </th>
               </tr>
@@ -84,15 +96,17 @@ type SortDirection = 'asc' | 'desc';
         </div>
         @if (totalPages() > 1) {
           <div class="pagination-controls">
-            <button class="btn btn-sm" (click)="previousPage()" [disabled]="currentPage() === 1">
-              <lucide-icon name="chevron-left" size="16"></lucide-icon>
-              Previous
-            </button>
-            <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
-            <button class="btn btn-sm" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
-              Next
-              <lucide-icon name="chevron-right" size="16"></lucide-icon>
-            </button>
+            <div>
+              <button class="btn" (click)="previousPage()" [disabled]="currentPage() === 1">
+                <lucide-icon name="chevron-left" size="14"></lucide-icon>
+                Previous
+              </button>
+              <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
+              <button class="btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+                Next
+                <lucide-icon name="chevron-right" size="14"></lucide-icon>
+              </button>
+            </div>
           </div>
         }
       </div>
@@ -107,59 +121,59 @@ export class MailComponent {
   mailboxes = signal<MailBoxGroups[] | null>(null);
   emails = signal<Mail[] | null>(null);
   selectedBox = signal<string | null>(null);
-  
+
   // Sorting
   sortColumn = signal<SortColumn>('createdOn');
   sortDirection = signal<SortDirection>('desc');
-  
+
   // Pagination
   currentPage = signal(1);
-  itemsPerPage = 100;
-  
+  itemsPerPage = 20;
+
   sortedEmails = computed(() => {
     const emails = this.emails();
     if (!emails) return null;
-    
+
     const sorted = [...emails].sort((a, b) => {
       const column = this.sortColumn();
       const direction = this.sortDirection();
-      
+
       let aVal: any = a[column];
       let bVal: any = b[column];
-      
+
       // Handle date sorting
       if (column === 'createdOn') {
         aVal = new Date(aVal).getTime();
         bVal = new Date(bVal).getTime();
       }
-      
+
       // Handle string sorting (case insensitive)
       if (typeof aVal === 'string') {
         aVal = aVal.toLowerCase();
         bVal = bVal.toLowerCase();
       }
-      
+
       if (aVal < bVal) return direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-    
+
     return sorted;
   });
-  
+
   totalPages = computed(() => {
     const emails = this.sortedEmails();
     if (!emails) return 0;
     return Math.ceil(emails.length / this.itemsPerPage);
   });
-  
+
   paginatedEmails = computed(() => {
     const emails = this.sortedEmails();
     if (!emails) return null;
-    
+
     const start = (this.currentPage() - 1) * this.itemsPerPage;
     const end = start + this.itemsPerPage;
-    
+
     return emails.slice(start, end);
   });
 
@@ -197,7 +211,6 @@ export class MailComponent {
     });
   }
 
-
   claimMailbox(emailAddress: string) {
     this.mailService.claimMailbox(emailAddress).subscribe({
       next: () => {
@@ -207,7 +220,7 @@ export class MailComponent {
       error: (error) => {
         console.error('Error claiming mailbox:', error);
         // You could add a toast notification service here for better UX
-      }
+      },
     });
   }
 
@@ -220,10 +233,10 @@ export class MailComponent {
       error: (error) => {
         console.error('Error unclaiming mailbox:', error);
         // You could add a toast notification service here for better UX
-      }
+      },
     });
   }
-  
+
   toggleSort(column: SortColumn) {
     if (this.sortColumn() === column) {
       // Toggle direction if same column
@@ -234,16 +247,16 @@ export class MailComponent {
       this.sortDirection.set(column === 'createdOn' ? 'desc' : 'asc');
     }
   }
-  
+
   nextPage() {
     if (this.currentPage() < this.totalPages()) {
-      this.currentPage.update(page => page + 1);
+      this.currentPage.update((page) => page + 1);
     }
   }
-  
+
   previousPage() {
     if (this.currentPage() > 1) {
-      this.currentPage.update(page => page - 1);
+      this.currentPage.update((page) => page - 1);
     }
   }
 }
