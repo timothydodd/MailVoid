@@ -1,33 +1,45 @@
-﻿using ServiceStack.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MailVoidWeb;
 
-
 public class Mail
 {
-    [PrimaryKey]
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public long Id { get; set; }
-    [Index]
+    
+    [Required]
     public required string To { get; set; }
+    
+    [Required]
     public required string Text { get; set; }
+    
     public bool IsHtml { get; set; }
-    [Index]
+    
+    [Required]
     public required string From { get; set; }
+    
     public string? FromName { get; set; }
     public string? ToOthers { get; set; }
+    
+    [Required]
     public required string Subject { get; set; }
+    
     public string? Charsets { get; set; }
     public DateTime CreatedOn { get; set; }
-    [Index]
     public string? MailGroupPath { get; set; }
 }
 
 public class Contact
 {
-    [PrimaryKey]
-    [AutoIncrement]
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public long Id { get; set; }
-    [Index(Unique = true)]
+    
+    [Required]
     public required string From { get; set; }
+    
+    [Required]
     public required string Name { get; set; }
 }

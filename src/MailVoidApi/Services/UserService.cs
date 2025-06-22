@@ -1,5 +1,5 @@
 ﻿using System.Security.Claims;
-
+using System.IdentityModel.Tokens.Jwt;
 
 namespace MailVoidApi.Services;
 
@@ -20,8 +20,11 @@ public class UserService : IUserService
         if (httpContext?.User?.Identity is not ClaimsIdentity identity)
             throw new UnauthorizedAccessException("User not authenticated");
 
-        // Extract the User ID claim (commonly "sub" or "userId")
-        var userIdClaim = identity.FindFirst("userId"); // Adjust as per your JWT claim setup
+        // Extract the User ID claim from standard 'sub' claim or NameIdentifier as backup
+        var userIdClaim = identity.FindFirst(JwtRegisteredClaimNames.Sub) ?? 
+                         identity.FindFirst(ClaimTypes.NameIdentifier) ??
+                         identity.FindFirst("sub");
+        
         userIdClaim.ThrowIfNull("Invalid User Id");
 
         return Guid.Parse(userIdClaim.Value);

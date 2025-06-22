@@ -1,41 +1,45 @@
-﻿using MailVoidApi.Services;
-using MailVoidWeb;
+﻿using MailVoidApi.Data;
+using MailVoidApi.Services;
 using MailVoidWeb.Data.Models;
-using ServiceStack.Data;
-using ServiceStack.OrmLite;
+using Microsoft.EntityFrameworkCore;
 
-namespace MailVoidApi.Data;
+namespace MailVoidApi.Services;
 
 public class DatabaseInitializer
 {
-    private readonly IDbConnectionFactory _dbFactory;
+    private readonly MailVoidDbContext _context;
     private readonly PasswordService _passwordService;
 
-    public DatabaseInitializer(IDbConnectionFactory dbFactory, PasswordService passwordService)
+    public DatabaseInitializer(MailVoidDbContext context, PasswordService passwordService)
     {
-        _dbFactory = dbFactory;
+        _context = context;
         _passwordService = passwordService;
     }
 
-    public void CreateTable()
+    public async Task SeedDefaultData()
     {
-        using (var db = _dbFactory.OpenDbConnection())
+        // Check if admin user already exists
+        var adminUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == "admin");
+        if (adminUser == null)
         {
-            db.CreateTableIfNotExists<Mail>();
-            db.CreateTableIfNotExists<Contact>();
-            db.CreateTableIfNotExists<MailGroup>();
-            if (db.CreateTableIfNotExists<User>())
+            var user = new User
             {
-                var user = new User
-                {
-                    Id = Guid.NewGuid(),
-                    UserName = "admin",
-                    PasswordHash = "",
-                    TimeStamp = DateTime.UtcNow
-                };
-                user.PasswordHash = _passwordService.HashPassword(user, "admin");
-                db.Insert(user);
-            }
+                Id = Guid.NewGuid(),
+                UserName = "admin",
+                PasswordHash = "",
+                TimeStamp = DateTime.UtcNow,
+                Role = Role.Admin
+            };
+            user.PasswordHash = _passwordService.HashPassword(user, "admin");
+            
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+        }
+        else if (adminUser.Role != Role.Admin)
+        {
+            // Update existing admin user to have Admin role
+            adminUser.Role = Role.Admin;
+            await _context.SaveChangesAsync();
         }
     }
 }

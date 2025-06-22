@@ -1,13 +1,18 @@
 /* You can add global styles to this file, and also import other style files */
 
 
+@use "styles/_button.scss";
+@use "styles/_forms.scss";
+@use "styles/_alerts.scss";
+@use "styles/_layouts.scss";
+@use "styles/_scaffolding.scss";
+@use "styles/_bootstrap.scss";
+@use "styles/menu.scss";
 @import url("styles/css-vars.css");
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap');
-@import url("styles/_button.scss");
-@import url("styles/_scaffolding.scss");
-@import url("styles/_bootstrap.scss");
+
 @import url("styles/cards.css");
-@import url("styles/menu.scss");
+
 @import url("styles/table.css");
 // scss-docs-end theme-color-dark-variables
 
@@ -127,20 +132,4 @@ h4 {
     font-size: calc(1.275rem + 0.3vw);
 }
 
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-input {
-    font-size: 1rem;
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-
-    &:focus {
-        outline: none;
-        border-color: var(--primary);
-    }
-}
+/* Form styles have been moved to _forms.scss */

@@ -1,24 +1,22 @@
-﻿using System.Data;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.IO.Compression;
 using System.Text;
-using MailVoidApi.Common;
 using MailVoidApi.Data;
 using MailVoidApi.Services;
 using MailVoidWeb;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.IdentityModel.Tokens;
-using ServiceStack.Data;
-using ServiceStack.OrmLite;
-using ServiceStack.OrmLite.Dapper;
 
 namespace MailVoidApi;
 
 public class Program
 {
     [Obsolete]
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddRequestDecompression();
@@ -49,15 +47,21 @@ public class Program
         {
             throw new InvalidOperationException("Connection string not found");
         }
-        var dbFactory = new OrmLiteConnectionFactory(connectionString, MySqlDialect.Provider);
 
-        builder.Services.AddSingleton<IDbConnectionFactory>(dbFactory);
-        builder.Services.AddTransient<IDbConnection>(sp => sp.GetRequiredService<IDbConnectionFactory>().OpenDbConnection());
+        // Add Entity Framework DbContext
+        builder.Services.AddDbContext<MailVoidDbContext>(options =>
+            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
+                mysqlOptions => mysqlOptions.MigrationsAssembly("MailVoidApi")));
 
 
         builder.Services.AddScoped<DatabaseInitializer>();
         builder.Services.AddSingleton<PasswordService>();
+        builder.Services.AddScoped<RefreshTokenService>();
         builder.Services.AddSingleton<AuthService>();
+
+        // Prevent automatic claim type mapping
+        JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+        JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
 
         builder.Services.AddAuthentication(options =>
         {
@@ -74,8 +78,8 @@ public class Program
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtSettings["Issuer"],
                 ValidAudience = jwtSettings["Audience"],
-
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Secret"]))
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Secret"])),
+                ClockSkew = TimeSpan.FromMinutes(5) // Allow 5 minute clock skew
             };
             options.Events = new JwtBearerEvents
             {
@@ -111,6 +115,8 @@ public class Program
         builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
         builder.Services.AddScoped<IMailGroupService, MailGroupService>();
         builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<IClaimedMailboxService, ClaimedMailboxService>();
+        builder.Services.AddScoped<UserManagementService>();
         builder.Services.AddSingleton<TimedCache>();
         builder.Services.AddLogging(logging =>
         {
@@ -159,16 +165,64 @@ public class Program
 
 
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
-        SqlMapper.AddTypeHandler(new DateTimeHandler());
         var app = builder.Build();
         if (app.Environment.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
         }
+
+        // Initialize database
         using (var scope = app.Services.CreateScope())
         {
+            var context = scope.ServiceProvider.GetRequiredService<MailVoidDbContext>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+            try
+            {
+                logger.LogInformation("Testing database connection...");
+                var canConnect = context.Database.CanConnect();
+                logger.LogInformation("Database connection test: {CanConnect}", canConnect);
+
+                logger.LogInformation("Checking applied migrations...");
+                var appliedMigrations = context.Database.GetAppliedMigrations().ToList();
+                logger.LogInformation("Applied migrations: {AppliedMigrations}",
+                    appliedMigrations.Any() ? string.Join(", ", appliedMigrations) : "None");
+
+                logger.LogInformation("Checking migrations assembly info...");
+                var migrationsAssembly = context.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>();
+                logger.LogInformation("Migrations assembly: {Assembly}", migrationsAssembly.Assembly.FullName);
+
+                logger.LogInformation("Checking all migrations...");
+                var allMigrations = context.Database.GetMigrations().ToList();
+                logger.LogInformation("All available migrations: {AllMigrations}",
+                    allMigrations.Any() ? string.Join(", ", allMigrations) : "None");
+
+                logger.LogInformation("Checking for pending migrations...");
+                var pendingMigrations = context.Database.GetPendingMigrations().ToList();
+
+                if (pendingMigrations.Any())
+                {
+                    logger.LogInformation("Found {Count} pending migrations: {Migrations}",
+                        pendingMigrations.Count, string.Join(", ", pendingMigrations));
+
+                    // Apply any pending migrations
+                    logger.LogInformation("Applying migrations...");
+                    context.Database.Migrate();
+                    logger.LogInformation("Migrations applied successfully.");
+                }
+                else
+                {
+                    logger.LogInformation("Database is up to date, no migrations to apply.");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error during database migration");
+                throw;
+            }
+
             var dbInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-            dbInitializer.CreateTable();
+            await dbInitializer.SeedDefaultData();
         }
         app.UseCors("MailVoidOrigins");
 

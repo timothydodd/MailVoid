@@ -53,7 +53,7 @@ export class ErrorPageComponent implements OnInit {
       });
   }
   btnRelogin() {
-    this.authService.logout();
+    // this.authService.logout();
   }
 }
 

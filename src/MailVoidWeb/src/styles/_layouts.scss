@@ -1,0 +1,307 @@
+/* Layout Components - Reusable layout patterns */
+
+/* Centered Container */
+.centered-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+/* Full Height Layout */
+.full-height {
+  min-height: 100vh;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Auth Layout (for login, register, forgot password, etc.) */
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--background);
+  padding: 1rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background-color: var(--bGDark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.auth-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem 1.5rem 1.5rem;
+  background-color: var(--bGLight);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.auth-logo {
+  width: 32px;
+  height: 32px;
+}
+
+.auth-title {
+  color: var(--foreground);
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 0;
+  font-family: "Roboto", sans-serif;
+}
+
+.auth-body {
+  padding: 2rem 1.5rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.auth-footer {
+  padding: 1rem 1.5rem;
+  text-align: center;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bGLight);
+}
+
+.auth-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.auth-link:hover {
+  color: var(--comment);
+  text-decoration: underline;
+}
+
+/* Split Layout */
+.split-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.split-left {
+  flex: 1;
+  background-color: var(--background);
+}
+
+.split-right {
+  flex: 1;
+  background-color: var(--bGDark);
+}
+
+/* Dashboard Layout */
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.dashboard-sidebar {
+  width: 250px;
+  background-color: var(--bGDark);
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.dashboard-main {
+  flex: 1;
+  background-color: var(--background);
+  overflow: auto;
+}
+
+.dashboard-content {
+  padding: 1.5rem;
+}
+
+/* Hero Section */
+.hero-section {
+  background-color: var(--bGDark);
+  color: var(--foreground);
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--foreground);
+}
+
+.hero-subtitle {
+  font-size: 1.25rem;
+  color: var(--comment);
+  margin-bottom: 2rem;
+}
+
+/* Feature Grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.feature-card {
+  background-color: var(--bGDark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.feature-icon {
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 1rem;
+  color: var(--primary);
+}
+
+.feature-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--foreground);
+}
+
+.feature-description {
+  color: var(--comment);
+  line-height: 1.6;
+}
+
+/* Page Header */
+.page-header {
+  background-color: var(--bGLight);
+  border-bottom: 1px solid var(--border-color);
+  padding: 1.5rem 2rem;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: var(--comment);
+  margin: 0.5rem 0 0;
+}
+
+/* Content Layout */
+.content-layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.content-narrow {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.content-wide {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Two Column Layout */
+.two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.three-column {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  .auth-container {
+    padding: 0.5rem;
+  }
+  
+  .auth-header {
+    padding: 1.5rem 1rem 1rem;
+  }
+  
+  .auth-body {
+    padding: 1.5rem 1rem;
+  }
+  
+  .auth-title {
+    font-size: 1.25rem;
+  }
+  
+  .dashboard-container {
+    flex-direction: column;
+  }
+  
+  .dashboard-sidebar {
+    width: 100%;
+    order: 2;
+  }
+  
+  .dashboard-main {
+    order: 1;
+  }
+  
+  .two-column,
+  .three-column {
+    grid-template-columns: 1fr;
+  }
+  
+  .hero-title {
+    font-size: 2rem;
+  }
+  
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+  
+  .split-layout {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .content-layout,
+  .content-narrow,
+  .content-wide {
+    padding: 1rem;
+  }
+  
+  .page-header {
+    padding: 1rem;
+  }
+  
+  .hero-section {
+    padding: 2rem 1rem;
+  }
+  
+  .feature-grid {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+}

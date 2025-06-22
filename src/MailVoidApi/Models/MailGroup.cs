@@ -1,18 +1,24 @@
 ﻿using MailVoidWeb.Data.Models;
-using ServiceStack.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MailVoidWeb
 {
     public class MailGroup
     {
-        [AutoIncrement]
-        [PrimaryKey]
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public long Id { get; set; }
-        [Index(Unique = true)]
+        
+        [Required]
         public required string Path { get; set; }
+        
         public string? Rules { get; set; }
-        [References(typeof(User))]
+        
+        [Required]
+        [ForeignKey("User")]
         public required Guid OwnerUserId { get; set; }
+        
         public bool IsPublic { get; set; }
     }
 
@@ -20,6 +26,5 @@ namespace MailVoidWeb
     {
         public required List<string> Patterns { get; set; }
         public int? MaxLifeTime { get; set; }
-
     }
 }

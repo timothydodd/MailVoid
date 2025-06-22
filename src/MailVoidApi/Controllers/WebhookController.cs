@@ -1,12 +1,11 @@
-﻿using System.Data;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using MailVoidApi.Common;
+using MailVoidApi.Data;
 using MailVoidApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ServiceStack.Data;
-using ServiceStack.OrmLite.Dapper;
+using Microsoft.EntityFrameworkCore;
 namespace MailVoidWeb.Controllers;
 
 [ApiController]
@@ -14,14 +13,15 @@ namespace MailVoidWeb.Controllers;
 public class WebhookController : ControllerBase
 {
     private readonly ILogger<WebhookController> _logger;
-    private readonly IDbConnectionFactory _dbFactory;
+    private readonly MailVoidDbContext _context;
     private readonly IBackgroundTaskQueue _taskQueue;
     private readonly IMailGroupService _mailGroupService;
-    public WebhookController(ILogger<WebhookController> logger, IBackgroundTaskQueue taskQueue, IDbConnectionFactory dbFactory, IMailGroupService mailGroupService)
+    
+    public WebhookController(ILogger<WebhookController> logger, IBackgroundTaskQueue taskQueue, MailVoidDbContext context, IMailGroupService mailGroupService)
     {
         _logger = logger;
         _taskQueue = taskQueue;
-        _dbFactory = dbFactory;
+        _context = context;
         _mailGroupService = mailGroupService;
     }
     [AllowAnonymous]
@@ -67,15 +67,10 @@ public class WebhookController : ControllerBase
             {
                 text = "SPAM";
             }
-            using (var db = _dbFactory.OpenDbConnection())
+            // Check if mail already exists
+            var existingMail = await _context.Mails.FindAsync(email.Id);
+            if (existingMail == null)
             {
-
-                var query = @"
-INSERT INTO Mail(Id,Mail.To,Mail.From,FromName,ToOthers,Text,IsHtml,Subject,Charsets,CreatedOn)
-SELECT @Id,@To,@From,@FromName,@ToOthers,@Text,@IsHtml,@Subject,@Charsets,@CreatedOn FROM DUAL
-WHERE
-NOT EXISTS (SELECT 1 FROM Mail Where Id=@Id)";
-
                 var mail = new Mail()
                 {
                     Id = email.Id,
@@ -90,7 +85,9 @@ NOT EXISTS (SELECT 1 FROM Mail Where Id=@Id)";
                     CreatedOn = email?.CreatedOn ?? DateTime.UtcNow
                 };
                 await _mailGroupService.SetMailPath(mail);
-                await db.ExecuteAsync(query, mail);
+                
+                _context.Mails.Add(mail);
+                await _context.SaveChangesAsync();
             }
             // Replace email text unicode into non-unicode text
 
@@ -103,98 +100,47 @@ NOT EXISTS (SELECT 1 FROM Mail Where Id=@Id)";
         List<Contact> newContacts = new List<Contact>();
         if (!string.IsNullOrEmpty(toOthers))
         {
-
-            using (var db = _dbFactory.OpenDbConnection())
+            var items = toOthers.Split(",");
+            foreach (var item in items)
             {
-
-                var items = toOthers.Split(",");
-                foreach (var item in items)
+                var contact = ParseContact(item);
+                if (!string.Equals(to, contact.From, StringComparison.OrdinalIgnoreCase))
                 {
-                    var contact = ParseContact(item);
-                    if (!string.Equals(to, contact.From, StringComparison.OrdinalIgnoreCase))
-                    {
-                        toOthersList.Add(contact.From);
-                    }
-                    newContacts.Add(contact);
+                    toOthersList.Add(contact.From);
                 }
-                if (newContacts.Count > 0)
+                newContacts.Add(contact);
+            }
+            
+            if (newContacts.Count > 0)
+            {
+                var fromAddresses = newContacts.Select(x => x.From).ToList();
+                var existingContacts = await _context.Contacts
+                    .Where(c => fromAddresses.Contains(c.From))
+                    .ToListAsync();
+
+                var contactsToInsert = new List<Contact>();
+                foreach (var contact in newContacts)
                 {
-                    var existingContactFroms = await GetExistingContacts(db, newContacts.Select(x => x.From));
-
-
-
-                    var updateContacts = new List<Contact>();
-                    var contactsToInsert = new List<Contact>();
-                    foreach (var contact in newContacts)
+                    var existingContact = existingContacts.FirstOrDefault(c => c.From == contact.From);
+                    if (existingContact != null && !string.IsNullOrEmpty(contact.Name) && existingContact.Name != contact.Name)
                     {
-                        var existingContact = existingContactFroms.FirstOrDefault(c => c.From == contact.From);
-                        if (existingContact != null && !string.IsNullOrEmpty(contact.Name) && existingContact.Name != contact.Name)
-                        {
-                            existingContact.Name = contact.Name;
-                            updateContacts.Add(existingContact);
-                        }
-                        else if (existingContact == null && !string.IsNullOrEmpty(contact.From))
-                        {
-                            contactsToInsert.Add(contact);
-                        }
+                        existingContact.Name = contact.Name;
                     }
-
-                    if (contactsToInsert.Any())
+                    else if (existingContact == null && !string.IsNullOrEmpty(contact.From))
                     {
-                        // Step 3: Add remaining contacts
-                        await InsertContacts(db, contactsToInsert);
-
+                        contactsToInsert.Add(contact);
                     }
-                    if (updateContacts.Any())
-                    {
-                        // Step 4: Update existing contacts
-                        await UpdateContacts(db, updateContacts);
-                    }
-
                 }
+
+                if (contactsToInsert.Any())
+                {
+                    _context.Contacts.AddRange(contactsToInsert);
+                }
+                
+                await _context.SaveChangesAsync();
             }
         }
         return toOthersList;
-    }
-    private async Task InsertContacts(IDbConnection con, IEnumerable<Contact> contacts)
-    {
-        if (contacts.Any())
-        {
-            foreach (var contact in contacts)
-            {
-                var query = $@"INSERT INTO Contact (Name, Contact.From) VALUES (@Name, @From)";
-                await con.ExecuteAsync(query, contact);
-            }
-
-        }
-    }
-    private async Task UpdateContacts(IDbConnection con, IEnumerable<Contact> contacts)
-    {
-        if (contacts.Any())
-        {
-            foreach (var contact in contacts)
-            {
-                var query = $@"UPDATE Contact SET Name = @Name WHERE Id = @Id";
-                await con.ExecuteAsync(query, contact);
-            }
-        }
-    }
-    private async Task<IEnumerable<Contact>> GetExistingContacts(IDbConnection con, IEnumerable<string> contacts)
-    {
-        WhereBuilder whereClause = new();
-        var dynamicParameters = new DynamicParameters();
-        if (contacts.Any())
-        {
-            List<string> keys = dynamicParameters.AddList(contacts, "cp");
-            var ids = string.Join(',', keys);
-            whereClause.AppendAnd($"c.FROM IN ({ids})");
-        }
-        else
-        {
-            return new List<Contact>();
-        }
-        var query = $@"SELECT * FROM Contact c {whereClause}";
-        return await con.QueryAsync<Contact>(query, dynamicParameters);
     }
     private Contact ParseContact(string contact)
     {

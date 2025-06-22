@@ -1,0 +1,112 @@
+﻿using MailVoidApi.Models;
+using MailVoidWeb;
+using MailVoidWeb.Data.Models;
+using MailVoidWeb.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace MailVoidApi.Data;
+
+public class MailVoidDbContext : DbContext
+{
+    public MailVoidDbContext(DbContextOptions<MailVoidDbContext> options) : base(options)
+    {
+    }
+
+    public DbSet<User> Users { get; set; }
+    public DbSet<Mail> Mails { get; set; }
+    public DbSet<MailGroup> MailGroups { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<Contact> Contacts { get; set; }
+    public DbSet<ClaimedMailbox> ClaimedMailboxes { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // User configuration
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("User");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserName).IsUnique();
+            entity.Property(e => e.PasswordHash).HasMaxLength(255);
+            entity.Property(e => e.UserName).IsRequired();
+        });
+
+        // Mail configuration
+        modelBuilder.Entity<Mail>(entity =>
+        {
+            entity.ToTable("Mail");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.To);
+            entity.HasIndex(e => e.From);
+            entity.HasIndex(e => e.MailGroupPath);
+            entity.Property(e => e.To).IsRequired();
+            entity.Property(e => e.Text).IsRequired();
+            entity.Property(e => e.From).IsRequired();
+            entity.Property(e => e.Subject).IsRequired();
+            entity.Property(e => e.CreatedOn).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        // MailGroup configuration
+        modelBuilder.Entity<MailGroup>(entity =>
+        {
+            entity.ToTable("MailGroup");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Path).IsUnique();
+            entity.Property(e => e.Path).IsRequired();
+            entity.Property(e => e.OwnerUserId).IsRequired();
+
+            // Foreign key relationship to User
+            entity.HasOne<User>()
+                  .WithMany()
+                  .HasForeignKey(e => e.OwnerUserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // RefreshToken configuration
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("RefreshToken");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.Token, e.UserId });
+            entity.HasIndex(e => e.Token);
+            entity.Property(e => e.Token).IsRequired();
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.CreatedDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Foreign key relationship to User
+            entity.HasOne<User>()
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Contact configuration
+        modelBuilder.Entity<Contact>(entity =>
+        {
+            entity.ToTable("Contact");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.From).IsUnique();
+            entity.Property(e => e.From).IsRequired();
+            entity.Property(e => e.Name).IsRequired();
+        });
+
+        // ClaimedMailbox configuration
+        modelBuilder.Entity<ClaimedMailbox>(entity =>
+        {
+            entity.ToTable("ClaimedMailbox");
+            entity.HasKey(e => e.Id);
+            // Indexes are created manually in migration due to longtext key length requirements
+            entity.Property(e => e.EmailAddress).IsRequired();
+            entity.Property(e => e.UserId).IsRequired();
+            // ClaimedOn will be set in code, no database default needed
+
+            // Foreign key relationship to User
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+}

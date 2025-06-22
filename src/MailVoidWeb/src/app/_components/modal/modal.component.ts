@@ -14,8 +14,12 @@ import { ModalService } from './modal.service';
       <div class="modal-container">
         <div class="modal" [@fadeInOut]>
           <div class="modal-header">
-            <h4 class="modal-title">{{ title() }}</h4>
-
+            @if (headerTemplate()) {
+              <ng-container *ngTemplateOutlet="headerTemplate()!"></ng-container>
+            } @else {
+              <h4 class="modal-title">{{ title() }}</h4>
+            }
+            
             <button class="close" aria-label="Close" (click)="close(false)">
               <lucide-angular name="x"></lucide-angular>
             </button>
@@ -63,6 +67,7 @@ export class ModalComponent {
   modalService = inject(ModalService);
   footerTemplate = signal<TemplateRef<any> | null | undefined>(null);
   bodyTemplate = signal<TemplateRef<any> | null | undefined>(null);
+  headerTemplate = signal<TemplateRef<any> | null | undefined>(null);
   isOpen = signal(false);
   title = signal<string | null>(null);
   constructor() {
@@ -71,12 +76,18 @@ export class ModalComponent {
         this.isOpen.set(true);
         this.bodyTemplate.set(x.bodyTemplate);
         this.footerTemplate.set(x.footerTemplate);
+        this.headerTemplate.set(x.headerTemplate);
         this.title.set(x.title);
+        // Prevent background scrolling
+        document.body.style.overflow = 'hidden';
       } else {
         this.isOpen.set(false);
         this.bodyTemplate.set(null);
         this.footerTemplate.set(null);
+        this.headerTemplate.set(null);
         this.title.set(null);
+        // Restore background scrolling
+        document.body.style.overflow = '';
       }
     });
   }

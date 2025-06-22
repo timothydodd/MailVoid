@@ -1,10 +1,10 @@
 ﻿using System.Text.Json;
 using System.Text.RegularExpressions;
+using MailVoidApi.Data;
 using MailVoidWeb;
+using MailVoidWeb.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using ServiceStack.Data;
-using ServiceStack.OrmLite;
-using ServiceStack.OrmLite.Dapper;
 
 namespace MailVoidApi.Services;
 
@@ -16,14 +16,14 @@ public interface IMailGroupService
 
 public class MailGroupService : IMailGroupService
 {
-
     private readonly ILogger<MailGroupService> _logger;
-    private readonly IDbConnectionFactory _dbFactory;
+    private readonly MailVoidDbContext _context;
     private readonly IMemoryCache _memoryCache;
-    public MailGroupService(ILogger<MailGroupService> logger, IDbConnectionFactory dbFactory, IMemoryCache memoryCache)
+    
+    public MailGroupService(ILogger<MailGroupService> logger, MailVoidDbContext context, IMemoryCache memoryCache)
     {
         _logger = logger;
-        _dbFactory = dbFactory;
+        _context = context;
         _memoryCache = memoryCache;
     }
 
@@ -33,24 +33,36 @@ public class MailGroupService : IMailGroupService
     {
         if (_memoryCache.TryGetValue(MailSetKey, out List<MailRuleSet>? ruleset))
         {
-
             return ruleset ?? new List<MailRuleSet>();
         }
-        using (var db = _dbFactory.OpenDbConnection())
+        
+        var mailGroups = await _context.MailGroups.ToListAsync();
+        var groups = mailGroups.Select(group =>
         {
-            var groups = (await db.SelectAsync<MailGroup>()).Select(group =>
-            {
-                return new MailRuleSet() { Path = group.Path, Rules = JsonSerializer.Deserialize<List<MailRule>>(group.Rules ?? "[]", JsonOptions) ?? new List<MailRule>() };
-
-
-            }).ToList();
-            _memoryCache.Set(groups, MailSetKey);
-            return groups ?? new List<MailRuleSet>();
-        }
-
+            return new MailRuleSet() 
+            { 
+                Path = group.Path, 
+                Rules = JsonSerializer.Deserialize<List<MailRule>>(group.Rules ?? "[]", JsonOptions) ?? new List<MailRule>() 
+            };
+        }).ToList();
+        
+        _memoryCache.Set(MailSetKey, groups);
+        return groups;
     }
     public async Task SetMailPath(Mail m)
     {
+        // First check if this email is claimed by a user
+        var claimedMailbox = await _context.ClaimedMailboxes
+            .Include(cm => cm.User)
+            .FirstOrDefaultAsync(cm => cm.EmailAddress == m.To && cm.IsActive);
+
+        if (claimedMailbox != null)
+        {
+            m.MailGroupPath = claimedMailbox.GetMailGroupPath(claimedMailbox.User!.UserName);
+            return;
+        }
+
+        // If not claimed, check mail group rules
         var sets = await this.GetMailRuleSets();
 
         foreach (var s in sets)
@@ -112,26 +124,34 @@ public class MailGroupService : IMailGroupService
 
         try
         {
-            var rs = new MailRuleSet() { Path = group.Path, Rules = JsonSerializer.Deserialize<List<MailRule>>(group.Rules, JsonOptions) ?? new List<MailRule>() };
-
+            var rs = new MailRuleSet() 
+            { 
+                Path = group.Path, 
+                Rules = JsonSerializer.Deserialize<List<MailRule>>(group.Rules, JsonOptions) ?? new List<MailRule>() 
+            };
 
             if (rs.Rules == null || rs.Rules.Count == 0)
                 return;
 
-            using var db = await _dbFactory.OpenDbConnectionAsync();
-            IEnumerable<Mail> mails = await db.QueryAsync<Mail>("SELECT * FROM Mail WHERE MailGroupPath IS NULL");
+            var mails = await _context.Mails
+                .Where(m => m.MailGroupPath == null)
+                .ToListAsync();
 
-
+            var updatedCount = 0;
             foreach (var m in mails)
             {
-
                 if (CheckMailRules(rs, m))
                 {
-                    await db.UpdateAsync(m);
+                    updatedCount++;
                 }
             }
 
-            _logger.LogInformation($"Updated {mails.Count()} mails for MailGroup {group.Id}.");
+            if (updatedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            _logger.LogInformation($"Updated {updatedCount} mails for MailGroup {group.Id}.");
         }
         catch (Exception ex)
         {

@@ -1,7 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using MailVoidApi.Controllers;
 using MailVoidWeb;
-using MailVoidWeb;
 
 [JsonSerializable(typeof(Mail))]
 [JsonSerializable(typeof(IEnumerable<Mail>))]

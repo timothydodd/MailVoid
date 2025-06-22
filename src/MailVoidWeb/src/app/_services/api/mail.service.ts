@@ -10,7 +10,26 @@ export class MailService {
     return this.http.get<MailBox[]>(`${environment.apiUrl}/api/mail/boxes`).pipe(
       map((boxes) => {
         const groups: MailBoxGroups[] = [{ groupName: '', mailBoxes: [] }];
+        
+        // Separate claimed and regular mailboxes
+        const claimedBoxes: string[] = [];
+        const regularBoxes: MailBox[] = [];
+        
         boxes.forEach((box) => {
+          if (box.path?.startsWith('user-')) {
+            claimedBoxes.push(box.name);
+          } else {
+            regularBoxes.push(box);
+          }
+        });
+        
+        // Add "My Boxes" section if there are claimed mailboxes
+        if (claimedBoxes.length > 0) {
+          groups.push({ groupName: 'My Boxes', mailBoxes: claimedBoxes });
+        }
+        
+        // Process regular mailboxes
+        regularBoxes.forEach((box) => {
           const groupName = box.path ?? '';
           const mailBoxName = box.name;
           const group = groups.find((g) => g.groupName === groupName);
@@ -20,6 +39,7 @@ export class MailService {
             groups.push({ groupName: groupName, mailBoxes: [mailBoxName] });
           }
         });
+        
         return groups;
       })
     );
@@ -38,6 +58,27 @@ export class MailService {
   }
   saveMailGroup(mailGroup: MailGroup) {
     return this.http.post<MailGroup>(`${environment.apiUrl}/api/mail/groups`, mailGroup);
+  }
+  
+  // Claimed Mailbox methods
+  getMyClaimedMailboxes() {
+    return this.http.get<ClaimedMailbox[]>(`${environment.apiUrl}/api/claimedmailbox/my-mailboxes`);
+  }
+  
+  getUnclaimedEmailAddresses() {
+    return this.http.get<string[]>(`${environment.apiUrl}/api/claimedmailbox/unclaimed`);
+  }
+  
+  claimMailbox(emailAddress: string) {
+    return this.http.post<ClaimedMailbox>(`${environment.apiUrl}/api/claimedmailbox/claim`, { emailAddress });
+  }
+  
+  unclaimMailbox(emailAddress: string) {
+    return this.http.delete(`${environment.apiUrl}/api/claimedmailbox/unclaim`, { body: { emailAddress } });
+  }
+  
+  isEmailClaimed(emailAddress: string) {
+    return this.http.get<boolean>(`${environment.apiUrl}/api/claimedmailbox/check/${encodeURIComponent(emailAddress)}`);
   }
 }
 export interface FilterOptions {
@@ -77,4 +118,11 @@ export interface MailBoxGroups {
 export interface MailRule {
   value: string;
   typeId: number;
+}
+
+export interface ClaimedMailbox {
+  id: number;
+  emailAddress: string;
+  claimedOn: string;
+  isActive: boolean;
 }

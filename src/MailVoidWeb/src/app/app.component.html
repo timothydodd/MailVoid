@@ -1,11 +1,10 @@
-@if (loggedIn()) {
+@if (authService.isLoggedIn | async) {
   <app-main-nav></app-main-nav>
-  <div class="container d-flex flex-column flex-grow">
-    <main role="main" class="pb-3 d-flex flex-column flex-grow">
-      <router-outlet />
-    </main>
-  </div>
-  <app-validation-defaults> </app-validation-defaults>
 }
-<app-login #loginModal></app-login>
+<div class="container d-flex flex-column flex-grow">
+  <main role="main" class="pb-3 d-flex flex-column flex-grow">
+    <router-outlet />
+  </main>
+</div>
+<app-validation-defaults> </app-validation-defaults>
 <app-modal> </app-modal>

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
@@ -7,6 +7,9 @@ import { catchError, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
 import { FilterOptions, Mail, MailBoxGroups, MailService } from '../../_services/api/mail.service';
 import { BoxListComponent } from './box-list/box-list.component';
+
+type SortColumn = 'from' | 'to' | 'subject' | 'createdOn';
+type SortDirection = 'asc' | 'desc';
 
 @Component({
   selector: 'app-mail',
@@ -17,7 +20,7 @@ import { BoxListComponent } from './box-list/box-list.component';
       <div class="left-side">
         <div class="section-card">
           <div class="section-header">
-            <button class="btn btn-icon align-self-end" (click)="mailSettings.show()">
+            <button class="btn btn-icon align-self-end" (click)="mailSettings.show()" title="Mail Settings">
               <lucide-icon name="cog"></lucide-icon>
             </button>
           </div>
@@ -26,6 +29,8 @@ import { BoxListComponent } from './box-list/box-list.component';
               [mailboxes]="mailboxes()"
               [(selectedBox)]="selectedBox"
               (deleteEvent)="deleteBox($event)"
+              (claimEvent)="claimMailbox($event)"
+              (unclaimEvent)="unclaimMailbox($event)"
             ></app-box-list>
           </div>
         </div>
@@ -35,15 +40,35 @@ import { BoxListComponent } from './box-list/box-list.component';
           <table>
             <thead>
               <tr>
-                <th>From</th>
-                <th>To</th>
-                <th>Subject</th>
-                <th>Created On</th>
+                <th class="sortable" (click)="toggleSort('from')">
+                  From
+                  @if (sortColumn() === 'from') {
+                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                  }
+                </th>
+                <th class="sortable" (click)="toggleSort('to')">
+                  To
+                  @if (sortColumn() === 'to') {
+                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                  }
+                </th>
+                <th class="sortable" (click)="toggleSort('subject')">
+                  Subject
+                  @if (sortColumn() === 'subject') {
+                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                  }
+                </th>
+                <th class="sortable" (click)="toggleSort('createdOn')">
+                  Created On
+                  @if (sortColumn() === 'createdOn') {
+                    <lucide-icon [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></lucide-icon>
+                  }
+                </th>
               </tr>
             </thead>
             <tbody>
-              @if (emails()) {
-                @for (email of emails(); track email.id) {
+              @if (paginatedEmails()) {
+                @for (email of paginatedEmails(); track email.id) {
                   <tr (click)="clickMail(email)">
                     <td>{{ email.from }}</td>
                     <td>{{ email.to }}</td>
@@ -57,6 +82,19 @@ import { BoxListComponent } from './box-list/box-list.component';
             </tbody>
           </table>
         </div>
+        @if (totalPages() > 1) {
+          <div class="pagination-controls">
+            <button class="btn btn-sm" (click)="previousPage()" [disabled]="currentPage() === 1">
+              <lucide-icon name="chevron-left" size="16"></lucide-icon>
+              Previous
+            </button>
+            <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
+            <button class="btn btn-sm" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+              Next
+              <lucide-icon name="chevron-right" size="16"></lucide-icon>
+            </button>
+          </div>
+        }
       </div>
     </div>
     <app-mail-settings-modal #mailSettings></app-mail-settings-modal>
@@ -69,6 +107,61 @@ export class MailComponent {
   mailboxes = signal<MailBoxGroups[] | null>(null);
   emails = signal<Mail[] | null>(null);
   selectedBox = signal<string | null>(null);
+  
+  // Sorting
+  sortColumn = signal<SortColumn>('createdOn');
+  sortDirection = signal<SortDirection>('desc');
+  
+  // Pagination
+  currentPage = signal(1);
+  itemsPerPage = 100;
+  
+  sortedEmails = computed(() => {
+    const emails = this.emails();
+    if (!emails) return null;
+    
+    const sorted = [...emails].sort((a, b) => {
+      const column = this.sortColumn();
+      const direction = this.sortDirection();
+      
+      let aVal: any = a[column];
+      let bVal: any = b[column];
+      
+      // Handle date sorting
+      if (column === 'createdOn') {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      }
+      
+      // Handle string sorting (case insensitive)
+      if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+      
+      if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return sorted;
+  });
+  
+  totalPages = computed(() => {
+    const emails = this.sortedEmails();
+    if (!emails) return 0;
+    return Math.ceil(emails.length / this.itemsPerPage);
+  });
+  
+  paginatedEmails = computed(() => {
+    const emails = this.sortedEmails();
+    if (!emails) return null;
+    
+    const start = (this.currentPage() - 1) * this.itemsPerPage;
+    const end = start + this.itemsPerPage;
+    
+    return emails.slice(start, end);
+  });
 
   constructor() {
     toObservable(this.selectedBox)
@@ -82,6 +175,7 @@ export class MailComponent {
       )
       .subscribe((selectedBox) => {
         this.emails.set(selectedBox?.items);
+        this.currentPage.set(1); // Reset to first page when emails change
       });
     this.refreshMail();
   }
@@ -101,5 +195,55 @@ export class MailComponent {
     this.mailService.deleteBoxes({ to: email } as FilterOptions).subscribe(() => {
       this.refreshMail();
     });
+  }
+
+
+  claimMailbox(emailAddress: string) {
+    this.mailService.claimMailbox(emailAddress).subscribe({
+      next: () => {
+        console.log(`Successfully claimed ${emailAddress}`);
+        this.refreshMail(); // Refresh to show the mailbox in "My Boxes"
+      },
+      error: (error) => {
+        console.error('Error claiming mailbox:', error);
+        // You could add a toast notification service here for better UX
+      }
+    });
+  }
+
+  unclaimMailbox(emailAddress: string) {
+    this.mailService.unclaimMailbox(emailAddress).subscribe({
+      next: () => {
+        console.log(`Successfully unclaimed ${emailAddress}`);
+        this.refreshMail(); // Refresh to remove from "My Boxes"
+      },
+      error: (error) => {
+        console.error('Error unclaiming mailbox:', error);
+        // You could add a toast notification service here for better UX
+      }
+    });
+  }
+  
+  toggleSort(column: SortColumn) {
+    if (this.sortColumn() === column) {
+      // Toggle direction if same column
+      this.sortDirection.set(this.sortDirection() === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to ascending (except for dates which default to descending)
+      this.sortColumn.set(column);
+      this.sortDirection.set(column === 'createdOn' ? 'desc' : 'asc');
+    }
+  }
+  
+  nextPage() {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.update(page => page + 1);
+    }
+  }
+  
+  previousPage() {
+    if (this.currentPage() > 1) {
+      this.currentPage.update(page => page - 1);
+    }
   }
 }

@@ -1,0 +1,28 @@
+/* Login page specific styles - most styles are now global */
+
+/* Logo animation and sizing for login page */
+.auth-logo-animated {
+  width: 74px;
+  height: 74px;
+  animation: slow-spin 20s linear infinite;
+}
+
+@keyframes slow-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Adjust header padding for larger logo */
+.auth-header {
+  padding: 2.5rem 1.5rem 2rem;
+}
+
+/* Any other component-specific overrides can go here */
+/* Currently using global auth layout classes from _layouts.scss */
+/* Form styles from _forms.scss */
+/* Alert styles from _alerts.scss */
+/* Button styles from _button.scss */

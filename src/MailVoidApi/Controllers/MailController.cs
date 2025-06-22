@@ -1,12 +1,11 @@
 ﻿using MailVoidApi.Common;
+using MailVoidApi.Data;
 using MailVoidApi.Services;
 using MailVoidWeb;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
-using ServiceStack.Data;
-using ServiceStack.OrmLite;
-using ServiceStack.OrmLite.Dapper;
+using Microsoft.EntityFrameworkCore;
 
 namespace MailVoidApi.Controllers;
 [Authorize]
@@ -15,79 +14,66 @@ namespace MailVoidApi.Controllers;
 public class MailController : ControllerBase
 {
     private readonly ILogger<MailController> _logger;
-    private readonly IDbConnectionFactory _dbFactory;
+    private readonly MailVoidDbContext _context;
     private readonly IMailGroupService _mailGroupService;
     private readonly IUserService _userService;
 
-    public MailController(ILogger<MailController> logger, IDbConnectionFactory dbFactory, IMailGroupService mailGroupService, IUserService userService)
+    public MailController(ILogger<MailController> logger, MailVoidDbContext context, IMailGroupService mailGroupService, IUserService userService)
     {
         _logger = logger;
-        _dbFactory = dbFactory;
+        _context = context;
         _mailGroupService = mailGroupService;
         _userService = userService;
     }
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMail(long id)
     {
-        using (var db = _dbFactory.OpenDbConnection())
+        var email = await _context.Mails.FindAsync(id);
+        if (email == null)
         {
-            var email = await db.SingleByIdAsync<Mail>(id);
-            if (email == null)
-            {
-                return NotFound();
-            }
-            return Ok(email);
+            return NotFound();
         }
+        return Ok(email);
     }
     [HttpGet("boxes")]
     public async Task<IEnumerable<MailBox>> GetBoxes()
     {
-        using (var db = _dbFactory.OpenDbConnection())
+        var boxes = await _context.Mails
+            .Select(m => new { m.To, m.MailGroupPath })
+            .Distinct()
+            .ToListAsync();
+            
+        return boxes.Select(x => new MailBox()
         {
-            var boxes = await db.SelectAsync<Mail>("SELECT DISTINCT Mail.To,Mail.MailGroupPath FROM Mail");
-            return boxes.Select(x =>
-            {
-                return new MailBox()
-                {
-                    Name = x.To,
-                    Path = x.MailGroupPath
-                };
-            });
-        }
-
+            Name = x.To,
+            Path = x.MailGroupPath
+        });
     }
     [HttpPost]
     public async Task<PagedResults<Mail>> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
     {
         var results = new PagedResults<Mail>();
-
-
         options ??= new FilterOptions();
-        using (var db = _dbFactory.OpenDbConnection())
+
+        var query = _context.Mails.AsQueryable();
+
+        if (!string.IsNullOrEmpty(options.To))
         {
-
-
-            var p = new
-            {
-                To = options.To,
-                Offset = (options.Page - 1) * options.PageSize,
-                PageSize = options.PageSize
-            };
-            var query = "select * FROM Mail";
-            if (!string.IsNullOrEmpty(options.To))
-            {
-                query += " WHERE Mail.To = @To";
-            }
-            if (options.PageSize == 1)
-            {
-                var countQuery = $"Select Count(b.*) From ({query}) as b";
-                results.TotalCount = await db.QuerySingleAsync<long>(query, p);
-            }
-            query += " ORDER BY CreatedOn DESC LIMIT @PageSize OFFSET @Offset";
-
-            results.Items = await db.QueryAsync<Mail>(query, p);
-            return results;
+            query = query.Where(m => m.To == options.To);
         }
+
+        if (options.PageSize == 1)
+        {
+            results.TotalCount = await query.CountAsync();
+        }
+
+        query = query.OrderByDescending(m => m.CreatedOn);
+        results.Items = await query
+            .Skip((options.Page - 1) * options.PageSize)
+            .Take(options.PageSize)
+            .ToListAsync();
+
+        return results;
     }
     [HttpDelete("boxes")]
     public async Task<IActionResult> DeleteBox([FromBody] FilterOptions options)
@@ -95,42 +81,38 @@ public class MailController : ControllerBase
         if (options == null || string.IsNullOrEmpty(options.To))
             return BadRequest();
 
-        using (var db = _dbFactory.OpenDbConnection())
-        {
-
-            var query = "DELETE FROM Mail WHERE Mail.To = @To";
-            await db.ExecuteAsync(query, new { options.To });
-            return Ok();
-        }
+        var mailsToDelete = await _context.Mails
+            .Where(m => m.To == options.To)
+            .ToListAsync();
+            
+        _context.Mails.RemoveRange(mailsToDelete);
+        await _context.SaveChangesAsync();
+        
+        return Ok();
     }
     [HttpGet("groups")]
     public async Task<IActionResult> GetMailGroups()
     {
-        using (var db = _dbFactory.OpenDbConnection())
-        {
-            var groups = await db.SelectAsync<MailGroup>();
-            return Ok(groups);
-        }
+        var groups = await _context.MailGroups.ToListAsync();
+        return Ok(groups);
     }
     [HttpPost("groups")]
     public async Task<IActionResult> SaveMailGroup([FromBody] MailGroupRequest groupRequest)
     {
-
         var group = groupRequest.ToMailGroup(_userService.GetUserId());
         if (group.Id == 0)
         {
-            using (var db = _dbFactory.OpenDbConnection())
-            {
-
-                group.Id = await db.InsertAsync(group);
-            }
+            _context.MailGroups.Add(group);
+            await _context.SaveChangesAsync();
         }
         else
         {
-            using (var db = _dbFactory.OpenDbConnection())
+            var existingGroup = await _context.MailGroups.FindAsync(group.Id);
+            if (existingGroup != null)
             {
-                var query = "UPDATE MailGroup SET Path = @Path, Rules = @Rules WHERE Id = @Id";
-                await db.ExecuteAsync(query, group);
+                existingGroup.Path = group.Path;
+                existingGroup.Rules = group.Rules;
+                await _context.SaveChangesAsync();
             }
         }
         await _mailGroupService.UpdateMailsByMailGroupPattern(group);

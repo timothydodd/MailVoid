@@ -17,8 +17,63 @@
     .right-side {
         display: flex;
         flex-direction: column;
-  
+        flex: 1;
         
+        .table-wrap {
+            flex: 1;
+            overflow-y: auto;
+            
+            table {
+                width: 100%;
+                
+                th.sortable {
+                    cursor: pointer;
+                    user-select: none;
+                    position: relative;
+                    padding-right: 1.5rem;
+                    
+                    &:hover {
+                        background-color: var(--bGLight);
+                    }
+                    
+                    lucide-icon {
+                        position: absolute;
+                        right: 0.5rem;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        opacity: 0.7;
+                    }
+                }
+            }
+        }
+        
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            background: var(--bGDark);
+            
+            .page-info {
+                font-size: 0.875rem;
+                color: var(--secondary);
+                min-width: 120px;
+                text-align: center;
+            }
+            
+            button {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                
+                &:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+            }
+        }
     }
 }
 

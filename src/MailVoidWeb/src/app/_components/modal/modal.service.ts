@@ -10,11 +10,12 @@ export class ModalService {
   modalEvent = new Subject<ModalData | null>();
 
   constructor() {}
-  open(title: string, body?: TemplateRef<any>, footer?: TemplateRef<any>) {
+  open(title: string, body?: TemplateRef<any>, footer?: TemplateRef<any>, header?: TemplateRef<any>) {
     this.modalEvent.next({
       title,
       bodyTemplate: body,
       footerTemplate: footer,
+      headerTemplate: header,
     });
   }
   close() {
@@ -26,4 +27,5 @@ export interface ModalData {
   title: string;
   bodyTemplate?: TemplateRef<any>;
   footerTemplate?: TemplateRef<any>;
+  headerTemplate?: TemplateRef<any>;
 }
