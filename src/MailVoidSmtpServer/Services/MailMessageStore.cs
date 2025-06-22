@@ -22,14 +22,16 @@ public class MailMessageStore : MessageStore
     {
         try
         {
-            // Parse the message
+            // Convert buffer to raw email string
             await using var stream = new MemoryStream();
-
             foreach (var segment in buffer)
             {
                 await stream.WriteAsync(segment.Span.ToArray(), cancellationToken);
             }
-
+            
+            var rawEmail = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+            
+            // Parse the message for metadata
             stream.Position = 0;
             var message = await MimeMessage.LoadAsync(stream, cancellationToken);
 
@@ -38,7 +40,7 @@ public class MailMessageStore : MessageStore
                 message.To.ToString(),
                 message.Subject);
 
-            // Forward to MailVoid API
+            // Forward to MailVoid API with both raw and parsed data
             var emailData = new EmailWebhookData
             {
                 From = message.From.Mailboxes.FirstOrDefault()?.Address ?? "unknown@unknown.com",
@@ -49,7 +51,8 @@ public class MailMessageStore : MessageStore
                 Headers = message.Headers.ToDictionary(h => h.Field, h => h.Value),
                 Attachments = ExtractAttachments(message),
                 MessageId = message.MessageId,
-                Date = message.Date.UtcDateTime
+                Date = message.Date.UtcDateTime,
+                RawEmail = rawEmail
             };
 
             var success = await _forwardingService.ForwardEmailAsync(emailData, cancellationToken);
@@ -107,6 +110,7 @@ public class EmailWebhookData
     public List<AttachmentData> Attachments { get; set; } = new();
     public string? MessageId { get; set; }
     public DateTime Date { get; set; }
+    public string RawEmail { get; set; } = "";
 }
 
 public class AttachmentData

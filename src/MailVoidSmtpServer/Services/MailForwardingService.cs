@@ -28,33 +28,9 @@ public class MailForwardingService
         {
             var url = $"{_options.BaseUrl.TrimEnd('/')}{_options.WebhookEndpoint}";
             
-            // Convert to SendGrid-like format that the webhook expects
-            var webhookPayload = new List<object>
-            {
-                new
-                {
-                    email = emailData.To.FirstOrDefault() ?? "",
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    @event = "processed",
-                    sg_event_id = Guid.NewGuid().ToString(),
-                    sg_message_id = emailData.MessageId ?? Guid.NewGuid().ToString(),
-                    from = emailData.From,
-                    to = emailData.To,
-                    subject = emailData.Subject,
-                    html = emailData.Html ?? emailData.Text,
-                    text = emailData.Text,
-                    headers = JsonSerializer.Serialize(emailData.Headers),
-                    attachments = emailData.Attachments.Count,
-                    attachment_info = JsonSerializer.Serialize(emailData.Attachments.Select(a => new 
-                    { 
-                        filename = a.Filename, 
-                        type = a.ContentType,
-                        content_id = Guid.NewGuid().ToString()
-                    }))
-                }
-            };
-
-            var json = JsonSerializer.Serialize(webhookPayload);
+            // Convert to MailData format that the webhook expects
+            var mailData = ConvertToMailData(emailData);
+            var json = JsonSerializer.Serialize(mailData);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             
             // Add API key header if configured
@@ -87,4 +63,104 @@ public class MailForwardingService
             return false;
         }
     }
+
+    private MailData ConvertToMailData(EmailWebhookData emailData)
+    {
+        // Use the original raw email if available, otherwise reconstruct it
+        var rawEmail = !string.IsNullOrEmpty(emailData.RawEmail) 
+            ? emailData.RawEmail 
+            : BuildRawEmail(emailData);
+        
+        return new MailData
+        {
+            From = emailData.From,
+            To = emailData.To.FirstOrDefault() ?? "",
+            Headers = emailData.Headers,
+            Raw = rawEmail,
+            RawSize = Encoding.UTF8.GetByteCount(rawEmail)
+        };
+    }
+
+    private string BuildRawEmail(EmailWebhookData emailData)
+    {
+        var sb = new StringBuilder();
+        
+        // Add headers
+        foreach (var header in emailData.Headers)
+        {
+            sb.AppendLine($"{header.Key}: {header.Value}");
+        }
+        
+        // Add Message-ID if not present
+        if (!emailData.Headers.ContainsKey("Message-ID") && !string.IsNullOrEmpty(emailData.MessageId))
+        {
+            sb.AppendLine($"Message-ID: {emailData.MessageId}");
+        }
+        
+        // Add Date if not present
+        if (!emailData.Headers.ContainsKey("Date"))
+        {
+            sb.AppendLine($"Date: {emailData.Date:R}");
+        }
+        
+        // Add From if not in headers
+        if (!emailData.Headers.ContainsKey("From"))
+        {
+            sb.AppendLine($"From: {emailData.From}");
+        }
+        
+        // Add To if not in headers
+        if (!emailData.Headers.ContainsKey("To"))
+        {
+            sb.AppendLine($"To: {string.Join(", ", emailData.To)}");
+        }
+        
+        // Add Subject if not in headers
+        if (!emailData.Headers.ContainsKey("Subject"))
+        {
+            sb.AppendLine($"Subject: {emailData.Subject}");
+        }
+        
+        // Add Content-Type if we have both HTML and text
+        if (!string.IsNullOrEmpty(emailData.Html) && !string.IsNullOrEmpty(emailData.Text))
+        {
+            sb.AppendLine("Content-Type: multipart/alternative; boundary=\"boundary123\"");
+            sb.AppendLine();
+            sb.AppendLine("--boundary123");
+            sb.AppendLine("Content-Type: text/plain; charset=utf-8");
+            sb.AppendLine();
+            sb.AppendLine(emailData.Text);
+            sb.AppendLine();
+            sb.AppendLine("--boundary123");
+            sb.AppendLine("Content-Type: text/html; charset=utf-8");
+            sb.AppendLine();
+            sb.AppendLine(emailData.Html);
+            sb.AppendLine();
+            sb.AppendLine("--boundary123--");
+        }
+        else if (!string.IsNullOrEmpty(emailData.Html))
+        {
+            sb.AppendLine("Content-Type: text/html; charset=utf-8");
+            sb.AppendLine();
+            sb.AppendLine(emailData.Html);
+        }
+        else
+        {
+            sb.AppendLine("Content-Type: text/plain; charset=utf-8");
+            sb.AppendLine();
+            sb.AppendLine(emailData.Text);
+        }
+        
+        return sb.ToString();
+    }
+}
+
+// MailData class for API compatibility
+public class MailData
+{
+    public string From { get; init; } = string.Empty;
+    public string To { get; init; } = string.Empty;
+    public Dictionary<string, string> Headers { get; init; } = new();
+    public string Raw { get; init; } = string.Empty;
+    public int RawSize { get; init; }
 }

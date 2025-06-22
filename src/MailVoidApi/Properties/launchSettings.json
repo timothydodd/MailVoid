@@ -9,7 +9,7 @@
             "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": "Microsoft.AspNetCore.SpaProxy"
         },
         "dotnetRunMessages": true,
-        "applicationUrl": "http://localhost:5133"
+        "applicationUrl": "http://*:5133"
     },
     "https": {
       "commandName": "Project",

@@ -19,6 +19,15 @@ public class EmailModel
     public string? Spam_Score { get; set; }
 }
 //{"to":["tdodd@dbmk2.com"],"from":"tdodd@me.com"}
+public class MailData
+{
+    public string From { get; init; } = string.Empty;
+    public string To { get; init; } = string.Empty;
+    public Dictionary<string, string> Headers { get; init; } = new();
+    public string Raw { get; init; } = string.Empty;
+    public int RawSize { get; init; }
+}
+
 public class Envelope
 {
     public List<string>? To { get; set; }
