@@ -26,6 +26,8 @@ public class MailForwardingService
     {
         try
         {
+            _logger.LogDebug("Starting email forwarding for message from {From} to {To}", 
+                emailData.From, string.Join(", ", emailData.To));
             var url = $"{_options.BaseUrl.TrimEnd('/')}{_options.WebhookEndpoint}";
             
             // Convert to MailData format that the webhook expects
@@ -40,7 +42,8 @@ public class MailForwardingService
                     new AuthenticationHeaderValue("ApiKey", _options.ApiKey);
             }
             
-            _logger.LogDebug("Forwarding email to {Url}", url);
+            _logger.LogDebug("Forwarding email to {Url} with payload size: {Size} bytes", url, json.Length);
+            _logger.LogTrace("Email JSON payload: {Payload}", json);
             
             var response = await _httpClient.PostAsync(url, content, cancellationToken);
             
@@ -71,7 +74,7 @@ public class MailForwardingService
             ? emailData.RawEmail 
             : BuildRawEmail(emailData);
         
-        return new MailData
+        var mailData = new MailData
         {
             From = emailData.From,
             To = emailData.To.FirstOrDefault() ?? "",
@@ -79,6 +82,11 @@ public class MailForwardingService
             Raw = rawEmail,
             RawSize = Encoding.UTF8.GetByteCount(rawEmail)
         };
+        
+        _logger.LogDebug("Converted email data - From: {From}, To: {To}, RawSize: {RawSize} bytes", 
+            mailData.From, mailData.To, mailData.RawSize);
+            
+        return mailData;
     }
 
     private string BuildRawEmail(EmailWebhookData emailData)

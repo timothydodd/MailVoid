@@ -21,6 +21,7 @@ public class Program
             {
                 config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
                 config.AddEnvironmentVariables();
+                config.AddUserSecrets<Program>();
             })
             .ConfigureServices((hostContext, services) =>
             {
@@ -28,7 +29,7 @@ public class Program
                 services.Configure<MailVoidApiOptions>(hostContext.Configuration.GetSection("MailVoidApi"));
 
                 services.AddHttpClient<MailForwardingService>();
-                services.AddTransient<MessageStore, MailMessageStore>();
+                services.AddTransient<IMessageStore, MailMessageStore>();
                 services.AddSingleton<SmtpServerService>();
                 services.AddHostedService<SmtpServerHostedService>();
             })
@@ -36,7 +37,19 @@ public class Program
             {
                 logging.ClearProviders();
                 logging.AddConsole();
-                logging.SetMinimumLevel(LogLevel.Information);
+                logging.AddDebug();
+                logging.AddEventLog();
+
+                // Configure log levels from appsettings.json
+                logging.AddConfiguration(context.Configuration.GetSection("Logging"));
+
+                // Add structured logging with timestamp and category
+                logging.Configure(options =>
+                {
+                    options.ActivityTrackingOptions = ActivityTrackingOptions.SpanId
+                                                    | ActivityTrackingOptions.TraceId
+                                                    | ActivityTrackingOptions.ParentId;
+                });
             });
 }
 
@@ -46,6 +59,10 @@ public class SmtpServerOptions
     public string Name { get; set; } = "MailVoid SMTP Server";
     public int MaxMessageSize { get; set; } = 10 * 1024 * 1024; // 10MB
     public bool RequireAuthentication { get; set; } = false;
+    public bool EnableSsl { get; set; } = false;
+    public int SslPort { get; set; } = 465;
+    public string? CertificatePath { get; set; }
+    public string? CertificatePassword { get; set; }
 }
 
 public class MailVoidApiOptions

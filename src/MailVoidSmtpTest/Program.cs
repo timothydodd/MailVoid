@@ -1,46 +1,80 @@
 ﻿using MailKit.Net.Smtp;
+using MailKit.Security;
 using MimeKit;
+using Microsoft.Extensions.Configuration;
 
 namespace MailVoidSmtpTest;
 
 class Program
 {
+    private static IConfiguration? _configuration;
     static async Task Main(string[] args)
     {
         Console.WriteLine("MailVoid SMTP Test");
         Console.WriteLine("=================");
 
-        // Test configuration
-        var smtpHost = "139.144.16.146";
-        var smtpPort = 25;
-        var fromEmail = "test@example.com";
-        var toEmail = "recipient@example.com";
+        // Load configuration
+        _configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddCommandLine(args)
+            .Build();
 
-        Console.WriteLine($"Testing SMTP server at {smtpHost}:{smtpPort}");
+        var config = _configuration.GetSection("SmtpTest");
+        var smtpHost = config["Host"] ?? "localhost";
+        var standardPort = int.Parse(config["StandardPort"] ?? "25");
+        var sslPort = int.Parse(config["SslPort"] ?? "465");
+        var fromEmail = config["FromEmail"] ?? "test@example.com";
+        var toEmail = config["ToEmail"] ?? "recipient@example.com";
+        var enableSslOption = bool.Parse(config["EnableSslOption"] ?? "true");
+        
+        int smtpPort;
+        bool useSsl;
+        
+        // Check if SSL option is enabled
+        if (enableSslOption)
+        {
+            // Ask user which port to test
+            Console.WriteLine("Select SMTP port to test:");
+            Console.WriteLine($"1. Port {standardPort} (Standard SMTP)");
+            Console.WriteLine($"2. Port {sslPort} (SMTP with SSL/TLS)");
+            Console.Write("Enter choice (1 or 2): ");
+            
+            var choice = Console.ReadLine();
+            smtpPort = choice == "2" ? sslPort : standardPort;
+            useSsl = choice == "2";
+        }
+        else
+        {
+            smtpPort = standardPort;
+            useSsl = false;
+        }
+
+        Console.WriteLine($"\nTesting SMTP server at {smtpHost}:{smtpPort} (SSL: {useSsl})");
         Console.WriteLine();
 
         // Test 1: Simple text email
         Console.WriteLine("Test 1: Sending simple text email...");
-        await SendSimpleTextEmail(smtpHost, smtpPort, fromEmail, toEmail);
+        await SendSimpleTextEmail(smtpHost, smtpPort, useSsl, fromEmail, toEmail);
 
         // Test 2: HTML email
         Console.WriteLine("\nTest 2: Sending HTML email...");
-        await SendHtmlEmail(smtpHost, smtpPort, fromEmail, toEmail);
+        await SendHtmlEmail(smtpHost, smtpPort, useSsl, fromEmail, toEmail);
 
         // Test 3: Email with special characters in subject
         Console.WriteLine("\nTest 3: Sending email with encoded subject...");
-        await SendEmailWithEncodedSubject(smtpHost, smtpPort, fromEmail, toEmail);
+        await SendEmailWithEncodedSubject(smtpHost, smtpPort, useSsl, fromEmail, toEmail);
 
         // Test 4: Email with multiple recipients
         Console.WriteLine("\nTest 4: Sending email with multiple recipients...");
-        await SendEmailWithMultipleRecipients(smtpHost, smtpPort, fromEmail,
+        await SendEmailWithMultipleRecipients(smtpHost, smtpPort, useSsl, fromEmail,
             new[] { toEmail, "cc@example.com", "bcc@example.com" });
 
         Console.WriteLine("\nAll tests completed!");
         Console.WriteLine("Check the MailVoid web interface to see if emails were received.");
     }
 
-    static async Task SendSimpleTextEmail(string host, int port, string from, string to)
+    static async Task SendSimpleTextEmail(string host, int port, bool useSsl, string from, string to)
     {
         try
         {
@@ -59,8 +93,7 @@ Best regards,
 SMTP Test"
             };
 
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, false);
+            using var client = await CreateSmtpClient(host, port, useSsl);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
@@ -72,7 +105,7 @@ SMTP Test"
         }
     }
 
-    static async Task SendHtmlEmail(string host, int port, string from, string to)
+    static async Task SendHtmlEmail(string host, int port, bool useSsl, string from, string to)
     {
         try
         {
@@ -100,8 +133,7 @@ SMTP Test"
 
             message.Body = builder.ToMessageBody();
 
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, false);
+            using var client = await CreateSmtpClient(host, port, useSsl);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
@@ -113,7 +145,7 @@ SMTP Test"
         }
     }
 
-    static async Task SendEmailWithEncodedSubject(string host, int port, string from, string to)
+    static async Task SendEmailWithEncodedSubject(string host, int port, bool useSsl, string from, string to)
     {
         try
         {
@@ -134,8 +166,7 @@ Best regards,
 SMTP Test"
             };
 
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, false);
+            using var client = await CreateSmtpClient(host, port, useSsl);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
@@ -147,7 +178,7 @@ SMTP Test"
         }
     }
 
-    static async Task SendEmailWithMultipleRecipients(string host, int port, string from, string[] recipients)
+    static async Task SendEmailWithMultipleRecipients(string host, int port, bool useSsl, string from, string[] recipients)
     {
         try
         {
@@ -185,8 +216,7 @@ Best regards,
 SMTP Test"
             };
 
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, false);
+            using var client = await CreateSmtpClient(host, port, useSsl);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
@@ -196,5 +226,28 @@ SMTP Test"
         {
             Console.WriteLine($"✗ Failed to send email with multiple recipients: {ex.Message}");
         }
+    }
+    
+    static async Task<SmtpClient> CreateSmtpClient(string host, int port, bool useSsl)
+    {
+        var client = new SmtpClient();
+        
+        // For self-signed certificates in development
+        var allowSelfSigned = bool.Parse(_configuration?["SmtpTest:AllowSelfSignedCertificates"] ?? "true");
+        if (allowSelfSigned)
+        {
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+        }
+        
+        if (useSsl)
+        {
+            await client.ConnectAsync(host, port, SecureSocketOptions.SslOnConnect);
+        }
+        else
+        {
+            await client.ConnectAsync(host, port, SecureSocketOptions.None);
+        }
+        
+        return client;
     }
 }
