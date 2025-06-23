@@ -30,24 +30,24 @@ public class SmtpServerService
         var options = new SmtpServerOptionsBuilder()
             .ServerName(_options.Name)
             .MaxMessageSize(_options.MaxMessageSize)
-             .Endpoint(builder => builder
-            .Port(25, isSecure: false)
-            .AllowUnsecureAuthentication(true)  // Allow for legacy relay
-            .AuthenticationRequired(false)      // Optional auth for relay
-            .Certificate(CreateCertificate()))
+            .Endpoint(builder => builder
+                .Port(25, isSecure: false)
+                .AllowUnsecureAuthentication(true)  // Allow for legacy relay
+                .AuthenticationRequired(false)      // Optional auth for relay
+                .Certificate(CreateCertificate()))
 
             // Port 587: Require STARTTLS for submission  
             .Endpoint(builder => builder
                 .Port(587, isSecure: false)
                 .AllowUnsecureAuthentication(false) // Force STARTTLS before auth
-                .AuthenticationRequired(true)       // Always require auth
+                .AuthenticationRequired(false)       // Always require auth
                 .Certificate(CreateCertificate()))
 
             // Port 465: Implicit TLS (alternative)
             .Endpoint(builder => builder
                 .Port(465, isSecure: true)          // Immediate TLS
                 .AllowUnsecureAuthentication(false)
-                .AuthenticationRequired(true)
+                .AuthenticationRequired(false)
                 .Certificate(CreateCertificate()))
             .Build();
 
@@ -74,7 +74,7 @@ public class SmtpServerService
 
 
 
-        _logger.LogInformation("SMTP server started successfully");
+        _logger.LogInformation("SMTP server started successfully on ports 25 (plain), 587 (STARTTLS), 465 (TLS)");
         return Task.CompletedTask;
     }
     private X509Certificate2 CreateCertificate()
