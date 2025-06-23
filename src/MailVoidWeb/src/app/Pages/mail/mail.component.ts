@@ -19,7 +19,7 @@ type SortDirection = 'asc' | 'desc';
     <div class="container d-flex flex-row flex-grow">
       <div class="left-side">
         <div class="section-card">
-          <div class="section-header">
+          <div class="section-header" style="padding: 5px">
             <button class="btn btn-icon align-self-end" (click)="mailSettings.show()" title="Mail Settings">
               <lucide-icon name="cog"></lucide-icon>
             </button>
@@ -83,8 +83,8 @@ type SortDirection = 'asc' | 'desc';
                 @for (email of paginatedEmails(); track email.id) {
                   <tr (click)="clickMail(email)">
                     <td>{{ email.from }}</td>
-                    <td>{{ email.to }}</td>
-                    <td>
+                    <td style="max-width: 100px;overflow:hidden;">{{ email.to }}</td>
+                    <td style="max-width: 300px;word-break: break-all;">
                       {{ email.subject }}
                     </td>
                     <td>{{ email.createdOn | date: 'short' }}</td>

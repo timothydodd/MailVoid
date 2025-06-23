@@ -1,8 +1,8 @@
+﻿using MailVoidSmtpServer.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MailVoidSmtpServer.Services;
 using SmtpServer.Storage;
 
 namespace MailVoidSmtpServer;
@@ -26,7 +26,7 @@ public class Program
             {
                 services.Configure<SmtpServerOptions>(hostContext.Configuration.GetSection("SmtpServer"));
                 services.Configure<MailVoidApiOptions>(hostContext.Configuration.GetSection("MailVoidApi"));
-                
+
                 services.AddHttpClient<MailForwardingService>();
                 services.AddTransient<MessageStore, MailMessageStore>();
                 services.AddSingleton<SmtpServerService>();

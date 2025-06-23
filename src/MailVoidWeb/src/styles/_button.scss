@@ -289,3 +289,49 @@ button.btn-no-border {
     background-color: white;
     color: var(--danger);
 }
+
+/* Common button styles */
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font: 500 0.875rem "Roboto", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &.btn-secondary {
+    background-color: var(--comment);
+    color: white;
+    &:hover:not(:disabled) { background-color: rgba(var(--comment-rgb), 0.9); }
+  }
+
+  &.btn-outline {
+    background-color: transparent;
+    color: var(--foreground);
+    border: 1px solid var(--border-color);
+    &:hover:not(:disabled) {
+      background-color: var(--bGLight);
+      border-color: var(--primary);
+    }
+  }
+
+  &.btn-danger {
+    background-color: #dc3545;
+    color: white;
+    &:hover:not(:disabled) { background-color: #c82333; }
+  }
+
+  &.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+  }
+}

@@ -1,8 +1,7 @@
-using SmtpServer;
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.DependencyInjection;
+using SmtpServer;
 
 namespace MailVoidSmtpServer.Services;
 
@@ -34,7 +33,7 @@ public class SmtpServerService
             .Build();
 
         _server = new SmtpServer.SmtpServer(options, _serviceProvider);
-        
+
         _ = Task.Run(async () =>
         {
             try
@@ -54,13 +53,13 @@ public class SmtpServerService
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Stopping SMTP server");
-        
+
         if (_server != null)
         {
             _server.Shutdown();
             await Task.CompletedTask;
         }
-        
+
         _logger.LogInformation("SMTP server stopped");
     }
 }
