@@ -29,7 +29,7 @@
     "@microsoft/signalr": "^8.0.7",
     "@ng-select/ng-select": "^14.7.0",
     "date-fns": "^4.1.0",
-    "lucide-angular": "^0.511.0",
+    "lucide-angular": "^0.522.0",
     "ngx-toastr": "^19.0.0",
     "ngx-valdemort": "^13.0.0",
     "ngxtension": "^5.0.0",
