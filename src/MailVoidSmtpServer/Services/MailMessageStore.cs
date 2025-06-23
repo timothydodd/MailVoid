@@ -22,8 +22,14 @@ public class MailMessageStore : MessageStore
     {
         try
         {
+            var isSecure = context.EndpointDefinition.IsSecure;
+            var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
+            var endpoint = context.EndpointDefinition.Endpoint;
+            var portInfo = endpoint?.Port.ToString() ?? "unknown";
+            
             _logger.LogDebug("Processing new email from session {SessionId}", context.SessionId);
-            _logger.LogDebug("Remote endpoint: {RemoteEndPoint}", context.EndpointDefinition.Endpoint);
+            _logger.LogDebug("Connection details - Remote: {RemoteEndPoint}, Port: {Port}, Security: {Security}", 
+                endpoint, portInfo, securityInfo);
             // Convert buffer to raw email string
             await using var stream = new MemoryStream();
             foreach (var segment in buffer)
@@ -37,10 +43,11 @@ public class MailMessageStore : MessageStore
             stream.Position = 0;
             var message = await MimeMessage.LoadAsync(stream, cancellationToken);
 
-            _logger.LogInformation("Received message from {From} to {To} with subject: {Subject}",
+            _logger.LogInformation("Received message from {From} to {To} with subject: {Subject} [Security: {Security}]",
                 message.From.ToString(),
                 message.To.ToString(),
-                message.Subject);
+                message.Subject,
+                securityInfo);
 
             _logger.LogDebug("Message details - Size: {Size} bytes, Attachments: {AttachmentCount}, MessageId: {MessageId}",
                 stream.Length,
@@ -68,14 +75,14 @@ public class MailMessageStore : MessageStore
 
             if (success)
             {
-                _logger.LogInformation("Successfully forwarded email to MailVoid API - MessageId: {MessageId}, From: {From}",
-                    message.MessageId, emailData.From);
+                _logger.LogInformation("✓ Email processed successfully - MessageId: {MessageId}, From: {From}, Security: {Security}",
+                    message.MessageId, emailData.From, securityInfo);
                 return SmtpResponse.Ok;
             }
             else
             {
-                _logger.LogError("Failed to forward email to MailVoid API - MessageId: {MessageId}, From: {From}",
-                    message.MessageId, emailData.From);
+                _logger.LogError("✗ Failed to forward email to MailVoid API - MessageId: {MessageId}, From: {From}, Security: {Security}",
+                    message.MessageId, emailData.From, securityInfo);
                 return new SmtpResponse(SmtpReplyCode.MailboxUnavailable, "Failed to process message");
             }
         }

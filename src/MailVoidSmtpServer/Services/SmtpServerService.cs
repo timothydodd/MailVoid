@@ -33,11 +33,14 @@ public class SmtpServerService
             .ServerName(_options.Name)
             .MaxMessageSize(_options.MaxMessageSize);
 
-        // Configure non-SSL endpoint
-        optionsBuilder.Endpoint(builder =>
-            builder
-                .Port(_options.Port)
-                .AllowUnsecureAuthentication(true));
+        // Configure non-SSL endpoint (only if SSL is disabled or ForceSSL is false)
+        if (!_options.EnableSsl || !_options.ForceSSL)
+        {
+            optionsBuilder.Endpoint(builder =>
+                builder
+                    .Port(_options.Port)
+                    .AllowUnsecureAuthentication(true));
+        }
 
         // Configure SSL/TLS if enabled
         if (_options.EnableSsl)
@@ -115,8 +118,25 @@ public class SmtpServerService
             }
         }, cancellationToken);
 
-        var ports = _options.EnableSsl ? $"{_options.Port} and SSL on {_options.SslPort}" : _options.Port.ToString();
-        _logger.LogInformation("SMTP server started successfully on port(s) {Ports}", ports);
+        var activePorts = new List<string>();
+        
+        if (!_options.EnableSsl || !_options.ForceSSL)
+        {
+            activePorts.Add($"{_options.Port} (non-SSL)");
+        }
+        
+        if (_options.EnableSsl)
+        {
+            activePorts.Add($"{_options.SslPort} (SSL/TLS)");
+        }
+        
+        var portsDescription = string.Join(" and ", activePorts);
+        if (_options.ForceSSL && _options.EnableSsl)
+        {
+            portsDescription += " [SSL ONLY - non-SSL disabled]";
+        }
+        
+        _logger.LogInformation("SMTP server started successfully on port(s) {Ports}", portsDescription);
         return Task.CompletedTask;
     }
 
@@ -135,30 +155,49 @@ public class SmtpServerService
 
     private void OnSessionCreated(object? sender, SessionEventArgs e)
     {
-        _logger.LogInformation("SMTP session created - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}",
+        var isSecure = e.Context.EndpointDefinition.IsSecure;
+        var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
+        var endpoint = e.Context.EndpointDefinition.Endpoint;
+        var portInfo = endpoint?.Port.ToString() ?? "unknown";
+        
+        _logger.LogInformation("SMTP session created - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Port: {Port}, Security: {Security}",
             e.Context.SessionId,
-            e.Context.EndpointDefinition.Endpoint);
+            endpoint,
+            portInfo,
+            securityInfo);
     }
 
     private void OnSessionCompleted(object? sender, SessionEventArgs e)
     {
-        _logger.LogInformation("SMTP session completed - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}",
+        var isSecure = e.Context.EndpointDefinition.IsSecure;
+        var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
+        
+        _logger.LogInformation("SMTP session completed - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
             e.Context.SessionId,
-            e.Context.EndpointDefinition.Endpoint);
+            e.Context.EndpointDefinition.Endpoint,
+            securityInfo);
     }
 
     private void OnSessionFaulted(object? sender, SessionFaultedEventArgs e)
     {
-        _logger.LogError(e.Exception, "SMTP session faulted - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}",
+        var isSecure = e.Context.EndpointDefinition.IsSecure;
+        var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
+        
+        _logger.LogError(e.Exception, "SMTP session faulted - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
             e.Context.SessionId,
-            e.Context.EndpointDefinition.Endpoint);
+            e.Context.EndpointDefinition.Endpoint,
+            securityInfo);
     }
 
     private void OnSessionCancelled(object? sender, SessionEventArgs e)
     {
-        _logger.LogWarning("SMTP session cancelled - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}",
+        var isSecure = e.Context.EndpointDefinition.IsSecure;
+        var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
+        
+        _logger.LogWarning("SMTP session cancelled - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
             e.Context.SessionId,
-            e.Context.EndpointDefinition.Endpoint);
+            e.Context.EndpointDefinition.Endpoint,
+            securityInfo);
     }
     
     private static X509Certificate2 GenerateSelfSignedCertificate(string serverName)

@@ -39,11 +39,12 @@ class Program
             Console.WriteLine("Select SMTP port to test:");
             Console.WriteLine($"1. Port {standardPort} (Standard SMTP)");
             Console.WriteLine($"2. Port {sslPort} (SMTP with SSL/TLS)");
-            Console.Write("Enter choice (1 or 2): ");
+            Console.WriteLine($"3. Port {standardPort} (SMTP with SSL/TLS)");
+            Console.Write("Enter choice (1 or 2 or 3): ");
 
             var choice = Console.ReadLine();
             smtpPort = choice == "2" ? sslPort : standardPort;
-            useSsl = choice == "2";
+            useSsl = choice != "1";
         }
         else
         {
@@ -242,7 +243,7 @@ SMTP Test"
 
         if (useSsl)
         {
-            await client.ConnectAsync(host, port, SecureSocketOptions.SslOnConnect);
+            await client.ConnectAsync(host, port, SecureSocketOptions.StartTlsWhenAvailable);
         }
         else
         {
