@@ -11,6 +11,15 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
+        // Debug environment variables before anything else
+        Console.WriteLine($"ASPNETCORE_ENVIRONMENT from system: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
+        Console.WriteLine($"All environment variables containing 'ENVIRONMENT':");
+        foreach (var env in Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
+                     .Where(e => e.Key.ToString()?.Contains("ENVIRONMENT", StringComparison.OrdinalIgnoreCase) == true))
+        {
+            Console.WriteLine($"  {env.Key} = {env.Value}");
+        }
+        
         var host = CreateHostBuilder(args).Build();
         await host.RunAsync();
     }
@@ -40,9 +49,22 @@ public class Program
                 
                 // Debug configuration loading
                 var configuration = hostContext.Configuration;
+                Console.WriteLine($"\n=== CONFIGURATION DEBUG ===");
                 Console.WriteLine($"Environment: {hostContext.HostingEnvironment.EnvironmentName}");
                 Console.WriteLine($"IsDevelopment: {hostContext.HostingEnvironment.IsDevelopment()}");
                 Console.WriteLine($"UserSecretsId: d2ee9be3-64bf-42ea-b392-36fc8ec6bf45");
+                
+                // Check if user secrets directory exists
+                var userSecretsPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".microsoft", "usersecrets", "d2ee9be3-64bf-42ea-b392-36fc8ec6bf45", "secrets.json");
+                Console.WriteLine($"User secrets path: {userSecretsPath}");
+                Console.WriteLine($"User secrets file exists: {File.Exists(userSecretsPath)}");
+                
+                if (File.Exists(userSecretsPath))
+                {
+                    Console.WriteLine($"User secrets content: {File.ReadAllText(userSecretsPath)}");
+                }
                 
                 // Print some config values to verify loading
                 var smtpConfig = configuration.GetSection("SmtpServer");
@@ -51,7 +73,8 @@ public class Program
                 
                 var apiConfig = configuration.GetSection("MailVoidApi");
                 Console.WriteLine($"API BaseUrl from config: {apiConfig["BaseUrl"]}");
-                Console.WriteLine($"API Key from config: {(string.IsNullOrEmpty(apiConfig["ApiKey"]) ? "(empty)" : "(loaded)")}");
+                Console.WriteLine($"API Key from config: {(string.IsNullOrEmpty(apiConfig["ApiKey"]) ? "(empty)" : $"(loaded: {apiConfig["ApiKey"].Substring(0, Math.Min(10, apiConfig["ApiKey"].Length))}...)")}");
+                Console.WriteLine($"=== END CONFIG DEBUG ===\n");
             })
             .ConfigureLogging((context, logging) =>
             {
