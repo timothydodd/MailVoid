@@ -1,4 +1,5 @@
-﻿using MailKit.Net.Smtp;
+﻿using MailKit;
+using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
@@ -80,6 +81,7 @@ class Program
     {
         try
         {
+            Console.WriteLine($"[DEBUG] Creating message from {from} to {to}");
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress("Test Sender", from));
             message.To.Add(new MailboxAddress("Test Recipient", to));
@@ -95,15 +97,27 @@ Best regards,
 SMTP Test"
             };
 
+            Console.WriteLine($"[DEBUG] Connecting to SMTP server at {host}:{port} (SSL: {useSsl})");
             using var client = await CreateSmtpClient(host, port, useSsl);
+
+            Console.WriteLine($"[DEBUG] Connected: {client.IsConnected}, Authenticated: {client.IsAuthenticated}");
+            Console.WriteLine($"[DEBUG] Capabilities: {string.Join(", ", client.Capabilities)}");
+
+            Console.WriteLine("[DEBUG] Sending message...");
             await client.SendAsync(message);
+            Console.WriteLine("[DEBUG] Message sent successfully");
+
+            Console.WriteLine("[DEBUG] Disconnecting...");
             await client.DisconnectAsync(true);
+            Console.WriteLine("[DEBUG] Disconnected");
 
             Console.WriteLine("✓ Simple text email sent successfully");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"✗ Failed to send simple text email: {ex.Message}");
+            Console.WriteLine($"[DEBUG] Exception type: {ex.GetType().Name}");
+            Console.WriteLine($"[DEBUG] Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -232,7 +246,8 @@ SMTP Test"
 
     static async Task<SmtpClient> CreateSmtpClient(string host, int port, bool useSsl)
     {
-        var client = new SmtpClient();
+        var client = new SmtpClient(new ProtocolLogger(Console.OpenStandardOutput()));
+
 
         // For self-signed certificates in development
         var allowSelfSigned = bool.Parse(_configuration?["SmtpTest:AllowSelfSignedCertificates"] ?? "true");
@@ -241,13 +256,28 @@ SMTP Test"
             client.ServerCertificateValidationCallback = (s, c, h, e) => true;
         }
 
-        if (useSsl)
+        Console.WriteLine($"[DEBUG] Attempting connection to {host}:{port}...");
+        Console.WriteLine($"[DEBUG] SSL mode: {(useSsl ? "StartTls" : "None")}");
+
+        try
         {
-            await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+            if (useSsl)
+            {
+                await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+            }
+            else
+            {
+                await client.ConnectAsync(host, port, SecureSocketOptions.None);
+            }
+
+            Console.WriteLine($"[DEBUG] Connection established successfully");
+            Console.WriteLine($"[DEBUG] Local endpoint: {client.LocalEndPoint}");
+            Console.WriteLine($"[DEBUG] IsSecure: {client.IsSecure}");
         }
-        else
+        catch (Exception ex)
         {
-            await client.ConnectAsync(host, port, SecureSocketOptions.None);
+            Console.WriteLine($"[DEBUG] Connection failed: {ex.Message}");
+            throw;
         }
 
         return client;

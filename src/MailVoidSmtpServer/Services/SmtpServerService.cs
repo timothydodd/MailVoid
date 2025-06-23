@@ -27,28 +27,25 @@ public class SmtpServerService
     {
         _logger.LogInformation("Starting SMTP server on port {Port}", _options.Port);
 
+        var cert = CreateCertificate();
         var options = new SmtpServerOptionsBuilder()
             .ServerName(_options.Name)
             .MaxMessageSize(_options.MaxMessageSize)
-            .Endpoint(builder => builder
-                .Port(25, isSecure: false)
-                .AllowUnsecureAuthentication(true)  // Allow for legacy relay
-                .AuthenticationRequired(false)      // Optional auth for relay
-                .Certificate(CreateCertificate()))
+            .Endpoint((builder) =>
+            {
+                builder.Port(25, isSecure: false)
+                .AllowUnsecureAuthentication(true)   // Allow plain text for port 25
+                .AuthenticationRequired(false)       // Optional auth for relay
+                .Certificate(cert);
+                // Port 587: Require STARTTLS for submission  
 
-            // Port 587: Require STARTTLS for submission  
-            .Endpoint(builder => builder
-                .Port(587, isSecure: false)
-                .AllowUnsecureAuthentication(false) // Force STARTTLS before auth
-                .AuthenticationRequired(false)       // Always require auth
-                .Certificate(CreateCertificate()))
 
-            // Port 465: Implicit TLS (alternative)
-            .Endpoint(builder => builder
-                .Port(465, isSecure: true)          // Immediate TLS
-                .AllowUnsecureAuthentication(false)
-                .AuthenticationRequired(false)
-                .Certificate(CreateCertificate()))
+            })
+
+
+
+
+
             .Build();
 
 
