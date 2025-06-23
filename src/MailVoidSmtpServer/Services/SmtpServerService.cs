@@ -60,7 +60,7 @@ public class SmtpServerService
 
 
 
-        _logger.LogInformation("SMTP server started successfully on port(s) {Ports}", portsDescription);
+        _logger.LogInformation("SMTP server started successfully");
         return Task.CompletedTask;
     }
     private X509Certificate2 CreateCertificate()
