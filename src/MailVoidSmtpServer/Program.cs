@@ -38,7 +38,12 @@ public class Program
                 logging.ClearProviders();
                 logging.AddConsole();
                 logging.AddDebug();
-                logging.AddEventLog();
+                
+                // Only add EventLog on Windows
+                if (OperatingSystem.IsWindows())
+                {
+                    logging.AddEventLog();
+                }
 
                 // Configure log levels from appsettings.json
                 logging.AddConfiguration(context.Configuration.GetSection("Logging"));

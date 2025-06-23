@@ -1,7 +1,7 @@
 ﻿using MailKit.Net.Smtp;
 using MailKit.Security;
-using MimeKit;
 using Microsoft.Extensions.Configuration;
+using MimeKit;
 
 namespace MailVoidSmtpTest;
 
@@ -17,6 +17,7 @@ class Program
         _configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddUserSecrets<Program>(optional: true)
             .AddCommandLine(args)
             .Build();
 
@@ -27,10 +28,10 @@ class Program
         var fromEmail = config["FromEmail"] ?? "test@example.com";
         var toEmail = config["ToEmail"] ?? "recipient@example.com";
         var enableSslOption = bool.Parse(config["EnableSslOption"] ?? "true");
-        
+
         int smtpPort;
         bool useSsl;
-        
+
         // Check if SSL option is enabled
         if (enableSslOption)
         {
@@ -39,7 +40,7 @@ class Program
             Console.WriteLine($"1. Port {standardPort} (Standard SMTP)");
             Console.WriteLine($"2. Port {sslPort} (SMTP with SSL/TLS)");
             Console.Write("Enter choice (1 or 2): ");
-            
+
             var choice = Console.ReadLine();
             smtpPort = choice == "2" ? sslPort : standardPort;
             useSsl = choice == "2";
@@ -227,18 +228,18 @@ SMTP Test"
             Console.WriteLine($"✗ Failed to send email with multiple recipients: {ex.Message}");
         }
     }
-    
+
     static async Task<SmtpClient> CreateSmtpClient(string host, int port, bool useSsl)
     {
         var client = new SmtpClient();
-        
+
         // For self-signed certificates in development
         var allowSelfSigned = bool.Parse(_configuration?["SmtpTest:AllowSelfSignedCertificates"] ?? "true");
         if (allowSelfSigned)
         {
             client.ServerCertificateValidationCallback = (s, c, h, e) => true;
         }
-        
+
         if (useSsl)
         {
             await client.ConnectAsync(host, port, SecureSocketOptions.SslOnConnect);
@@ -247,7 +248,7 @@ SMTP Test"
         {
             await client.ConnectAsync(host, port, SecureSocketOptions.None);
         }
-        
+
         return client;
     }
 }

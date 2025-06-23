@@ -68,7 +68,10 @@ public class SmtpServerService
             {
                 try
                 {
-                    var certificate = new X509Certificate2(_options.CertificatePath, _options.CertificatePassword);
+                    // Use X509CertificateLoader for .NET 9
+                    var certificate = string.IsNullOrEmpty(_options.CertificatePassword)
+                        ? X509CertificateLoader.LoadCertificateFromFile(_options.CertificatePath)
+                        : X509CertificateLoader.LoadPkcs12FromFile(_options.CertificatePath, _options.CertificatePassword);
                     // In SmtpServer v11, certificate is configured through the Endpoint builder
                     // SmtpServer v11 requires certificate to be set differently
                     optionsBuilder.Endpoint(builder =>
@@ -191,22 +194,9 @@ public class SmtpServerService
             DateTimeOffset.Now.AddDays(-1), 
             DateTimeOffset.Now.AddYears(1));
         
-        // Export and reimport with appropriate storage flags
-        // Use Exportable flag to allow the private key to be used
-        var exported = certificate.Export(X509ContentType.Pfx);
-        certificate.Dispose();
-        
-        // Use PersistKeySet and Exportable flags, avoid MachineKeySet which requires admin privileges
-        var storageFlags = X509KeyStorageFlags.PersistKeySet | 
-                          X509KeyStorageFlags.Exportable;
-        
-        // On Windows, also use UserKeySet to avoid permission issues
-        if (OperatingSystem.IsWindows())
-        {
-            storageFlags |= X509KeyStorageFlags.UserKeySet;
-        }
-        
-        return new X509Certificate2(exported, (string?)null, storageFlags);
+        // For .NET 9, we can return the certificate directly
+        // The certificate already has the private key attached from CreateSelfSigned
+        return certificate;
     }
 }
 
