@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../_services/auth-service';
@@ -9,7 +9,7 @@ import { AuthService } from '../../_services/auth-service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './login-page.component.html',
-  styleUrls: ['./login-page.component.css']
+  styleUrls: ['./login-page.component.css'],
 })
 export class LoginPageComponent {
   username = '';
@@ -25,7 +25,7 @@ export class LoginPageComponent {
   ) {
     // Get return url from route parameters or default to '/'
     this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
-    
+
     // Redirect if already authenticated
     if (this.authService.isAuthenticated()) {
       this.router.navigate([this.returnUrl]);
