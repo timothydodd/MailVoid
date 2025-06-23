@@ -55,7 +55,9 @@ public class MailMessageStore : MessageStore
                 Subject = message.Subject ?? "(no subject)",
                 Html = message.HtmlBody,
                 Text = message.TextBody ?? message.HtmlBody ?? "",
-                Headers = message.Headers.ToDictionary(h => h.Field, h => h.Value),
+                Headers = message.Headers
+                    .GroupBy(h => h.Field)
+                    .ToDictionary(g => g.Key, g => string.Join("; ", g.Select(h => h.Value))),
                 Attachments = ExtractAttachments(message),
                 MessageId = message.MessageId,
                 Date = message.Date.UtcDateTime,
