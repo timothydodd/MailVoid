@@ -21,7 +21,12 @@ public class Program
             {
                 config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
                 config.AddEnvironmentVariables();
-                config.AddUserSecrets<Program>();
+                
+                // Only load user secrets in Development environment
+                if (context.HostingEnvironment.IsDevelopment())
+                {
+                    config.AddUserSecrets<Program>(optional: true);
+                }
             })
             .ConfigureServices((hostContext, services) =>
             {
@@ -32,6 +37,21 @@ public class Program
                 services.AddTransient<IMessageStore, MailMessageStore>();
                 services.AddSingleton<SmtpServerService>();
                 services.AddHostedService<SmtpServerHostedService>();
+                
+                // Debug configuration loading
+                var configuration = hostContext.Configuration;
+                Console.WriteLine($"Environment: {hostContext.HostingEnvironment.EnvironmentName}");
+                Console.WriteLine($"IsDevelopment: {hostContext.HostingEnvironment.IsDevelopment()}");
+                Console.WriteLine($"UserSecretsId: d2ee9be3-64bf-42ea-b392-36fc8ec6bf45");
+                
+                // Print some config values to verify loading
+                var smtpConfig = configuration.GetSection("SmtpServer");
+                Console.WriteLine($"SMTP Port from config: {smtpConfig["Port"]}");
+                Console.WriteLine($"SMTP SSL Port from config: {smtpConfig["SslPort"]}");
+                
+                var apiConfig = configuration.GetSection("MailVoidApi");
+                Console.WriteLine($"API BaseUrl from config: {apiConfig["BaseUrl"]}");
+                Console.WriteLine($"API Key from config: {(string.IsNullOrEmpty(apiConfig["ApiKey"]) ? "(empty)" : "(loaded)")}");
             })
             .ConfigureLogging((context, logging) =>
             {
