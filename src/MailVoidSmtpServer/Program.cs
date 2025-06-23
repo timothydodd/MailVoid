@@ -87,7 +87,7 @@ public class SmtpServerOptions
     public bool RequireAuthentication { get; set; } = false;
     public bool EnableSsl { get; set; } = false;
     public bool ForceSSL { get; set; } = false;
-    public int SslPort { get; set; } = 465;
+    public int SslPort { get; set; } = 587;
     public string? CertificatePath { get; set; }
     public string? CertificatePassword { get; set; }
 }

@@ -20,6 +20,8 @@ User secrets are stored in:
 ~/.microsoft/usersecrets/d2ee9be3-64bf-42ea-b392-36fc8ec6bf45/secrets.json
 ```
 
+**Note**: The SMTP server now uses port 587 for SSL/TLS (SMTP submission) instead of port 465.
+
 Verify the file exists:
 ```bash
 ls -la ~/.microsoft/usersecrets/d2ee9be3-64bf-42ea-b392-36fc8ec6bf45/
