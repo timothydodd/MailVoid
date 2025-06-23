@@ -1,6 +1,8 @@
 ﻿using System.Buffers;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using MimeKit;
+using MimeKit.Utils;
 using SmtpServer;
 using SmtpServer.Protocol;
 using SmtpServer.Storage;
@@ -49,10 +51,23 @@ public class MailMessageStore : MessageStore
                 message.Subject,
                 securityInfo);
 
-            _logger.LogDebug("Message details - Size: {Size} bytes, Attachments: {AttachmentCount}, MessageId: {MessageId}",
+            _logger.LogDebug("Message details - Size: {Size} bytes, Attachments: {AttachmentCount}, MessageId: {MessageId}, BodyParts: {BodyPartCount}",
                 stream.Length,
                 message.Attachments.Count(),
-                message.MessageId);
+                message.MessageId,
+                message.BodyParts.Count());
+                
+            // Log body part types for debugging
+            foreach (var part in message.BodyParts.Take(5)) // Limit to first 5 parts
+            {
+                if (part is TextPart textPart)
+                {
+                    _logger.LogDebug("Body part found - ContentType: {ContentType}, Encoding: {Encoding}, Size: {Size}",
+                        textPart.ContentType.MimeType,
+                        textPart.ContentTransferEncoding,
+                        textPart.Text?.Length ?? 0);
+                }
+            }
 
             // Forward to MailVoid API with both raw and parsed data
             var emailData = new EmailWebhookData
@@ -60,8 +75,8 @@ public class MailMessageStore : MessageStore
                 From = message.From.Mailboxes.FirstOrDefault()?.Address ?? "unknown@unknown.com",
                 To = message.To.Mailboxes.Select(m => m.Address).ToList(),
                 Subject = message.Subject ?? "(no subject)",
-                Html = message.HtmlBody,
-                Text = message.TextBody ?? message.HtmlBody ?? "",
+                Html = GetDecodedHtmlBody(message),
+                Text = GetDecodedTextBody(message),
                 Headers = message.Headers
                     .GroupBy(h => h.Field)
                     .ToDictionary(g => g.Key, g => string.Join("; ", g.Select(h => h.Value))),
@@ -120,6 +135,58 @@ public class MailMessageStore : MessageStore
         }
 
         return attachments;
+    }
+    
+    private static string? GetDecodedHtmlBody(MimeMessage message)
+    {
+        try
+        {
+            // First try the built-in HtmlBody property
+            var htmlBody = message.HtmlBody;
+            if (!string.IsNullOrEmpty(htmlBody))
+            {
+                return htmlBody;
+            }
+            
+            // If that doesn't work, manually find HTML parts
+            var htmlPart = message.BodyParts.OfType<TextPart>()
+                .FirstOrDefault(part => part.ContentType.IsMimeType("text", "html"));
+                
+            return htmlPart?.Text;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+    
+    private static string GetDecodedTextBody(MimeMessage message)
+    {
+        try
+        {
+            // First try the built-in TextBody property
+            var textBody = message.TextBody;
+            if (!string.IsNullOrEmpty(textBody))
+            {
+                return textBody;
+            }
+            
+            // If that doesn't work, manually find text parts
+            var textPart = message.BodyParts.OfType<TextPart>()
+                .FirstOrDefault(part => part.ContentType.IsMimeType("text", "plain"));
+                
+            if (textPart?.Text != null)
+            {
+                return textPart.Text;
+            }
+            
+            // Fallback to HTML body if no text body
+            return GetDecodedHtmlBody(message) ?? "";
+        }
+        catch
+        {
+            return "";
+        }
     }
 }
 
