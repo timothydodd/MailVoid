@@ -27,17 +27,31 @@ public class SmtpServerService
     {
         _logger.LogInformation("Starting SMTP server on port {Port}", _options.Port);
 
-        var optionsBuilder = new SmtpServerOptionsBuilder()
+        var options = new SmtpServerOptionsBuilder()
             .ServerName(_options.Name)
             .MaxMessageSize(_options.MaxMessageSize)
-            .Port(_options.Port)  // Standard SMTP port
+             .Endpoint(builder => builder
+            .Port(25, isSecure: false)
+            .AllowUnsecureAuthentication(true)  // Allow for legacy relay
+            .AuthenticationRequired(false)      // Optional auth for relay
+            .Certificate(CreateCertificate()))
+
+            // Port 587: Require STARTTLS for submission  
             .Endpoint(builder => builder
-                .Port(25, isSecure: false)  // Start unencrypted, allow STARTTLS upgrade
-                .AllowUnsecureAuthentication(false)  // Require encryption for auth
-                .Certificate(CreateCertificate()));
+                .Port(587, isSecure: false)
+                .AllowUnsecureAuthentication(false) // Force STARTTLS before auth
+                .AuthenticationRequired(true)       // Always require auth
+                .Certificate(CreateCertificate()))
+
+            // Port 465: Implicit TLS (alternative)
+            .Endpoint(builder => builder
+                .Port(465, isSecure: true)          // Immediate TLS
+                .AllowUnsecureAuthentication(false)
+                .AuthenticationRequired(true)
+                .Certificate(CreateCertificate()))
+            .Build();
 
 
-        var options = optionsBuilder.Build();
         _server = new SmtpServer.SmtpServer(options, _serviceProvider);
 
         // Subscribe to server events for logging
