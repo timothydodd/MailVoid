@@ -243,7 +243,7 @@ SMTP Test"
 
         if (useSsl)
         {
-            await client.ConnectAsync(host, port, SecureSocketOptions.StartTlsWhenAvailable);
+            await client.ConnectAsync(host, port, SecureSocketOptions.SslOnConnect);
         }
         else
         {

@@ -1,11 +1,9 @@
-﻿using System.Security.Authentication;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmtpServer;
-using SmtpServer.ComponentModel;
 
 namespace MailVoidSmtpServer.Services;
 public class SmtpServerService
@@ -31,71 +29,13 @@ public class SmtpServerService
 
         var optionsBuilder = new SmtpServerOptionsBuilder()
             .ServerName(_options.Name)
-            .MaxMessageSize(_options.MaxMessageSize);
+            .MaxMessageSize(_options.MaxMessageSize)
+            .Port(_options.Port)  // Standard SMTP port
+            .Endpoint(builder => builder
+                .Port(25, isSecure: false)  // Start unencrypted, allow STARTTLS upgrade
+                .AllowUnsecureAuthentication(false)  // Require encryption for auth
+                .Certificate(CreateCertificate()));
 
-        // Configure non-SSL endpoint (only if SSL is disabled or ForceSSL is false)
-        if (!_options.EnableSsl || !_options.ForceSSL)
-        {
-            optionsBuilder.Endpoint(builder =>
-                builder
-                    .Port(_options.Port)
-                    .AllowUnsecureAuthentication(true));
-        }
-
-        // Configure SSL/TLS if enabled
-        if (_options.EnableSsl)
-        {
-            _logger.LogInformation("Configuring SSL/TLS on port {SslPort}", _options.SslPort);
-
-            if (string.IsNullOrEmpty(_options.CertificatePath))
-            {
-                _logger.LogWarning("SSL is enabled but no certificate path provided. Generating self-signed certificate.");
-                
-                // Generate a self-signed certificate for development
-                var certificate = GenerateSelfSignedCertificate(_options.Name);
-                
-                optionsBuilder.Endpoint(builder =>
-                {
-                    builder
-                        .Port(_options.SslPort, true)
-                        .AllowUnsecureAuthentication(false);
-
-                    // Enable SSL/TLS protocols
-                    builder.SupportedSslProtocols(SslProtocols.Tls12 | SslProtocols.Tls13);
-                    builder.Certificate(certificate);
-                });
-                
-                _logger.LogInformation("Self-signed certificate generated successfully for {Name}", _options.Name);
-            }
-            else
-            {
-                try
-                {
-                    // Use X509CertificateLoader for .NET 9
-                    var certificate = string.IsNullOrEmpty(_options.CertificatePassword)
-                        ? X509CertificateLoader.LoadCertificateFromFile(_options.CertificatePath)
-                        : X509CertificateLoader.LoadPkcs12FromFile(_options.CertificatePath, _options.CertificatePassword);
-                    // In SmtpServer v11, certificate is configured through the Endpoint builder
-                    // SmtpServer v11 requires certificate to be set differently
-                    optionsBuilder.Endpoint(builder =>
-                    {
-                        builder
-                            .Port(_options.SslPort, true)
-                            .AllowUnsecureAuthentication(false);
-
-                        // Set the certificate via the SslServerAuthenticationOptions
-                        builder.SupportedSslProtocols(SslProtocols.Tls12 | SslProtocols.Tls13);
-                        builder.Certificate(certificate);
-                    });
-                    _logger.LogInformation("SSL certificate loaded successfully from {Path}", _options.CertificatePath);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to load SSL certificate from {Path}", _options.CertificatePath);
-                    throw;
-                }
-            }
-        }
 
         var options = optionsBuilder.Build();
         _server = new SmtpServer.SmtpServer(options, _serviceProvider);
@@ -118,26 +58,30 @@ public class SmtpServerService
             }
         }, cancellationToken);
 
-        var activePorts = new List<string>();
-        
-        if (!_options.EnableSsl || !_options.ForceSSL)
-        {
-            activePorts.Add($"{_options.Port} (non-SSL)");
-        }
-        
-        if (_options.EnableSsl)
-        {
-            activePorts.Add($"{_options.SslPort} (SSL/TLS)");
-        }
-        
-        var portsDescription = string.Join(" and ", activePorts);
-        if (_options.ForceSSL && _options.EnableSsl)
-        {
-            portsDescription += " [SSL ONLY - non-SSL disabled]";
-        }
-        
+
+
         _logger.LogInformation("SMTP server started successfully on port(s) {Ports}", portsDescription);
         return Task.CompletedTask;
+    }
+    private X509Certificate2 CreateCertificate()
+    {
+        if (!string.IsNullOrEmpty(_options.CertificatePath))
+        {
+            try
+            {
+                // Load certificate from file
+                return string.IsNullOrEmpty(_options.CertificatePassword)
+                    ? X509CertificateLoader.LoadCertificateFromFile(_options.CertificatePath)
+                    : X509CertificateLoader.LoadPkcs12FromFile(_options.CertificatePath, _options.CertificatePassword);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load SSL certificate from {Path}", _options.CertificatePath);
+                throw;
+            }
+        }
+        // Generate self-signed certificate for development/testing
+        return GenerateSelfSignedCertificate(_options.Name);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -159,7 +103,7 @@ public class SmtpServerService
         var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
         var endpoint = e.Context.EndpointDefinition.Endpoint;
         var portInfo = endpoint?.Port.ToString() ?? "unknown";
-        
+
         _logger.LogInformation("SMTP session created - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Port: {Port}, Security: {Security}",
             e.Context.SessionId,
             endpoint,
@@ -171,7 +115,7 @@ public class SmtpServerService
     {
         var isSecure = e.Context.EndpointDefinition.IsSecure;
         var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
-        
+
         _logger.LogInformation("SMTP session completed - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
             e.Context.SessionId,
             e.Context.EndpointDefinition.Endpoint,
@@ -182,7 +126,7 @@ public class SmtpServerService
     {
         var isSecure = e.Context.EndpointDefinition.IsSecure;
         var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
-        
+
         _logger.LogError(e.Exception, "SMTP session faulted - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
             e.Context.SessionId,
             e.Context.EndpointDefinition.Endpoint,
@@ -193,33 +137,33 @@ public class SmtpServerService
     {
         var isSecure = e.Context.EndpointDefinition.IsSecure;
         var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
-        
+
         _logger.LogWarning("SMTP session cancelled - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
             e.Context.SessionId,
             e.Context.EndpointDefinition.Endpoint,
             securityInfo);
     }
-    
+
     private static X509Certificate2 GenerateSelfSignedCertificate(string serverName)
     {
         var distinguishedName = new X500DistinguishedName($"CN={serverName}");
-        
+
         using var rsa = RSA.Create(2048);
         var request = new CertificateRequest(distinguishedName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        
+
         // Add extensions
         request.CertificateExtensions.Add(
             new X509KeyUsageExtension(
-                X509KeyUsageFlags.DataEncipherment | 
-                X509KeyUsageFlags.KeyEncipherment | 
-                X509KeyUsageFlags.DigitalSignature, 
+                X509KeyUsageFlags.DataEncipherment |
+                X509KeyUsageFlags.KeyEncipherment |
+                X509KeyUsageFlags.DigitalSignature,
                 false));
-        
+
         request.CertificateExtensions.Add(
             new X509EnhancedKeyUsageExtension(
                 new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, // Server Authentication
                 false));
-        
+
         // Add Subject Alternative Names
         var sanBuilder = new SubjectAlternativeNameBuilder();
         sanBuilder.AddDnsName(serverName);
@@ -227,12 +171,12 @@ public class SmtpServerService
         sanBuilder.AddIpAddress(System.Net.IPAddress.Loopback);
         sanBuilder.AddIpAddress(System.Net.IPAddress.IPv6Loopback);
         request.CertificateExtensions.Add(sanBuilder.Build());
-        
+
         // Create certificate valid for 1 year
         var certificate = request.CreateSelfSigned(
-            DateTimeOffset.Now.AddDays(-1), 
+            DateTimeOffset.Now.AddDays(-1),
             DateTimeOffset.Now.AddYears(1));
-        
+
         // For .NET 9, we can return the certificate directly
         // The certificate already has the private key attached from CreateSelfSigned
         return certificate;

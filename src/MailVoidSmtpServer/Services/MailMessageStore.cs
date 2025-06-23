@@ -24,6 +24,9 @@ public class MailMessageStore : MessageStore
     {
         try
         {
+            // SECURITY: This server is for receiving emails only - never relay or send emails
+            _logger.LogDebug("Email relay is disabled - this server only receives emails for testing");
+            
             var isSecure = context.EndpointDefinition.IsSecure;
             var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
             var endpoint = context.EndpointDefinition.Endpoint;

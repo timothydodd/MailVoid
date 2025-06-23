@@ -84,10 +84,6 @@ public class SmtpServerOptions
     public int Port { get; set; } = 25;
     public string Name { get; set; } = "MailVoid SMTP Server";
     public int MaxMessageSize { get; set; } = 10 * 1024 * 1024; // 10MB
-    public bool RequireAuthentication { get; set; } = false;
-    public bool EnableSsl { get; set; } = false;
-    public bool ForceSSL { get; set; } = false;
-    public int SslPort { get; set; } = 587;
     public string? CertificatePath { get; set; }
     public string? CertificatePassword { get; set; }
 }
