@@ -38,7 +38,7 @@ public class OutboundEmailQueueService : IOutboundEmailQueueService
         _retryTimer = new Timer(ProcessRetryQueue, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
-    public async Task<string> EnqueueEmailAsync(EmailWebhookData emailData, int priority = 0)
+    public Task<string> EnqueueEmailAsync(EmailWebhookData emailData, int priority = 0)
     {
         var queueItem = new OutboundQueueItem
         {
@@ -53,7 +53,7 @@ public class OutboundEmailQueueService : IOutboundEmailQueueService
         _logger.LogDebug("Enqueued outbound email - ID: {EmailId}, From: {From}, To: {To}, Priority: {Priority}",
             queueItem.Id, emailData.From, string.Join(",", emailData.To), priority);
 
-        return queueItem.Id;
+        return Task.FromResult(queueItem.Id);
     }
 
     public async Task<OutboundQueueItem?> DequeueEmailAsync(CancellationToken cancellationToken = default)
@@ -96,16 +96,17 @@ public class OutboundEmailQueueService : IOutboundEmailQueueService
         return selectedEmail;
     }
 
-    public async Task MarkEmailAsSentAsync(string emailId)
+    public Task MarkEmailAsSentAsync(string emailId)
     {
         if (_processingEmails.TryRemove(emailId, out var email))
         {
             _logger.LogInformation("Outbound email sent successfully - ID: {EmailId}, From: {From}, Attempts: {Attempts}",
                 emailId, email.EmailData.From, email.RetryAttempts);
         }
+        return Task.CompletedTask;
     }
 
-    public async Task MarkEmailAsFailedAsync(string emailId, string error)
+    public Task MarkEmailAsFailedAsync(string emailId, string error)
     {
         if (_processingEmails.TryRemove(emailId, out var email))
         {
@@ -130,21 +131,22 @@ public class OutboundEmailQueueService : IOutboundEmailQueueService
                     emailId, email.EmailData.From, error);
             }
         }
+        return Task.CompletedTask;
     }
 
-    public async Task<int> GetQueueCountAsync()
+    public Task<int> GetQueueCountAsync()
     {
-        return _queue.Count + _processingEmails.Count + _retryQueue.Count;
+        return Task.FromResult(_queue.Count + _processingEmails.Count + _retryQueue.Count);
     }
 
-    public async Task<IEnumerable<OutboundQueueItem>> GetFailedEmailsAsync()
+    public Task<IEnumerable<OutboundQueueItem>> GetFailedEmailsAsync()
     {
-        return _failedEmails.Values.ToList();
+        return Task.FromResult<IEnumerable<OutboundQueueItem>>(_failedEmails.Values.ToList());
     }
 
-    public async Task<IEnumerable<OutboundQueueItem>> GetRetryableEmailsAsync()
+    public Task<IEnumerable<OutboundQueueItem>> GetRetryableEmailsAsync()
     {
-        return _retryQueue.Values.ToList();
+        return Task.FromResult<IEnumerable<OutboundQueueItem>>(_retryQueue.Values.ToList());
     }
 
     private void ProcessRetryQueue(object? state)

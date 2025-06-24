@@ -91,16 +91,17 @@ public class InboundEmailQueueService : IInboundEmailQueueService
         return selectedEmail;
     }
 
-    public async Task MarkEmailAsProcessedAsync(string emailId)
+    public Task MarkEmailAsProcessedAsync(string emailId)
     {
         if (_processingEmails.TryRemove(emailId, out var email))
         {
             _logger.LogInformation("Email processed successfully - ID: {EmailId}, From: {From}, Attempts: {Attempts}",
                 emailId, email.EmailData.From, email.ProcessingAttempts);
         }
+        return Task.CompletedTask;
     }
 
-    public async Task MarkEmailAsFailedAsync(string emailId, string error)
+    public Task MarkEmailAsFailedAsync(string emailId, string error)
     {
         if (_processingEmails.TryRemove(emailId, out var email))
         {
@@ -129,16 +130,17 @@ public class InboundEmailQueueService : IInboundEmailQueueService
                     emailId, email.EmailData.From, error);
             }
         }
+        return Task.CompletedTask;
     }
 
-    public async Task<int> GetQueueCountAsync()
+    public Task<int> GetQueueCountAsync()
     {
-        return _queue.Count + _processingEmails.Count;
+        return Task.FromResult(_queue.Count + _processingEmails.Count);
     }
 
-    public async Task<IEnumerable<QueuedEmail>> GetFailedEmailsAsync()
+    public Task<IEnumerable<QueuedEmail>> GetFailedEmailsAsync()
     {
-        return _failedEmails.Values.ToList();
+        return Task.FromResult<IEnumerable<QueuedEmail>>(_failedEmails.Values.ToList());
     }
 }
 

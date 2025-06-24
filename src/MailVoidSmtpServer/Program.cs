@@ -62,7 +62,8 @@ public class Program
 
                 var apiConfig = configuration.GetSection("MailVoidApi");
                 Console.WriteLine($"API BaseUrl from config: {apiConfig["BaseUrl"]}");
-                Console.WriteLine($"API Key from config: {(string.IsNullOrEmpty(apiConfig["ApiKey"]) ? "(empty)" : $"(loaded: {apiConfig["ApiKey"].Substring(0, Math.Min(10, apiConfig["ApiKey"].Length))}...)")}");
+                var apiKey = apiConfig["ApiKey"];
+                Console.WriteLine($"API Key from config: {(string.IsNullOrEmpty(apiKey) ? "(empty)" : $"(loaded: {apiKey.Substring(0, Math.Min(10, apiKey.Length))}...)")}");
                 Console.WriteLine($"=== END CONFIG DEBUG ===\n");
             })
             .ConfigureLogging((context, logging) =>

@@ -1,6 +1,4 @@
-﻿using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmtpServer;
@@ -27,7 +25,6 @@ public class SmtpServerService
     {
         _logger.LogInformation("Starting SMTP server on port {Port}", _options.Port);
 
-        var cert = CreateCertificate();
         var options = new SmtpServerOptionsBuilder()
             .ServerName(_options.Name)
             .MaxMessageSize(_options.MaxMessageSize)
@@ -35,11 +32,8 @@ public class SmtpServerService
             {
                 builder.Port(25, isSecure: false)
                 .AllowUnsecureAuthentication(true)   // Allow plain text for port 25
-                .AuthenticationRequired(false)       // Optional auth for relay
-                .Certificate(cert);
-                // Port 587: Require STARTTLS for submission  
-
-
+                .AuthenticationRequired(false);      // Optional auth for relay
+                // No certificate for plain text only
             })
 
 
@@ -71,28 +65,8 @@ public class SmtpServerService
 
 
 
-        _logger.LogInformation("SMTP server started successfully on ports 25 (plain), 587 (STARTTLS), 465 (TLS)");
+        _logger.LogInformation("SMTP server started successfully on port 25 (plain text only)");
         return Task.CompletedTask;
-    }
-    private X509Certificate2 CreateCertificate()
-    {
-        if (!string.IsNullOrEmpty(_options.CertificatePath))
-        {
-            try
-            {
-                // Load certificate from file
-                return string.IsNullOrEmpty(_options.CertificatePassword)
-                    ? X509CertificateLoader.LoadCertificateFromFile(_options.CertificatePath)
-                    : X509CertificateLoader.LoadPkcs12FromFile(_options.CertificatePath, _options.CertificatePassword);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to load SSL certificate from {Path}", _options.CertificatePath);
-                throw;
-            }
-        }
-        // Generate self-signed certificate for development/testing
-        return GenerateSelfSignedCertificate(_options.Name);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -155,43 +129,6 @@ public class SmtpServerService
             securityInfo);
     }
 
-    private static X509Certificate2 GenerateSelfSignedCertificate(string serverName)
-    {
-        var distinguishedName = new X500DistinguishedName($"CN={serverName}");
-
-        using var rsa = RSA.Create(2048);
-        var request = new CertificateRequest(distinguishedName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-
-        // Add extensions
-        request.CertificateExtensions.Add(
-            new X509KeyUsageExtension(
-                X509KeyUsageFlags.DataEncipherment |
-                X509KeyUsageFlags.KeyEncipherment |
-                X509KeyUsageFlags.DigitalSignature,
-                false));
-
-        request.CertificateExtensions.Add(
-            new X509EnhancedKeyUsageExtension(
-                new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, // Server Authentication
-                false));
-
-        // Add Subject Alternative Names
-        var sanBuilder = new SubjectAlternativeNameBuilder();
-        sanBuilder.AddDnsName(serverName);
-        sanBuilder.AddDnsName("localhost");
-        sanBuilder.AddIpAddress(System.Net.IPAddress.Loopback);
-        sanBuilder.AddIpAddress(System.Net.IPAddress.IPv6Loopback);
-        request.CertificateExtensions.Add(sanBuilder.Build());
-
-        // Create certificate valid for 1 year
-        var certificate = request.CreateSelfSigned(
-            DateTimeOffset.Now.AddDays(-1),
-            DateTimeOffset.Now.AddYears(1));
-
-        // For .NET 9, we can return the certificate directly
-        // The certificate already has the private key attached from CreateSelfSigned
-        return certificate;
-    }
 }
 
 public class SmtpServerHostedService : IHostedService
