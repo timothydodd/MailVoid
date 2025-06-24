@@ -1,54 +1,30 @@
-﻿using System.Text.Json;
-using System.Text.RegularExpressions;
-using MailVoidApi.Data;
+﻿using MailVoidApi.Data;
 using MailVoidWeb;
 using MailVoidWeb.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace MailVoidApi.Services;
 
 public interface IMailGroupService
 {
     Task SetMailPath(Mail m);
-    Task UpdateMailsByMailGroupPattern(MailGroup group);
+    Task<MailGroup> GetOrCreateMailGroup(string subdomain, Guid? userId = null);
+    Task<bool> HasUserAccess(long mailGroupId, Guid userId);
+    Task GrantUserAccess(long mailGroupId, Guid userId);
+    Task RevokeUserAccess(long mailGroupId, Guid userId);
 }
 
 public class MailGroupService : IMailGroupService
 {
     private readonly ILogger<MailGroupService> _logger;
     private readonly MailVoidDbContext _context;
-    private readonly IMemoryCache _memoryCache;
     
-    public MailGroupService(ILogger<MailGroupService> logger, MailVoidDbContext context, IMemoryCache memoryCache)
+    public MailGroupService(ILogger<MailGroupService> logger, MailVoidDbContext context)
     {
         _logger = logger;
         _context = context;
-        _memoryCache = memoryCache;
     }
 
-    private const string MailSetKey = "MAIL_SETS";
-    private readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions() { PropertyNameCaseInsensitive = true };
-    private async Task<List<MailRuleSet>> GetMailRuleSets()
-    {
-        if (_memoryCache.TryGetValue(MailSetKey, out List<MailRuleSet>? ruleset))
-        {
-            return ruleset ?? new List<MailRuleSet>();
-        }
-        
-        var mailGroups = await _context.MailGroups.ToListAsync();
-        var groups = mailGroups.Select(group =>
-        {
-            return new MailRuleSet() 
-            { 
-                Path = group.Path, 
-                Rules = JsonSerializer.Deserialize<List<MailRule>>(group.Rules ?? "[]", JsonOptions) ?? new List<MailRule>() 
-            };
-        }).ToList();
-        
-        _memoryCache.Set(MailSetKey, groups);
-        return groups;
-    }
     public async Task SetMailPath(Mail m)
     {
         // First check if this email is claimed by a user
@@ -62,120 +38,98 @@ public class MailGroupService : IMailGroupService
             return;
         }
 
-        // If not claimed, check mail group rules
-        var sets = await this.GetMailRuleSets();
-
-        foreach (var s in sets)
-        {
-            if (CheckMailRules(s, m))
-                return;
-        }
-    }
-    private bool CheckMailRules(MailRuleSet set, Mail m)
-    {
-
-        foreach (var r in set.Rules)
-        {
-            bool found = false;
-            switch (r.TypeId)
-            {
-                case (int)MailRuleType.Contains:
-                    {
-                        found = m.To.Contains(r.Value);
-
-                    }
-                    break;
-                case (int)MailRuleType.StartsWith:
-                    {
-                        found = m.To.StartsWith(r.Value);
-                    }
-                    break;
-                case (int)MailRuleType.EndsWith:
-                    {
-                        found = m.To.EndsWith(r.Value);
-                    }
-                    break;
-                case (int)MailRuleType.RegEx:
-                    {
-                        var regex = new Regex(r.Value);
-                        found = regex.IsMatch(m.To);
-                    }
-                    break;
-
-            }
-            if (found)
-            {
-                m.MailGroupPath = set.Path;
-                return true;
-            }
-
-        }
-        return false;
+        // For unclaimed emails, extract subdomain and create/assign to mail group
+        var subdomain = EmailSubdomainHelper.ExtractSubdomain(m.To);
+        m.MailGroupPath = EmailSubdomainHelper.GenerateMailGroupPath(subdomain);
+        
+        // Ensure the mail group exists for this subdomain
+        await GetOrCreateMailGroup(subdomain);
     }
 
-    public async Task UpdateMailsByMailGroupPattern(MailGroup group)
+    public async Task<MailGroup> GetOrCreateMailGroup(string subdomain, Guid? userId = null)
     {
-        // Convert mailgroup rule into regex
-        if (string.IsNullOrEmpty(group.Rules))
+        var path = EmailSubdomainHelper.GenerateMailGroupPath(subdomain);
+        
+        var existingGroup = await _context.MailGroups
+            .FirstOrDefaultAsync(mg => mg.Subdomain == subdomain);
+
+        if (existingGroup != null)
         {
-            _logger.LogWarning("MailGroup rules are empty or null.");
-            return;
+            return existingGroup;
         }
 
-        try
+        // Create new mail group with admin user as owner if provided
+        var adminUser = userId.HasValue ? await _context.Users.FirstAsync(u => u.Id == userId.Value) :
+                       await _context.Users.FirstAsync(u => u.UserName == "admin");
+
+        var newGroup = new MailGroup
         {
-            var rs = new MailRuleSet() 
-            { 
-                Path = group.Path, 
-                Rules = JsonSerializer.Deserialize<List<MailRule>>(group.Rules, JsonOptions) ?? new List<MailRule>() 
+            Path = path,
+            Subdomain = subdomain,
+            OwnerUserId = adminUser.Id,
+            IsPublic = true,
+            Description = $"Auto-generated group for {subdomain} subdomain"
+        };
+
+        _context.MailGroups.Add(newGroup);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation($"Created new mail group for subdomain: {subdomain}");
+        return newGroup;
+    }
+
+    public async Task<bool> HasUserAccess(long mailGroupId, Guid userId)
+    {
+        var mailGroup = await _context.MailGroups
+            .Include(mg => mg.MailGroupUsers)
+            .FirstOrDefaultAsync(mg => mg.Id == mailGroupId);
+
+        if (mailGroup == null)
+            return false;
+
+        // Owner always has access
+        if (mailGroup.OwnerUserId == userId)
+            return true;
+
+        // Public groups are accessible to all users
+        if (mailGroup.IsPublic)
+            return true;
+
+        // Check explicit user access
+        return mailGroup.MailGroupUsers.Any(mgu => mgu.UserId == userId);
+    }
+
+    public async Task GrantUserAccess(long mailGroupId, Guid userId)
+    {
+        var existingAccess = await _context.MailGroupUsers
+            .FirstOrDefaultAsync(mgu => mgu.MailGroupId == mailGroupId && mgu.UserId == userId);
+
+        if (existingAccess == null)
+        {
+            var mailGroupUser = new MailGroupUser
+            {
+                MailGroupId = mailGroupId,
+                UserId = userId
             };
 
-            if (rs.Rules == null || rs.Rules.Count == 0)
-                return;
-
-            var mails = await _context.Mails
-                .Where(m => m.MailGroupPath == null)
-                .ToListAsync();
-
-            var updatedCount = 0;
-            foreach (var m in mails)
-            {
-                if (CheckMailRules(rs, m))
-                {
-                    updatedCount++;
-                }
-            }
-
-            if (updatedCount > 0)
-            {
-                await _context.SaveChangesAsync();
-            }
-
-            _logger.LogInformation($"Updated {updatedCount} mails for MailGroup {group.Id}.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating mails by MailGroup pattern.");
+            _context.MailGroupUsers.Add(mailGroupUser);
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation($"Granted user {userId} access to mail group {mailGroupId}");
         }
     }
 
-}
-public class MailRule
-{
-    public required string Value { get; set; }
-    public required int TypeId { get; set; }
+    public async Task RevokeUserAccess(long mailGroupId, Guid userId)
+    {
+        var existingAccess = await _context.MailGroupUsers
+            .FirstOrDefaultAsync(mgu => mgu.MailGroupId == mailGroupId && mgu.UserId == userId);
 
-}
-public class MailRuleSet
-{
-    public required string Path { get; set; }
-    public required List<MailRule> Rules { get; set; }
-}
-public enum MailRuleType
-{
-    None = 0,
-    Contains = 1,
-    StartsWith = 2,
-    EndsWith = 3,
-    RegEx = 4,
+        if (existingAccess != null)
+        {
+            _context.MailGroupUsers.Remove(existingAccess);
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation($"Revoked user {userId} access from mail group {mailGroupId}");
+        }
+    }
 }

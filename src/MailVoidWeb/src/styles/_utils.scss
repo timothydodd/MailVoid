@@ -32,6 +32,12 @@
   border: 1px solid rgba(255, 85, 85, 0.3);
 }
 
+.badge-warning {
+  background-color: rgba(255, 184, 0, 0.2);
+  color: var(--orange);
+  border: 1px solid rgba(255, 184, 0, 0.3);
+}
+
 /* Messages */
 .message {
   padding: 0.75rem 1rem;
@@ -143,4 +149,9 @@
   font: 600 0.75rem "Roboto", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* Text utilities */
+.text-muted {
+  color: var(--comment) !important;
 }

@@ -1,174 +1,209 @@
+import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import {
-  AbstractControl,
-  FormArray,
-  FormControl,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-  ValidationErrors,
-  ValidatorFn,
-  Validators,
-} from '@angular/forms';
+import { FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
-import { ValdemortModule } from 'ngx-valdemort';
 import { LucideAngularModule } from 'lucide-angular';
-import { MailGroup, MailService } from '../../../_services/api/mail.service';
-import { CheckComponent } from '../../check/check.component';
+import { ValdemortModule } from 'ngx-valdemort';
+import { MailGroup, MailGroupUser, MailService, User } from '../../../_services/api/mail.service';
 @Component({
   selector: 'app-mail-group',
-  imports: [ReactiveFormsModule, FormsModule, ValdemortModule, NgSelectModule, CheckComponent, LucideAngularModule],
+  imports: [CommonModule, LucideAngularModule, ReactiveFormsModule, FormsModule, NgSelectModule, ValdemortModule],
   template: `
     <div class="mail-group-layout">
-      <!-- Mail Groups List Panel -->
-      <div class="groups-panel">
-        <div class="panel-header">
-          <h4 class="panel-title">Mail Groups</h4>
-          <button class="btn btn-primary btn-sm" (click)="newForm()">
-            <span>Add Group</span>
-          </button>
-        </div>
-        <div class="groups-list">
-          @if (mailGroups().length === 0) {
-            <div class="empty-state">
-              <p class="empty-message">No mail groups configured</p>
-              <button class="btn btn-word" (click)="newForm()">Create your first group</button>
-            </div>
-          } @else {
-            @for (item of mailGroups(); track item.id) {
-              <div class="group-item" [class.active]="selectedMailGroup()?.value?.id === item.id">
-                <div class="group-info">
-                  <h5 class="group-name">{{ getMailNameFromPath(item.path) }}</h5>
-                  <p class="group-path">{{ item.path }}</p>
-                  <span class="group-badge" [class.public]="item.isPublic" [class.private]="!item.isPublic">
-                    {{ item.isPublic ? 'Public' : 'Private' }}
-                  </span>
-                </div>
-                <button class="btn btn-icon" (click)="buildForm(item)" title="Edit Group">
-                  <lucide-icon name="pencil" size="16"></lucide-icon>
-                </button>
-              </div>
-            }
-          }
+      <div class="info-banner">
+        <div class="info-content">
+          <lucide-icon name="info" size="20" class="info-icon"></lucide-icon>
+          <div class="info-text">
+            <h5>Mail Group Management</h5>
+            <p>
+              Mail groups are automatically created based on email subdomains. You can manage group settings and user
+              access for groups you own.
+            </p>
+          </div>
         </div>
       </div>
 
-      <!-- Mail Group Editor Panel -->
-      <div class="editor-panel">
-        @if (selectedMailGroup(); as mg) {
-          <div class="form-container" [formGroup]="mg">
-            <div class="panel-header">
-              <h4 class="panel-title">
-                {{ mg.value.id ? 'Edit Mail Group' : 'New Mail Group' }}
-              </h4>
-            </div>
+      <!-- Mail Groups List -->
+      <div class="groups-container">
+        <div class="container-header">
+          <h4 class="container-title">Available Mail Groups</h4>
+          <span class="groups-count">{{ mailGroups().length }} groups</span>
+        </div>
 
-            <div class="form-content">
-              <!-- Basic Settings Section -->
-              <div class="form-section">
-                <h5 class="section-title">Basic Settings</h5>
-
-                <div class="form-group">
-                  <label for="path" class="form-label required">Path</label>
-                  <input
-                    id="path"
-                    type="text"
-                    class="form-control"
-                    formControlName="path"
-                    placeholder="e.g., /orders, /notifications"
-                  />
-                  <val-errors controlName="path" label="Path"></val-errors>
-                  <div class="form-text">The path pattern for grouping emails</div>
-                </div>
-
-                <div class="form-group">
-                  <app-check formControlName="isPublic" label="Public Group"></app-check>
-                  <div class="checkbox-description">
-                    <small>Public groups are visible to all users</small>
-                  </div>
-                  <val-errors controlName="isPublic" label="Public setting"></val-errors>
-                </div>
-              </div>
-
-              <!-- Rules Section -->
-              <div class="form-section">
-                <div class="section-header">
-                  <h5 class="section-title">Routing Rules</h5>
-                  <button type="button" class="btn btn-primary btn-sm" (click)="addRule()">Add Rule</button>
-                </div>
-
-                <div class="rules-container">
-                  @if (mg.controls.rules.controls.length === 0) {
-                    <div class="empty-rules">
-                      <p class="empty-message">No rules defined</p>
-                      <button type="button" class="btn btn-word" (click)="addRule()">Add your first rule</button>
-                    </div>
-                  } @else {
-                    @for (rule of mg.controls.rules.controls; track $index) {
-                      <div class="rule-card" [formGroup]="rule">
-                        <div class="rule-header">
-                          <span class="rule-number">Rule {{ $index + 1 }}</span>
-                          <button
-                            type="button"
-                            class="btn btn-icon btn-danger"
-                            (click)="mg.controls.rules.removeAt($index)"
-                            title="Remove rule"
-                          >
-                            <lucide-icon name="trash-2" size="14"></lucide-icon>
-                          </button>
-                        </div>
-
-                        <div class="rule-fields">
-                          <div class="form-group">
-                            <label class="form-label required">Rule Type</label>
-                            <ng-select
-                              class="form-select"
-                              formControlName="typeId"
-                              [items]="typeOptions"
-                              bindLabel="name"
-                              bindValue="id"
-                              placeholder="Select rule type"
-                            >
-                            </ng-select>
-                            <val-errors controlName="typeId" label="Type"></val-errors>
-                          </div>
-
-                          <div class="form-group">
-                            <label class="form-label required">Pattern Value</label>
-                            <input
-                              type="text"
-                              class="form-control"
-                              formControlName="value"
-                              [placeholder]="getPlaceholderForRuleType(rule.value.typeId)"
-                            />
-                            <val-errors controlName="value" label="Value"></val-errors>
-                          </div>
-                        </div>
-                      </div>
-                    }
-                  }
-                </div>
-              </div>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="form-actions">
-              <button type="button" class="btn btn-secondary" (click)="cancelForm()">Cancel</button>
-              <button type="button" class="btn btn-primary" [disabled]="!mg.valid" (click)="saveForm()">
-                {{ mg.value.id ? 'Update Group' : 'Create Group' }}
-              </button>
-            </div>
+        @if (mailGroups().length === 0) {
+          <div class="empty-state">
+            <lucide-icon name="mail" size="48" class="empty-icon"></lucide-icon>
+            <h5 class="empty-title">No Mail Groups Yet</h5>
+            <p class="empty-message">Mail groups will appear here automatically when emails are received.</p>
           </div>
         } @else {
-          <div class="editor-empty">
-            <div class="empty-editor">
-              <lucide-icon name="plus-circle" size="48" class="empty-icon"></lucide-icon>
-              <h5 class="empty-title">Select or Create a Mail Group</h5>
-              <p class="empty-message">Choose a group from the list to edit, or create a new one to get started.</p>
-            </div>
+          <div class="groups-grid">
+            @for (group of mailGroups(); track group.id) {
+              <div class="group-card" [class.selected]="selectedGroup()?.id === group.id">
+                <div class="group-header">
+                  <div class="group-icon">
+                    <lucide-icon name="mail" size="24"></lucide-icon>
+                  </div>
+                  <div class="group-info">
+                    <h5 class="group-subdomain">{{ group.subdomain || 'Unknown' }}</h5>
+                    <p class="group-path">{{ group.path || 'No path assigned' }}</p>
+                  </div>
+                  <div class="group-badges">
+                    <span class="group-badge" [class.public]="group.isPublic" [class.private]="!group.isPublic">
+                      {{ group.isPublic ? 'Public' : 'Private' }}
+                    </span>
+                    @if (group.isOwner) {
+                      <span class="owner-badge">Owner</span>
+                    }
+                  </div>
+                </div>
+
+                @if (group.description) {
+                  <p class="group-description">{{ group.description }}</p>
+                }
+
+                <div class="group-meta">
+                  <div class="meta-item">
+                    <lucide-icon name="calendar" size="14"></lucide-icon>
+                    <span>Created {{ formatDate(group.createdAt) }}</span>
+                  </div>
+                </div>
+
+                @if (group.isOwner) {
+                  <div class="group-actions">
+                    <button class="btn btn-outline btn-sm" (click)="editGroup(group)" title="Edit Group">
+                      <lucide-icon name="edit" size="14"></lucide-icon>
+                      Edit
+                    </button>
+                    <button class="btn btn-outline btn-sm" (click)="manageUsers(group)" title="Manage Users">
+                      <lucide-icon name="users" size="14"></lucide-icon>
+                      Users
+                    </button>
+                  </div>
+                }
+              </div>
+            }
           </div>
         }
       </div>
+
+      <!-- Edit Group Panel -->
+      @if (editingGroup() && editForm()) {
+        <div class="edit-panel">
+          <div class="panel-header">
+            <h4 class="panel-title">Edit Mail Group - {{ editingGroup()?.subdomain }}</h4>
+            <button class="btn btn-icon" (click)="cancelEdit()" title="Close">
+              <lucide-icon name="x" size="16"></lucide-icon>
+            </button>
+          </div>
+          <div class="panel-content" [formGroup]="editForm()!">
+            <div class="form-group">
+              <label for="description" class="form-label">Description</label>
+              <textarea
+                id="description"
+                class="form-control"
+                formControlName="description"
+                placeholder="Enter a description for this mail group"
+                rows="3"
+              ></textarea>
+              <val-errors controlName="description" label="Description"></val-errors>
+            </div>
+
+            <div class="form-group">
+              <div class="form-check">
+                <input type="checkbox" id="isPublic" class="form-check-input" formControlName="isPublic" />
+                <label for="isPublic" class="form-check-label"> Public Group </label>
+              </div>
+              <div class="form-text">
+                Public groups are accessible to all users. Private groups require explicit user access.
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" (click)="cancelEdit()">Cancel</button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="!editForm()?.valid || isLoading()"
+                (click)="saveGroup()"
+              >
+                <span *ngIf="isLoading()">Saving...</span>
+                <span *ngIf="!isLoading()">Save Changes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- User Management Panel -->
+      @if (managingUsers() && selectedGroup()) {
+        <div class="users-panel">
+          <div class="panel-header">
+            <h4 class="panel-title">Manage Users - {{ selectedGroup()?.subdomain }}</h4>
+            <button class="btn btn-icon" (click)="closeUserManagement()" title="Close">
+              <lucide-icon name="x" size="16"></lucide-icon>
+            </button>
+          </div>
+          <div class="panel-content">
+            <!-- Add User Section -->
+            <div class="add-user-section">
+              <h5>Add User Access</h5>
+              <div class="add-user-form">
+                <ng-select
+                  [(ngModel)]="selectedUserId"
+                  [items]="availableUsers()"
+                  bindLabel="userName"
+                  bindValue="id"
+                  placeholder="Select a user to grant access"
+                  class="user-select"
+                >
+                  <ng-option *ngFor="let user of availableUsers()" [value]="user.id">
+                    {{ user.userName }}
+                  </ng-option>
+                </ng-select>
+                <button class="btn btn-primary" [disabled]="!selectedUserId || isLoading()" (click)="addUser()">
+                  <lucide-icon name="plus" size="14"></lucide-icon>
+                  Add User
+                </button>
+              </div>
+            </div>
+
+            <!-- Current Users List -->
+            <div class="current-users-section">
+              <h5>Current Users</h5>
+              @if (groupUsers().length === 0) {
+                <p class="text-muted">No users have been granted access to this group.</p>
+              } @else {
+                <div class="users-list">
+                  @for (groupUser of groupUsers(); track groupUser.id) {
+                    <div class="user-item">
+                      <div class="user-info">
+                        <span class="user-name">{{ groupUser.user.userName }}</span>
+                        <span class="user-granted">Granted {{ formatDate(groupUser.grantedAt) }}</span>
+                      </div>
+                      <button
+                        class="btn btn-danger btn-sm"
+                        (click)="removeUser(groupUser)"
+                        title="Remove user access"
+                        [disabled]="isLoading()"
+                      >
+                        <lucide-icon name="trash-2" size="14"></lucide-icon>
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            @if (selectedGroup()?.isPublic) {
+              <div class="public-notice">
+                <lucide-icon name="info" size="16"></lucide-icon>
+                <span>This is a public group. All users automatically have access regardless of the list above.</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
   `,
   styleUrl: './mail-group.component.scss',
@@ -176,125 +211,172 @@ import { CheckComponent } from '../../check/check.component';
 })
 export class MailGroupComponent {
   mailService = inject(MailService);
+
+  // Data signals
   mailGroups = signal<MailGroup[]>([]);
-  selectedMailGroup = signal<FormGroup<MailGroupForm> | null>(null);
-  typeOptions = [
-    { id: 1, name: 'Contains' },
-    { id: 2, name: 'Starts With' },
-    { id: 3, name: 'Ends With' },
-    { id: 4, name: 'Regex' },
-  ];
+  users = signal<User[]>([]);
+  groupUsers = signal<MailGroupUser[]>([]);
+
+  // State signals
+  selectedGroup = signal<MailGroup | null>(null);
+  editingGroup = signal<MailGroup | null>(null);
+  managingUsers = signal<boolean>(false);
+  isLoading = signal<boolean>(false);
+
+  // Form signals
+  editForm = signal<FormGroup | null>(null);
+  selectedUserId: string | null = null;
+
   constructor() {
+    this.loadMailGroups();
+    this.loadUsers();
+  }
+
+  loadMailGroups() {
     this.mailService.getMailGroups().subscribe((groups) => {
       this.mailGroups.set(groups);
     });
   }
-  getMailNameFromPath(path: string) {
-    const x = path.split('/');
-    return x[x.length - 1];
-  }
-  newForm() {
-    this.buildForm({ path: '', rules: null, isPublic: true } as MailGroup);
-  }
-  addRule() {
-    const form = this.selectedMailGroup()?.controls.rules;
-    if (!form) return;
-    form.push(
-      new FormGroup<MailRuleForm>({
-        value: new FormControl(null, [Validators.required]),
-        typeId: new FormControl(null, [Validators.required]),
-      })
-    );
-  }
-  buildForm(group: MailGroup) {
-    let rules = [];
-    if (group.rules) {
-      try {
-        rules = JSON.parse(group.rules);
-      } catch {
-        rules = [];
-      }
-    }
-    const ruleGroup: FormGroup<MailRuleForm>[] = [];
-    for (const rule of rules) {
-      ruleGroup.push(
-        new FormGroup<MailRuleForm>({
-          value: new FormControl(rule.value, [Validators.required]),
-          typeId: new FormControl<number>(rule.typeId, [Validators.required]),
-        })
-      );
-    }
-    const form = new FormGroup<MailGroupForm>({
-      id: new FormControl(group.id),
-      path: new FormControl(group.path, [Validators.required]),
-      rules: new FormArray(ruleGroup),
-      isPublic: new FormControl(group.isPublic, [Validators.required]),
+
+  loadUsers() {
+    this.mailService.getUsers().subscribe((users) => {
+      this.users.set(users);
     });
-    this.selectedMailGroup.set(form);
-  }
-  saveForm() {
-    if (this.selectedMailGroup()?.valid) {
-      const form = this.selectedMailGroup()?.value;
-      if (!form) return;
-      const mailGroup: MailGroup = {
-        id: form.id ?? 0,
-        path: form.path ?? '',
-        rules: JSON.stringify(form.rules ?? []),
-        isPublic: form.isPublic ?? false,
-        ownerUserId: '',
-      };
-      if (!form) return;
-      this.mailService.saveMailGroup(mailGroup).subscribe((group) => {
-        this.mailGroups.set([...this.mailGroups(), group]);
-        this.selectedMailGroup.set(null);
-      });
-    }
-  }
-  cancelForm() {
-    this.selectedMailGroup.set(null);
   }
 
-  getPlaceholderForRuleType(typeId: number | null | undefined): string {
-    switch (typeId) {
-      case 1:
-        return 'Text to search for (e.g., "order")';
-      case 2:
-        return 'Text to start with (e.g., "noreply@")';
-      case 3:
-        return 'Text to end with (e.g., ".com")';
-      case 4:
-        return 'Regular expression pattern (e.g., "^order-\\d+")';
-      default:
-        return 'Enter pattern value';
-    }
+  loadGroupUsers(groupId: number) {
+    this.mailService.getMailGroupUsers(groupId).subscribe((groupUsers) => {
+      this.groupUsers.set(groupUsers);
+      this.updateAvailableUsers();
+    });
   }
-}
 
-export interface MailGroupForm {
-  id: FormControl<number | null>;
-  path: FormControl<string | null>;
-  rules: FormArray<FormGroup<MailRuleForm>>;
-  isPublic: FormControl<boolean | null>;
-}
-export interface MailRuleForm {
-  value: FormControl<string | null>;
-  typeId: FormControl<number | null>;
-}
-export function validCSharpRegexValidator(): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    const pattern = control.value;
+  availableUsers = signal<User[]>([]);
 
-    if (!pattern) {
-      // If no value, consider it valid (use required validator if needed)
-      return null;
-    }
+  updateAvailableUsers() {
+    const currentGroupUserIds = this.groupUsers().map((gu) => gu.userId);
+    const available = this.users().filter((user) => !currentGroupUserIds.includes(user.id));
+    this.availableUsers.set(available);
+  }
 
-    try {
-      // Attempt to compile the regex
-      new RegExp(pattern);
-      return null; // Valid regex
-    } catch (e) {
-      return { invalidRegex: e }; // Invalid regex
-    }
-  };
+  formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+
+  // Group editing methods
+  editGroup(group: MailGroup) {
+    this.editingGroup.set(group);
+    this.selectedGroup.set(group);
+    this.managingUsers.set(false);
+
+    const form = new FormGroup({
+      description: new FormControl(group.description || ''),
+      isPublic: new FormControl(group.isPublic),
+    });
+
+    this.editForm.set(form);
+  }
+
+  cancelEdit() {
+    this.editingGroup.set(null);
+    this.editForm.set(null);
+    this.selectedGroup.set(null);
+  }
+
+  saveGroup() {
+    const form = this.editForm();
+    const group = this.editingGroup();
+
+    if (!form || !group || !form.valid) return;
+
+    this.isLoading.set(true);
+
+    const updateData = {
+      id: group.id,
+      description: form.value.description,
+      isPublic: form.value.isPublic,
+    };
+
+    this.mailService.updateMailGroup(updateData).subscribe({
+      next: (updatedGroup) => {
+        // Update the group in the list
+        const groups = this.mailGroups();
+        const index = groups.findIndex((g) => g.id === updatedGroup.id);
+        if (index !== -1) {
+          groups[index] = updatedGroup;
+          this.mailGroups.set([...groups]);
+        }
+
+        this.cancelEdit();
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Error updating group:', error);
+        this.isLoading.set(false);
+      },
+    });
+  }
+
+  // User management methods
+  manageUsers(group: MailGroup) {
+    this.selectedGroup.set(group);
+    this.editingGroup.set(null);
+    this.managingUsers.set(true);
+    this.editForm.set(null);
+    this.selectedUserId = null;
+
+    this.loadGroupUsers(group.id);
+  }
+
+  closeUserManagement() {
+    this.managingUsers.set(false);
+    this.selectedGroup.set(null);
+    this.groupUsers.set([]);
+    this.availableUsers.set([]);
+    this.selectedUserId = null;
+  }
+
+  addUser() {
+    const group = this.selectedGroup();
+    const userId = this.selectedUserId;
+
+    if (!group || !userId) return;
+
+    this.isLoading.set(true);
+
+    this.mailService.grantUserAccess(group.id, userId).subscribe({
+      next: () => {
+        this.loadGroupUsers(group.id);
+        this.selectedUserId = null;
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Error adding user:', error);
+        this.isLoading.set(false);
+      },
+    });
+  }
+
+  removeUser(groupUser: MailGroupUser) {
+    const group = this.selectedGroup();
+    if (!group) return;
+
+    this.isLoading.set(true);
+
+    this.mailService.revokeUserAccess(group.id, groupUser.userId).subscribe({
+      next: () => {
+        this.loadGroupUsers(group.id);
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Error removing user:', error);
+        this.isLoading.set(false);
+      },
+    });
+  }
 }

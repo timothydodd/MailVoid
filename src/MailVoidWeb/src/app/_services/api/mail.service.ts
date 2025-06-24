@@ -56,8 +56,25 @@ export class MailService {
   getMailGroups() {
     return this.http.get<MailGroup[]>(`${environment.apiUrl}/api/mail/groups`);
   }
-  saveMailGroup(mailGroup: MailGroup) {
-    return this.http.post<MailGroup>(`${environment.apiUrl}/api/mail/groups`, mailGroup);
+  
+  updateMailGroup(mailGroup: Partial<MailGroup> & { id: number }) {
+    return this.http.put<MailGroup>(`${environment.apiUrl}/api/mail/groups/${mailGroup.id}`, mailGroup);
+  }
+  
+  getUsers() {
+    return this.http.get<User[]>(`${environment.apiUrl}/api/mail/users`);
+  }
+  
+  getMailGroupUsers(mailGroupId: number) {
+    return this.http.get<MailGroupUser[]>(`${environment.apiUrl}/api/mail/groups/${mailGroupId}/users`);
+  }
+  
+  grantUserAccess(mailGroupId: number, userId: string) {
+    return this.http.post(`${environment.apiUrl}/api/mail/groups/${mailGroupId}/access`, { userId });
+  }
+  
+  revokeUserAccess(mailGroupId: number, userId: string) {
+    return this.http.delete(`${environment.apiUrl}/api/mail/groups/${mailGroupId}/access/${userId}`);
   }
   
   // Claimed Mailbox methods
@@ -97,10 +114,12 @@ export interface Mail {
 
 export interface MailGroup {
   id: number;
-  path: string;
-  rules: string | null;
-  ownerUserId: string;
+  path: string | null;
+  subdomain: string | null;
+  description: string | null;
   isPublic: boolean;
+  createdAt: string;
+  isOwner: boolean;
 }
 export interface PagedResults<T> {
   items: T[] | null;
@@ -115,9 +134,8 @@ export interface MailBoxGroups {
   groupName: string;
   mailBoxes: string[];
 }
-export interface MailRule {
-  value: string;
-  typeId: number;
+export interface GrantAccessRequest {
+  userId: string;
 }
 
 export interface ClaimedMailbox {
@@ -125,4 +143,19 @@ export interface ClaimedMailbox {
   emailAddress: string;
   claimedOn: string;
   isActive: boolean;
+}
+
+export interface User {
+  id: string;
+  userName: string;
+  role: number;
+  timeStamp: string;
+}
+
+export interface MailGroupUser {
+  id: number;
+  mailGroupId: number;
+  userId: string;
+  grantedAt: string;
+  user: User;
 }

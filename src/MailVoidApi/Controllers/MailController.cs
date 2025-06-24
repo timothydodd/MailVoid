@@ -93,49 +93,137 @@ public class MailController : ControllerBase
     [HttpGet("groups")]
     public async Task<IActionResult> GetMailGroups()
     {
-        var groups = await _context.MailGroups.ToListAsync();
+        var userId = _userService.GetUserId();
+        var groups = await _context.MailGroups
+            .Where(mg => mg.Subdomain != null && (mg.IsPublic || mg.OwnerUserId == userId || 
+                        mg.MailGroupUsers.Any(mgu => mgu.UserId == userId)))
+            .Select(mg => new { 
+                mg.Id, 
+                Path = mg.Path ?? "",
+                Subdomain = mg.Subdomain ?? "",
+                Description = mg.Description ?? "",
+                mg.IsPublic, 
+                mg.CreatedAt,
+                IsOwner = mg.OwnerUserId == userId
+            })
+            .ToListAsync();
         return Ok(groups);
     }
-    [HttpPost("groups")]
-    public async Task<IActionResult> SaveMailGroup([FromBody] MailGroupRequest groupRequest)
+
+    [HttpPost("groups/{mailGroupId}/access")]
+    public async Task<IActionResult> GrantAccess(long mailGroupId, [FromBody] GrantAccessRequest request)
     {
-        var group = groupRequest.ToMailGroup(_userService.GetUserId());
-        if (group.Id == 0)
-        {
-            _context.MailGroups.Add(group);
-            await _context.SaveChangesAsync();
-        }
-        else
-        {
-            var existingGroup = await _context.MailGroups.FindAsync(group.Id);
-            if (existingGroup != null)
-            {
-                existingGroup.Path = group.Path;
-                existingGroup.Rules = group.Rules;
-                await _context.SaveChangesAsync();
-            }
-        }
-        await _mailGroupService.UpdateMailsByMailGroupPattern(group);
+        var currentUserId = _userService.GetUserId();
+        
+        // Check if current user is owner of the mail group
+        var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
+        if (mailGroup == null || mailGroup.OwnerUserId != currentUserId)
+            return Forbid();
+
+        await _mailGroupService.GrantUserAccess(mailGroupId, request.UserId);
         return Ok();
     }
 
-}
-public record MailGroupRequest
-{
-    public long? Id { get; set; }
-    public required string Path { get; set; }
-    public required string Rules { get; set; }
-
-    public MailGroup ToMailGroup(Guid userId)
+    [HttpDelete("groups/{mailGroupId}/access/{userId}")]
+    public async Task<IActionResult> RevokeAccess(long mailGroupId, Guid userId)
     {
-        return new MailGroup()
-        {
-            Id = Id ?? 0,
-            Path = Path,
-            Rules = Rules,
-            OwnerUserId = userId
-        };
+        var currentUserId = _userService.GetUserId();
+        
+        // Check if current user is owner of the mail group
+        var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
+        if (mailGroup == null || mailGroup.OwnerUserId != currentUserId)
+            return Forbid();
+
+        await _mailGroupService.RevokeUserAccess(mailGroupId, userId);
+        return Ok();
     }
+
+    [HttpPut("groups/{id}")]
+    public async Task<IActionResult> UpdateMailGroup(long id, [FromBody] UpdateMailGroupRequest request)
+    {
+        var currentUserId = _userService.GetUserId();
+        
+        var mailGroup = await _context.MailGroups.FindAsync(id);
+        if (mailGroup == null)
+            return NotFound();
+            
+        if (mailGroup.OwnerUserId != currentUserId)
+            return Forbid();
+
+        mailGroup.Description = request.Description;
+        mailGroup.IsPublic = request.IsPublic;
+        
+        await _context.SaveChangesAsync();
+        
+        return Ok(new {
+            mailGroup.Id,
+            Path = mailGroup.Path ?? "",
+            Subdomain = mailGroup.Subdomain ?? "",
+            Description = mailGroup.Description ?? "",
+            mailGroup.IsPublic,
+            mailGroup.CreatedAt,
+            IsOwner = true
+        });
+    }
+
+    [HttpGet("groups/{mailGroupId}/users")]
+    public async Task<IActionResult> GetMailGroupUsers(long mailGroupId)
+    {
+        var currentUserId = _userService.GetUserId();
+        
+        var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
+        if (mailGroup == null)
+            return NotFound();
+            
+        if (mailGroup.OwnerUserId != currentUserId)
+            return Forbid();
+
+        var groupUsers = await _context.MailGroupUsers
+            .Include(mgu => mgu.User)
+            .Where(mgu => mgu.MailGroupId == mailGroupId)
+            .Select(mgu => new {
+                mgu.Id,
+                mgu.MailGroupId,
+                mgu.UserId,
+                mgu.GrantedAt,
+                User = new {
+                    mgu.User.Id,
+                    mgu.User.UserName,
+                    mgu.User.Role,
+                    mgu.User.TimeStamp
+                }
+            })
+            .ToListAsync();
+            
+        return Ok(groupUsers);
+    }
+
+    [HttpGet("users")]
+    public async Task<IActionResult> GetUsers()
+    {
+        var users = await _context.Users
+            .Select(u => new {
+                u.Id,
+                u.UserName,
+                u.Role,
+                u.TimeStamp
+            })
+            .ToListAsync();
+            
+        return Ok(users);
+    }
+
+}
+
+public record GrantAccessRequest
+{
+    public required Guid UserId { get; set; }
+}
+
+public record UpdateMailGroupRequest
+{
+    public string? Description { get; set; }
+    public bool IsPublic { get; set; }
 }
 public class FilterOptions
 {

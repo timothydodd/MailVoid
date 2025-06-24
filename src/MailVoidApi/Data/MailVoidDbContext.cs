@@ -15,6 +15,7 @@ public class MailVoidDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Mail> Mails { get; set; }
     public DbSet<MailGroup> MailGroups { get; set; }
+    public DbSet<MailGroupUser> MailGroupUsers { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Contact> Contacts { get; set; }
     public DbSet<ClaimedMailbox> ClaimedMailboxes { get; set; }
@@ -53,14 +54,39 @@ public class MailVoidDbContext : DbContext
         {
             entity.ToTable("MailGroup");
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Path).IsUnique();
-            entity.Property(e => e.Path).IsRequired();
+            entity.HasIndex(e => e.Path);
+            entity.HasIndex(e => e.Subdomain);
+            entity.Property(e => e.Path).IsRequired(false);
+            entity.Property(e => e.Subdomain).IsRequired(false);
             entity.Property(e => e.OwnerUserId).IsRequired();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // Foreign key relationship to User
             entity.HasOne<User>()
                   .WithMany()
                   .HasForeignKey(e => e.OwnerUserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // MailGroupUser configuration
+        modelBuilder.Entity<MailGroupUser>(entity =>
+        {
+            entity.ToTable("MailGroupUser");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.MailGroupId, e.UserId }).IsUnique();
+            entity.Property(e => e.MailGroupId).IsRequired();
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.GrantedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Foreign key relationships
+            entity.HasOne(e => e.MailGroup)
+                  .WithMany(mg => mg.MailGroupUsers)
+                  .HasForeignKey(e => e.MailGroupId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 

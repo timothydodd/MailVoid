@@ -11,7 +11,7 @@ import { MailGroupComponent } from './mail-group/mail-group.component';
     <ng-template #modalHeader>
       <div class="settings-header">
         <h3 class="settings-title">Mail Settings</h3>
-        <p class="settings-subtitle">Configure mail groups, routing rules, and manage your mailboxes</p>
+        <p class="settings-subtitle">View mail groups and manage your mailboxes</p>
       </div>
     </ng-template>
 
@@ -21,7 +21,7 @@ import { MailGroupComponent } from './mail-group/mail-group.component';
         <div class="settings-subheader">
           <div class="settings-nav">
             <button class="nav-tab" [class.active]="activeTab() === 'groups'" (click)="setActiveTab('groups')">
-              Mail Groups
+              Subdomain Groups
             </button>
             <button class="nav-tab" [class.active]="activeTab() === 'mailboxes'" (click)="setActiveTab('mailboxes')">
               Manage Mailboxes
