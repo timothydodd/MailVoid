@@ -24,8 +24,8 @@ public class MailData
     public string From { get; init; } = string.Empty;
     public string To { get; init; } = string.Empty;
     public Dictionary<string, string> Headers { get; init; } = new();
-    public string Raw { get; init; } = string.Empty;
-    public int RawSize { get; init; }
+    public string? Html { get; init; }
+    public string? Text { get; init; }
 }
 
 public class Envelope

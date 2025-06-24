@@ -71,13 +71,16 @@ public class MailMessageStore : MessageStore
             }
 
             // Forward to MailVoid API with both raw and parsed data
+            var htmlBody = GetDecodedHtmlBody(message);
+            var textBody = GetDecodedTextBody(message);
+            
             var emailData = new EmailWebhookData
             {
                 From = message.From.Mailboxes.FirstOrDefault()?.Address ?? "unknown@unknown.com",
                 To = message.To.Mailboxes.Select(m => m.Address).ToList(),
                 Subject = message.Subject ?? "(no subject)",
-                Html = GetDecodedHtmlBody(message),
-                Text = GetDecodedTextBody(message) ?? "",
+                Html = htmlBody,
+                Text = !string.IsNullOrEmpty(textBody) ? textBody : null,
                 Headers = message.Headers
                     .GroupBy(h => h.Field)
                     .ToDictionary(g => g.Key, g => string.Join("; ", g.Select(h => h.Value))),
@@ -142,14 +145,32 @@ public class MailMessageStore : MessageStore
     {
         try
         {
-            // First try the built-in HtmlBody property
+            // First try the built-in HtmlBody property - this handles decoding properly
             var htmlBody = message.HtmlBody;
             if (!string.IsNullOrEmpty(htmlBody))
             {
+                _logger.LogDebug("Using message.HtmlBody property");
                 return htmlBody;
             }
 
-            // If that doesn't work, manually find HTML parts
+            // Check if the body is directly an HTML part
+            var body = message.Body;
+            if (body is TextPart htmlBodyPart && htmlBodyPart.IsHtml)
+            {
+                _logger.LogDebug("Found HTML TextPart in message.Body");
+                return htmlBodyPart.Text;
+            }
+
+            // For multipart messages, find the HTML part
+            if (body is Multipart multipart)
+            {
+                _logger.LogDebug("Processing multipart message for HTML");
+                var htmlText = GetTextFromMultipart(multipart, "text/html");
+                if (!string.IsNullOrEmpty(htmlText))
+                    return htmlText;
+            }
+
+            // Last resort - scan all body parts
             var htmlPart = message.BodyParts.OfType<TextPart>()
                 .FirstOrDefault(part => part.ContentType.IsMimeType("text", "html"));
 
@@ -158,14 +179,15 @@ public class MailMessageStore : MessageStore
                 _logger.LogDebug("HTML part encoding: {Encoding}, Charset: {Charset}",
                     htmlPart.ContentTransferEncoding, htmlPart.ContentType.Charset);
 
-                // The Text property should automatically decode
+                // The Text property should automatically decode quoted-printable and base64
                 return htmlPart.Text;
             }
 
             return null;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error extracting HTML body");
             return null;
         }
     }
@@ -174,29 +196,72 @@ public class MailMessageStore : MessageStore
     {
         try
         {
-            // First try the built-in TextBody property
+            // First try the built-in TextBody property - this handles multipart properly
             var textBody = message.TextBody;
             if (!string.IsNullOrEmpty(textBody))
             {
+                _logger.LogDebug("Using message.TextBody property");
                 return textBody;
             }
 
-            // If that doesn't work, manually find text parts
+            // If body is null, try to get text from the Body structure
+            var body = message.Body;
+            if (body is TextPart textBodyPart && textBodyPart.IsPlain)
+            {
+                _logger.LogDebug("Found TextPart in message.Body");
+                return textBodyPart.Text ?? "";
+            }
+
+            // For multipart messages, find the best text representation
+            if (body is Multipart multipart)
+            {
+                _logger.LogDebug("Processing multipart message with {Count} parts", multipart.Count);
+                var plainText = GetTextFromMultipart(multipart, "text/plain");
+                if (!string.IsNullOrEmpty(plainText))
+                    return plainText;
+            }
+
+            // Last resort - scan all body parts
             var textPart = message.BodyParts.OfType<TextPart>()
                 .FirstOrDefault(part => part.ContentType.IsMimeType("text", "plain"));
 
             if (textPart?.Text != null)
             {
+                _logger.LogDebug("Found text part in BodyParts scan");
                 return textPart.Text;
             }
 
+            _logger.LogDebug("No plain text found, falling back to HTML");
             // Fallback to HTML body if no text body
             return GetDecodedHtmlBody(message) ?? "";
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error extracting text body");
             return "";
         }
+    }
+
+    private string? GetTextFromMultipart(Multipart multipart, string mimeType)
+    {
+        foreach (var part in multipart)
+        {
+            if (part is TextPart textPart)
+            {
+                var parts = mimeType.Split('/');
+                if (parts.Length == 2 && textPart.ContentType.IsMimeType(parts[0], parts[1]))
+                {
+                    return textPart.Text;
+                }
+            }
+            else if (part is Multipart nestedMultipart)
+            {
+                var result = GetTextFromMultipart(nestedMultipart, mimeType);
+                if (!string.IsNullOrEmpty(result))
+                    return result;
+            }
+        }
+        return null;
     }
 }
 
@@ -206,7 +271,7 @@ public class EmailWebhookData
     public List<string> To { get; set; } = new();
     public string Subject { get; set; } = "";
     public string? Html { get; set; }
-    public string Text { get; set; } = "";
+    public string? Text { get; set; }
     public Dictionary<string, string> Headers { get; set; } = new();
     public List<AttachmentData> Attachments { get; set; } = new();
     public string? MessageId { get; set; }

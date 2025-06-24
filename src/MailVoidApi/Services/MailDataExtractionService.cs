@@ -24,26 +24,37 @@ public class MailDataExtractionService : IMailDataExtractionService
     {
         try
         {
-            var parsedData = ParseRawEmailData(mailData.Raw);
+            var subject = ExtractSubjectFromHeaders(mailData.Headers) ?? "No Subject";
+            var contentType = ExtractContentTypeFromHeaders(mailData.Headers);
+            var dateStr = mailData.Headers.TryGetValue("Date", out var date) ? date : null;
+            var parsedDate = ParseDate(dateStr);
+            
+            // Determine if content is HTML based on the presence of Html field or content type
+            var isHtml = !string.IsNullOrEmpty(mailData.Html) || 
+                        (string.IsNullOrEmpty(mailData.Html) && string.IsNullOrEmpty(mailData.Text) && 
+                         contentType?.Contains("text/html", StringComparison.OrdinalIgnoreCase) == true);
+            
+            // Use Html if available, otherwise fall back to Text
+            var body = !string.IsNullOrEmpty(mailData.Html) ? mailData.Html : (mailData.Text ?? string.Empty);
             
             var mail = new Mail
             {
                 From = ExtractEmailAddress(mailData.From),
                 To = ExtractEmailAddress(mailData.To),
-                Subject = parsedData.Subject ?? ExtractSubjectFromHeaders(mailData.Headers) ?? "No Subject",
-                Text = parsedData.Body,
-                IsHtml = parsedData.IsHtml,
+                Subject = subject,
+                Text = body,
+                IsHtml = isHtml,
                 FromName = ExtractDisplayName(mailData.From),
                 ToOthers = ExtractAdditionalRecipientsFromHeaders(mailData.Headers, mailData.To),
                 Charsets = ExtractCharsetFromHeaders(mailData.Headers),
-                CreatedOn = parsedData.Date ?? DateTime.UtcNow
+                CreatedOn = parsedDate ?? DateTime.UtcNow
             };
 
             return await Task.FromResult(mail);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to parse raw email data, falling back to basic extraction");
+            _logger.LogWarning(ex, "Failed to extract email data, falling back to basic extraction");
             return await FallbackExtractionAsync(mailData);
         }
     }
@@ -52,14 +63,18 @@ public class MailDataExtractionService : IMailDataExtractionService
     {
         var subject = ExtractSubjectFromHeaders(mailData.Headers) ?? "No Subject";
         var contentType = ExtractContentTypeFromHeaders(mailData.Headers);
-        var isHtml = contentType?.Contains("text/html", StringComparison.OrdinalIgnoreCase) == true;
+        var isHtml = !string.IsNullOrEmpty(mailData.Html) || 
+                    contentType?.Contains("text/html", StringComparison.OrdinalIgnoreCase) == true;
+        
+        // Use Html if available, otherwise fall back to Text
+        var body = !string.IsNullOrEmpty(mailData.Html) ? mailData.Html : (mailData.Text ?? string.Empty);
 
         return new Mail
         {
             From = ExtractEmailAddress(mailData.From),
             To = ExtractEmailAddress(mailData.To),
             Subject = subject,
-            Text = mailData.Raw,
+            Text = body,
             IsHtml = isHtml,
             FromName = ExtractDisplayName(mailData.From),
             ToOthers = null,
@@ -86,29 +101,6 @@ public class MailDataExtractionService : IMailDataExtractionService
         return displayNameMatch.Success ? displayNameMatch.Groups[1].Value.Trim().Trim('"') : null;
     }
 
-    private (string Body, bool IsHtml, string? Subject, DateTime? Date) ParseRawEmailData(string rawData)
-    {
-        var lines = rawData.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        var headerEndIndex = Array.FindIndex(lines, string.IsNullOrEmpty);
-        
-        if (headerEndIndex == -1)
-        {
-            // No empty line found, assume entire content is body
-            return (rawData, DetectHtmlContent(rawData), null, null);
-        }
-
-        var headerLines = lines.Take(headerEndIndex).ToArray();
-        var bodyLines = lines.Skip(headerEndIndex + 1).ToArray();
-        var body = string.Join("\n", bodyLines);
-
-        var subject = DecodeMimeHeader(ExtractHeaderValue(headerLines, "Subject"));
-        var dateStr = ExtractHeaderValue(headerLines, "Date");
-        var date = ParseDate(dateStr);
-        var isHtml = DetectHtmlContent(body) || 
-                    ExtractHeaderValue(headerLines, "Content-Type")?.Contains("text/html", StringComparison.OrdinalIgnoreCase) == true;
-
-        return (body, isHtml, subject, date);
-    }
 
     private string? ExtractHeaderValue(string[] headerLines, string headerName)
     {
