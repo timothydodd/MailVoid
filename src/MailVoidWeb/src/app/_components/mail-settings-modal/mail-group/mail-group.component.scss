@@ -204,6 +204,18 @@
   justify-content: flex-end;
 }
 
+.private-label {
+  color: var(--orange);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.25rem 0.5rem;
+  background-color: rgba(255, 184, 0, 0.1);
+  border: 1px solid rgba(255, 184, 0, 0.3);
+  border-radius: 12px;
+}
+
 /* Badges */
 .group-badge {
   display: inline-block;

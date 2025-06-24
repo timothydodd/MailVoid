@@ -1,7 +1,6 @@
 ﻿using MailVoidApi.Models;
 using MailVoidWeb;
 using MailVoidWeb.Data.Models;
-using MailVoidWeb.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace MailVoidApi.Data;
@@ -18,7 +17,6 @@ public class MailVoidDbContext : DbContext
     public DbSet<MailGroupUser> MailGroupUsers { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Contact> Contacts { get; set; }
-    public DbSet<ClaimedMailbox> ClaimedMailboxes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +56,8 @@ public class MailVoidDbContext : DbContext
             entity.HasIndex(e => e.Subdomain);
             entity.Property(e => e.Path).IsRequired(false);
             entity.Property(e => e.Subdomain).IsRequired(false);
+            entity.Property(e => e.IsUserPrivate).HasDefaultValue(false);
+            entity.Property(e => e.IsDefaultMailbox).HasDefaultValue(false);
             entity.Property(e => e.OwnerUserId).IsRequired();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -118,21 +118,5 @@ public class MailVoidDbContext : DbContext
             entity.Property(e => e.Name).IsRequired();
         });
 
-        // ClaimedMailbox configuration
-        modelBuilder.Entity<ClaimedMailbox>(entity =>
-        {
-            entity.ToTable("ClaimedMailbox");
-            entity.HasKey(e => e.Id);
-            // Indexes are created manually in migration due to longtext key length requirements
-            entity.Property(e => e.EmailAddress).IsRequired();
-            entity.Property(e => e.UserId).IsRequired();
-            // ClaimedOn will be set in code, no database default needed
-
-            // Foreign key relationship to User
-            entity.HasOne(e => e.User)
-                  .WithMany()
-                  .HasForeignKey(e => e.UserId)
-                  .OnDelete(DeleteBehavior.Cascade);
-        });
     }
 }

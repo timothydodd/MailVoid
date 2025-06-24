@@ -129,7 +129,6 @@ public class Program
         builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
         builder.Services.AddScoped<IMailGroupService, MailGroupService>();
         builder.Services.AddScoped<IUserService, UserService>();
-        builder.Services.AddScoped<IClaimedMailboxService, ClaimedMailboxService>();
         builder.Services.AddScoped<UserManagementService>();
         builder.Services.AddScoped<IMailDataExtractionService, MailDataExtractionService>();
         builder.Services.AddSingleton<TimedCache>();

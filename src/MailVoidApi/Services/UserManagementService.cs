@@ -8,11 +8,13 @@ public class UserManagementService
 {
     private readonly MailVoidDbContext _context;
     private readonly PasswordService _passwordService;
+    private readonly IMailGroupService _mailGroupService;
 
-    public UserManagementService(MailVoidDbContext context, PasswordService passwordService)
+    public UserManagementService(MailVoidDbContext context, PasswordService passwordService, IMailGroupService mailGroupService)
     {
         _context = context;
         _passwordService = passwordService;
+        _mailGroupService = mailGroupService;
     }
 
     public async Task<List<User>> GetAllUsersAsync()
@@ -53,6 +55,9 @@ public class UserManagementService
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
+
+        // Create a default private MailGroup for the user
+        await _mailGroupService.CreateUserPrivateMailGroup(user.Id, isDefault: true);
 
         return user;
     }

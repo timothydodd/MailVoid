@@ -22,9 +22,27 @@ namespace MailVoidWeb
         
         public bool IsPublic { get; set; }
         
+        /// <summary>
+        /// Indicates if this is a private user mailbox that cannot be shared or deleted
+        /// </summary>
+        public bool IsUserPrivate { get; set; } = false;
+        
+        /// <summary>
+        /// Indicates if this is a default user mailbox that cannot be unclaimed
+        /// </summary>
+        public bool IsDefaultMailbox { get; set; } = false;
+        
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         
         public virtual ICollection<MailGroupUser> MailGroupUsers { get; set; } = new List<MailGroupUser>();
+        
+        /// <summary>
+        /// Gets the path format for a user's private mailbox
+        /// </summary>
+        public static string GetUserPrivatePath(string username)
+        {
+            return $"user-{username}";
+        }
     }
 
     public class MailGroupUser

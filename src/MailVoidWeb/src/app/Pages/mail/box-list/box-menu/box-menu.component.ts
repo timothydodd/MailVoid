@@ -11,17 +11,6 @@ import { ClickOutsideDirective } from '../../../../_services/click-outside.direc
     </button>
     @if (isOpen()) {
       <div class="menu" appClickOutside (clickOutside)="close()" [delayTime]="200">
-        @if (!isEmailClaimed()) {
-          <button dropdown-item (click)="claimClick()">
-            <lucide-angular name="inbox" size="16"></lucide-angular>
-            Claim Mailbox
-          </button>
-        } @else {
-          <button dropdown-item (click)="unclaimClick()">
-            <lucide-angular name="upload" size="16"></lucide-angular>
-            Release Mailbox
-          </button>
-        }
         <button dropdown-item (click)="deleteClick()">
           <lucide-angular name="trash-2" size="16"></lucide-angular>
           Delete
@@ -32,31 +21,13 @@ import { ClickOutsideDirective } from '../../../../_services/click-outside.direc
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BoxMenuComponent {
-  private mailService = inject(MailService);
-
   isOpen = signal(false);
   item = input.required<string>();
   groupName = input<string>('');
   deleteEvent = output<string>();
-  claimEvent = output<string>();
-  unclaimEvent = output<string>();
-
-  isEmailClaimed() {
-    return this.groupName() === 'My Boxes';
-  }
 
   deleteClick() {
     this.deleteEvent.emit(this.item());
-    this.close();
-  }
-
-  claimClick() {
-    this.claimEvent.emit(this.item());
-    this.close();
-  }
-
-  unclaimClick() {
-    this.unclaimEvent.emit(this.item());
     this.close();
   }
 

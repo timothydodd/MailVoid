@@ -24,7 +24,14 @@ export class JwtInterceptor implements HttpInterceptor {
       request.url.includes('/auth/refresh') ||
       request.url.includes('/auth/logout')
     ) {
-      return next.handle(request).pipe(catchError((error) => this.handleError(error)));
+      return next.handle(request).pipe(
+        catchError((error) => {
+          if (error instanceof HttpErrorResponse && error.status === 404) {
+            return this.handle404Error();
+          }
+          return this.handleError(error);
+        })
+      );
     }
 
     const token = this.authService.getToken();
@@ -37,6 +44,10 @@ export class JwtInterceptor implements HttpInterceptor {
       catchError((error) => {
         if (error instanceof HttpErrorResponse && error.status === 401) {
           return this.handle401Error(request, next);
+        }
+        
+        if (error instanceof HttpErrorResponse && error.status === 404) {
+          return this.handle404Error();
         }
 
         return this.handleError(error);
@@ -100,6 +111,12 @@ export class JwtInterceptor implements HttpInterceptor {
         })
       );
     }
+  }
+
+  private handle404Error(): Observable<never> {
+    // Log out the user and redirect to login page
+    this.authService.logout();
+    return throwError(() => 'Resource not found - user logged out');
   }
 
   private handleError(err: any): Observable<never> {

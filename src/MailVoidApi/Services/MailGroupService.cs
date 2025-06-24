@@ -1,6 +1,5 @@
 ﻿using MailVoidApi.Data;
 using MailVoidWeb;
-using MailVoidWeb.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace MailVoidApi.Services;
@@ -12,6 +11,8 @@ public interface IMailGroupService
     Task<bool> HasUserAccess(long mailGroupId, Guid userId);
     Task GrantUserAccess(long mailGroupId, Guid userId);
     Task RevokeUserAccess(long mailGroupId, Guid userId);
+    Task<MailGroup> CreateUserPrivateMailGroup(Guid userId, bool isDefault = false);
+    Task<List<MailGroup>> GetUserPrivateMailGroups(Guid userId);
 }
 
 public class MailGroupService : IMailGroupService
@@ -27,19 +28,20 @@ public class MailGroupService : IMailGroupService
 
     public async Task SetMailPath(Mail m)
     {
-        // First check if this email is claimed by a user
-        var claimedMailbox = await _context.ClaimedMailboxes
-            .Include(cm => cm.User)
-            .FirstOrDefaultAsync(cm => cm.EmailAddress == m.To && cm.IsActive);
+        // Extract subdomain to check if this is a user's private mailbox
+        var subdomain = EmailSubdomainHelper.ExtractSubdomain(m.To);
+        
+        // Check if this email belongs to a user's private mailbox (subdomain matches username)
+        var privateMailGroup = await _context.MailGroups
+            .FirstOrDefaultAsync(mg => mg.IsUserPrivate && mg.Subdomain == subdomain);
 
-        if (claimedMailbox != null)
+        if (privateMailGroup != null)
         {
-            m.MailGroupPath = claimedMailbox.GetMailGroupPath(claimedMailbox.User!.UserName);
+            m.MailGroupPath = privateMailGroup.Path;
             return;
         }
 
-        // For unclaimed emails, extract subdomain and create/assign to mail group
-        var subdomain = EmailSubdomainHelper.ExtractSubdomain(m.To);
+        // For non-private emails, create/assign to mail group
         m.MailGroupPath = EmailSubdomainHelper.GenerateMailGroupPath(subdomain);
         
         // Ensure the mail group exists for this subdomain
@@ -132,4 +134,43 @@ public class MailGroupService : IMailGroupService
             _logger.LogInformation($"Revoked user {userId} access from mail group {mailGroupId}");
         }
     }
+
+    public async Task<MailGroup> CreateUserPrivateMailGroup(Guid userId, bool isDefault = false)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+        {
+            throw new InvalidOperationException($"User {userId} not found");
+        }
+
+        var path = MailGroup.GetUserPrivatePath(user.UserName);
+        var subdomain = user.UserName; // Use username as subdomain
+
+        var privateMailGroup = new MailGroup
+        {
+            Path = path,
+            Subdomain = subdomain,
+            Description = $"Private mailbox for {user.UserName}",
+            OwnerUserId = userId,
+            IsPublic = false,
+            IsUserPrivate = true,
+            IsDefaultMailbox = isDefault, // Mark as default only if specified
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.MailGroups.Add(privateMailGroup);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Created private mail group for user {UserId} with subdomain {Subdomain}", userId, subdomain);
+        return privateMailGroup;
+    }
+
+    public async Task<List<MailGroup>> GetUserPrivateMailGroups(Guid userId)
+    {
+        return await _context.MailGroups
+            .Where(mg => mg.OwnerUserId == userId && mg.IsUserPrivate)
+            .OrderBy(mg => mg.Subdomain)
+            .ToListAsync();
+    }
+
 }

@@ -95,7 +95,7 @@ public class MailController : ControllerBase
     {
         var userId = _userService.GetUserId();
         var groups = await _context.MailGroups
-            .Where(mg => mg.Subdomain != null && (mg.IsPublic || mg.OwnerUserId == userId || 
+            .Where(mg => mg.Subdomain != null && !mg.IsUserPrivate && (mg.IsPublic || mg.OwnerUserId == userId || 
                         mg.MailGroupUsers.Any(mgu => mgu.UserId == userId)))
             .Select(mg => new { 
                 mg.Id, 
@@ -104,7 +104,8 @@ public class MailController : ControllerBase
                 Description = mg.Description ?? "",
                 mg.IsPublic, 
                 mg.CreatedAt,
-                IsOwner = mg.OwnerUserId == userId
+                IsOwner = mg.OwnerUserId == userId,
+                mg.IsUserPrivate
             })
             .ToListAsync();
         return Ok(groups);
@@ -120,6 +121,10 @@ public class MailController : ControllerBase
         if (mailGroup == null || mailGroup.OwnerUserId != currentUserId)
             return Forbid();
 
+        // Prevent sharing private user mailboxes
+        if (mailGroup.IsUserPrivate)
+            return BadRequest(new { message = "Private user mailboxes cannot be shared." });
+
         await _mailGroupService.GrantUserAccess(mailGroupId, request.UserId);
         return Ok();
     }
@@ -133,6 +138,10 @@ public class MailController : ControllerBase
         var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
         if (mailGroup == null || mailGroup.OwnerUserId != currentUserId)
             return Forbid();
+
+        // Prevent modifying access to private user mailboxes
+        if (mailGroup.IsUserPrivate)
+            return BadRequest(new { message = "Private user mailboxes cannot have access modified." });
 
         await _mailGroupService.RevokeUserAccess(mailGroupId, userId);
         return Ok();
@@ -150,8 +159,17 @@ public class MailController : ControllerBase
         if (mailGroup.OwnerUserId != currentUserId)
             return Forbid();
 
-        mailGroup.Description = request.Description;
-        mailGroup.IsPublic = request.IsPublic;
+        // Prevent modifying private user mailboxes public status
+        if (mailGroup.IsUserPrivate)
+        {
+            // Only allow description updates for private mailboxes
+            mailGroup.Description = request.Description;
+        }
+        else
+        {
+            mailGroup.Description = request.Description;
+            mailGroup.IsPublic = request.IsPublic;
+        }
         
         await _context.SaveChangesAsync();
         
@@ -162,7 +180,8 @@ public class MailController : ControllerBase
             Description = mailGroup.Description ?? "",
             mailGroup.IsPublic,
             mailGroup.CreatedAt,
-            IsOwner = true
+            IsOwner = true,
+            mailGroup.IsUserPrivate
         });
     }
 
@@ -213,6 +232,74 @@ public class MailController : ControllerBase
         return Ok(users);
     }
 
+    [HttpPost("mail-groups")]
+    public async Task<IActionResult> CreateMailGroup([FromBody] CreateMailGroupRequest request)
+    {
+        var userId = _userService.GetUserId();
+        
+        // Check if subdomain already exists
+        var existingGroup = await _context.MailGroups
+            .FirstOrDefaultAsync(mg => mg.Subdomain == request.Subdomain);
+            
+        if (existingGroup != null)
+        {
+            return BadRequest(new { message = "A mail group with this subdomain already exists." });
+        }
+        
+        var mailGroup = new MailGroup
+        {
+            Path = EmailSubdomainHelper.GenerateMailGroupPath(request.Subdomain),
+            Subdomain = request.Subdomain,
+            Description = request.Description ?? $"Mail group for {request.Subdomain}",
+            OwnerUserId = userId,
+            IsPublic = request.IsPublic,
+            IsUserPrivate = false,
+            IsDefaultMailbox = false,
+            CreatedAt = DateTime.UtcNow
+        };
+        
+        _context.MailGroups.Add(mailGroup);
+        await _context.SaveChangesAsync();
+        
+        return Ok(new {
+            id = mailGroup.Id,
+            path = mailGroup.Path,
+            subdomain = mailGroup.Subdomain,
+            description = mailGroup.Description,
+            isPublic = mailGroup.IsPublic,
+            createdAt = mailGroup.CreatedAt
+        });
+    }
+
+    [HttpDelete("mail-groups/{id}")]
+    public async Task<IActionResult> DeleteMailGroup(long id)
+    {
+        var userId = _userService.GetUserId();
+        var mailGroup = await _context.MailGroups.FindAsync(id);
+        
+        if (mailGroup == null)
+        {
+            return NotFound();
+        }
+        
+        // Prevent deleting default mailboxes
+        if (mailGroup.IsDefaultMailbox)
+        {
+            return BadRequest(new { message = "Cannot delete default mailbox." });
+        }
+        
+        // Only owner or admin can delete
+        if (mailGroup.OwnerUserId != userId && !User.IsInRole("Admin"))
+        {
+            return Forbid();
+        }
+        
+        _context.MailGroups.Remove(mailGroup);
+        await _context.SaveChangesAsync();
+        
+        return Ok();
+    }
+
 }
 
 public record GrantAccessRequest
@@ -222,6 +309,13 @@ public record GrantAccessRequest
 
 public record UpdateMailGroupRequest
 {
+    public string? Description { get; set; }
+    public bool IsPublic { get; set; }
+}
+
+public record CreateMailGroupRequest
+{
+    public required string Subdomain { get; set; }
     public string? Description { get; set; }
     public bool IsPublic { get; set; }
 }

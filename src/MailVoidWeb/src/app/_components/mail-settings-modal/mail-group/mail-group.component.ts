@@ -1,10 +1,16 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { LucideAngularModule } from 'lucide-angular';
 import { ValdemortModule } from 'ngx-valdemort';
-import { MailGroup, MailGroupUser, MailService, User } from '../../../_services/api/mail.service';
+import {
+  CreateMailGroupRequest,
+  MailGroup,
+  MailGroupUser,
+  MailService,
+  User,
+} from '../../../_services/api/mail.service';
 @Component({
   selector: 'app-mail-group',
   imports: [CommonModule, LucideAngularModule, ReactiveFormsModule, FormsModule, NgSelectModule, ValdemortModule],
@@ -27,7 +33,13 @@ import { MailGroup, MailGroupUser, MailService, User } from '../../../_services/
       <div class="groups-container">
         <div class="container-header">
           <h4 class="container-title">Available Mail Groups</h4>
-          <span class="groups-count">{{ mailGroups().length }} groups</span>
+          <div class="header-actions">
+            <span class="groups-count">{{ mailGroups().length }} groups</span>
+            <button class="btn btn-primary btn-sm" (click)="showCreateForm()">
+              <lucide-icon name="plus" size="14"></lucide-icon>
+              Create Group
+            </button>
+          </div>
         </div>
 
         @if (mailGroups().length === 0) {
@@ -69,7 +81,7 @@ import { MailGroup, MailGroupUser, MailService, User } from '../../../_services/
                   </div>
                 </div>
 
-                @if (group.isOwner) {
+                @if (group.isOwner && !group.isUserPrivate) {
                   <div class="group-actions">
                     <button class="btn btn-outline btn-sm" (click)="editGroup(group)" title="Edit Group">
                       <lucide-icon name="edit" size="14"></lucide-icon>
@@ -79,6 +91,15 @@ import { MailGroup, MailGroupUser, MailService, User } from '../../../_services/
                       <lucide-icon name="users" size="14"></lucide-icon>
                       Users
                     </button>
+                    <button class="btn btn-outline btn-sm btn-danger" (click)="deleteGroup(group)" title="Delete Group">
+                      <lucide-icon name="trash" size="14"></lucide-icon>
+                      Delete
+                    </button>
+                  </div>
+                }
+                @if (group.isUserPrivate) {
+                  <div class="group-actions">
+                    <span class="private-label">Private Mailbox</span>
                   </div>
                 }
               </div>
@@ -86,6 +107,67 @@ import { MailGroup, MailGroupUser, MailService, User } from '../../../_services/
           </div>
         }
       </div>
+
+      <!-- Create Group Panel -->
+      @if (creatingGroup() && createForm()) {
+        <div class="edit-panel">
+          <div class="panel-header">
+            <h4 class="panel-title">Create New Mail Group</h4>
+            <button class="btn btn-icon" (click)="cancelCreate()" title="Close">
+              <lucide-icon name="x" size="16"></lucide-icon>
+            </button>
+          </div>
+          <div class="panel-content" [formGroup]="createForm()!">
+            <div class="form-group">
+              <label for="subdomain" class="form-label">Subdomain</label>
+              <input
+                id="subdomain"
+                type="text"
+                class="form-control"
+                formControlName="subdomain"
+                placeholder="e.g., support, sales, notifications"
+              />
+              <div class="form-text">Emails sent to anything&#64;[subdomain].mailvoid.com will go to this group</div>
+              <val-errors controlName="subdomain" label="Subdomain"></val-errors>
+            </div>
+
+            <div class="form-group">
+              <label for="description" class="form-label">Description</label>
+              <textarea
+                id="description"
+                class="form-control"
+                formControlName="description"
+                placeholder="Enter a description for this mail group"
+                rows="3"
+              ></textarea>
+              <val-errors controlName="description" label="Description"></val-errors>
+            </div>
+
+            <div class="form-group">
+              <div class="form-check">
+                <input type="checkbox" id="isPublic" class="form-check-input" formControlName="isPublic" />
+                <label for="isPublic" class="form-check-label"> Public Group </label>
+              </div>
+              <div class="form-text">
+                Public groups are accessible to all users. Private groups require explicit user access.
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" (click)="cancelCreate()">Cancel</button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="!createForm()?.valid || isLoading()"
+                (click)="createGroup()"
+              >
+                <span *ngIf="isLoading()">Creating...</span>
+                <span *ngIf="!isLoading()">Create Group</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Edit Group Panel -->
       @if (editingGroup() && editForm()) {
@@ -220,11 +302,13 @@ export class MailGroupComponent {
   // State signals
   selectedGroup = signal<MailGroup | null>(null);
   editingGroup = signal<MailGroup | null>(null);
+  creatingGroup = signal<boolean>(false);
   managingUsers = signal<boolean>(false);
   isLoading = signal<boolean>(false);
 
   // Form signals
   editForm = signal<FormGroup | null>(null);
+  createForm = signal<FormGroup | null>(null);
   selectedUserId: string | null = null;
 
   constructor() {
@@ -375,6 +459,72 @@ export class MailGroupComponent {
       },
       error: (error) => {
         console.error('Error removing user:', error);
+        this.isLoading.set(false);
+      },
+    });
+  }
+
+  // Create Group methods
+  showCreateForm() {
+    this.creatingGroup.set(true);
+    this.editingGroup.set(null);
+    this.managingUsers.set(false);
+
+    const form = new FormGroup({
+      subdomain: new FormControl('', [Validators.required, Validators.pattern(/^[a-z0-9-]+$/)]),
+      description: new FormControl(''),
+      isPublic: new FormControl(true),
+    });
+
+    this.createForm.set(form);
+  }
+
+  cancelCreate() {
+    this.creatingGroup.set(false);
+    this.createForm.set(null);
+  }
+
+  createGroup() {
+    const form = this.createForm();
+    if (!form || !form.valid) return;
+
+    this.isLoading.set(true);
+
+    const request: CreateMailGroupRequest = {
+      subdomain: form.get('subdomain')?.value,
+      description: form.get('description')?.value || undefined,
+      isPublic: form.get('isPublic')?.value,
+    };
+
+    this.mailService.createMailGroup(request).subscribe({
+      next: (group) => {
+        this.loadMailGroups();
+        this.cancelCreate();
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Error creating group:', error);
+        this.isLoading.set(false);
+      },
+    });
+  }
+
+  deleteGroup(group: MailGroup) {
+    if (
+      !confirm(`Are you sure you want to delete the mail group "${group.subdomain}"? This action cannot be undone.`)
+    ) {
+      return;
+    }
+
+    this.isLoading.set(true);
+
+    this.mailService.deleteMailGroup(group.id).subscribe({
+      next: () => {
+        this.loadMailGroups();
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Error deleting group:', error);
         this.isLoading.set(false);
       },
     });

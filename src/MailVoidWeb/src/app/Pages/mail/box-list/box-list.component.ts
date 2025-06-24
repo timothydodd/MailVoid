@@ -27,8 +27,6 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
                     [item]="item"
                     [groupName]="group.groupName"
                     (deleteEvent)="deleteEvent.emit($event)"
-                    (claimEvent)="claimEvent.emit($event)"
-                    (unclaimEvent)="unclaimEvent.emit($event)"
                   >
                   </app-box-menu>
                 </div>
@@ -50,8 +48,6 @@ export class BoxListComponent {
   mailboxes = input.required<MailBoxGroups[] | null>();
   selectedBox = model<string | null>();
   deleteEvent = output<string>();
-  claimEvent = output<string>();
-  unclaimEvent = output<string>();
 
   sortedMailboxes = computed(() => {
     const mb = this.mailboxes();

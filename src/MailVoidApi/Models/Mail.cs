@@ -27,7 +27,7 @@ public class Mail
     public required string Subject { get; set; }
     
     public string? Charsets { get; set; }
-    public DateTime CreatedOn { get; set; }
+    public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
     public string? MailGroupPath { get; set; }
 }
 

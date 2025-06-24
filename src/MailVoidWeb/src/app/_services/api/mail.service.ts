@@ -77,25 +77,13 @@ export class MailService {
     return this.http.delete(`${environment.apiUrl}/api/mail/groups/${mailGroupId}/access/${userId}`);
   }
   
-  // Claimed Mailbox methods
-  getMyClaimedMailboxes() {
-    return this.http.get<ClaimedMailbox[]>(`${environment.apiUrl}/api/claimedmailbox/my-mailboxes`);
+  // Mail Group management
+  createMailGroup(data: CreateMailGroupRequest) {
+    return this.http.post<MailGroup>(`${environment.apiUrl}/api/mail/mail-groups`, data);
   }
   
-  getUnclaimedEmailAddresses() {
-    return this.http.get<string[]>(`${environment.apiUrl}/api/claimedmailbox/unclaimed`);
-  }
-  
-  claimMailbox(emailAddress: string) {
-    return this.http.post<ClaimedMailbox>(`${environment.apiUrl}/api/claimedmailbox/claim`, { emailAddress });
-  }
-  
-  unclaimMailbox(emailAddress: string) {
-    return this.http.delete(`${environment.apiUrl}/api/claimedmailbox/unclaim`, { body: { emailAddress } });
-  }
-  
-  isEmailClaimed(emailAddress: string) {
-    return this.http.get<boolean>(`${environment.apiUrl}/api/claimedmailbox/check/${encodeURIComponent(emailAddress)}`);
+  deleteMailGroup(id: number) {
+    return this.http.delete(`${environment.apiUrl}/api/mail/mail-groups/${id}`);
   }
 }
 export interface FilterOptions {
@@ -118,6 +106,7 @@ export interface MailGroup {
   subdomain: string | null;
   description: string | null;
   isPublic: boolean;
+  isUserPrivate: boolean;
   createdAt: string;
   isOwner: boolean;
 }
@@ -138,11 +127,10 @@ export interface GrantAccessRequest {
   userId: string;
 }
 
-export interface ClaimedMailbox {
-  id: number;
-  emailAddress: string;
-  claimedOn: string;
-  isActive: boolean;
+export interface CreateMailGroupRequest {
+  subdomain: string;
+  description?: string;
+  isPublic: boolean;
 }
 
 export interface User {

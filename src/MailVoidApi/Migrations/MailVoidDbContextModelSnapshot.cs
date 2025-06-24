@@ -187,6 +187,11 @@ namespace MailVoidApi.Migrations
                     b.Property<bool>("IsPublic")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<bool>("IsUserPrivate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("char(36)");
 
@@ -196,6 +201,9 @@ namespace MailVoidApi.Migrations
                     b.Property<string>("Subdomain")
                         .HasColumnType("varchar(255)");
 
+                    b.Property<string>("UserEmailAddress")
+                        .HasColumnType("varchar(255)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId");
@@ -203,6 +211,8 @@ namespace MailVoidApi.Migrations
                     b.HasIndex("Path");
 
                     b.HasIndex("Subdomain");
+
+                    b.HasIndex("UserEmailAddress");
 
                     b.ToTable("MailGroup", (string)null);
                 });
@@ -236,33 +246,6 @@ namespace MailVoidApi.Migrations
                     b.ToTable("MailGroupUser", (string)null);
                 });
 
-            modelBuilder.Entity("MailVoidWeb.Models.ClaimedMailbox", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("ClaimedOn")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("EmailAddress")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("ClaimedMailbox", (string)null);
-                });
 
             modelBuilder.Entity("MailVoidApi.Models.RefreshToken", b =>
                 {
@@ -301,16 +284,6 @@ namespace MailVoidApi.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("MailVoidWeb.Models.ClaimedMailbox", b =>
-                {
-                    b.HasOne("MailVoidWeb.Data.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
 
             modelBuilder.Entity("MailVoidWeb.MailGroup", b =>
                 {

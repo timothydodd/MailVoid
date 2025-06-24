@@ -29,8 +29,6 @@ type SortDirection = 'asc' | 'desc';
               [mailboxes]="mailboxes()"
               [(selectedBox)]="selectedBox"
               (deleteEvent)="deleteBox($event)"
-              (claimEvent)="claimMailbox($event)"
-              (unclaimEvent)="unclaimMailbox($event)"
             ></app-box-list>
           </div>
         </div>
@@ -211,31 +209,6 @@ export class MailComponent {
     });
   }
 
-  claimMailbox(emailAddress: string) {
-    this.mailService.claimMailbox(emailAddress).subscribe({
-      next: () => {
-        console.log(`Successfully claimed ${emailAddress}`);
-        this.refreshMail(); // Refresh to show the mailbox in "My Boxes"
-      },
-      error: (error) => {
-        console.error('Error claiming mailbox:', error);
-        // You could add a toast notification service here for better UX
-      },
-    });
-  }
-
-  unclaimMailbox(emailAddress: string) {
-    this.mailService.unclaimMailbox(emailAddress).subscribe({
-      next: () => {
-        console.log(`Successfully unclaimed ${emailAddress}`);
-        this.refreshMail(); // Refresh to remove from "My Boxes"
-      },
-      error: (error) => {
-        console.error('Error unclaiming mailbox:', error);
-        // You could add a toast notification service here for better UX
-      },
-    });
-  }
 
   toggleSort(column: SortColumn) {
     if (this.sortColumn() === column) {
