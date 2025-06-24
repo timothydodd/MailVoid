@@ -31,11 +31,22 @@ public class Program
             {
                 services.Configure<SmtpServerOptions>(hostContext.Configuration.GetSection("SmtpServer"));
                 services.Configure<MailVoidApiOptions>(hostContext.Configuration.GetSection("MailVoidApi"));
+                services.Configure<EmailQueueOptions>(hostContext.Configuration.GetSection("EmailQueue"));
+                services.Configure<QueueMonitoringOptions>(hostContext.Configuration.GetSection("QueueMonitoring"));
 
                 services.AddHttpClient<MailForwardingService>();
                 services.AddTransient<IMessageStore, MailMessageStore>();
                 services.AddSingleton<SmtpServerService>();
+                
+                // Queue services
+                services.AddSingleton<IInboundEmailQueueService, InboundEmailQueueService>();
+                services.AddSingleton<IOutboundEmailQueueService, OutboundEmailQueueService>();
+                
+                // Background services
                 services.AddHostedService<SmtpServerHostedService>();
+                services.AddHostedService<InboundEmailProcessorService>();
+                services.AddHostedService<OutboundEmailProcessorService>();
+                services.AddHostedService<QueueMonitoringService>();
 
                 // Debug configuration loading
                 var configuration = hostContext.Configuration;

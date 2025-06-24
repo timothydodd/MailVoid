@@ -4,18 +4,19 @@ using MimeKit;
 using SmtpServer;
 using SmtpServer.Protocol;
 using SmtpServer.Storage;
+using MailVoidSmtpServer.Models;
 
 namespace MailVoidSmtpServer.Services;
 
 public class MailMessageStore : MessageStore
 {
     private readonly ILogger<MailMessageStore> _logger;
-    private readonly MailForwardingService _forwardingService;
+    private readonly IInboundEmailQueueService _inboundQueue;
 
-    public MailMessageStore(ILogger<MailMessageStore> logger, MailForwardingService forwardingService)
+    public MailMessageStore(ILogger<MailMessageStore> logger, IInboundEmailQueueService inboundQueue)
     {
         _logger = logger;
-        _forwardingService = forwardingService;
+        _inboundQueue = inboundQueue;
     }
 
     public override async Task<SmtpResponse> SaveAsync(ISessionContext context, IMessageTransaction transaction, ReadOnlySequence<byte> buffer, CancellationToken cancellationToken)
@@ -70,7 +71,7 @@ public class MailMessageStore : MessageStore
                 }
             }
 
-            // Forward to MailVoid API with both raw and parsed data
+            // Queue email for background processing
             var htmlBody = GetDecodedHtmlBody(message);
             var textBody = GetDecodedTextBody(message);
             
@@ -90,20 +91,13 @@ public class MailMessageStore : MessageStore
                 RawEmail = rawEmail
             };
 
-            var success = await _forwardingService.ForwardEmailAsync(emailData, cancellationToken);
+            // Queue the email for background processing instead of processing immediately
+            var queueId = await _inboundQueue.EnqueueEmailAsync(emailData, priority: 0);
 
-            if (success)
-            {
-                _logger.LogInformation("✓ Email processed successfully - MessageId: {MessageId}, From: {From}, Security: {Security}",
-                    message.MessageId, emailData.From, securityInfo);
-                return SmtpResponse.Ok;
-            }
-            else
-            {
-                _logger.LogError("✗ Failed to forward email to MailVoid API - MessageId: {MessageId}, From: {From}, Security: {Security}",
-                    message.MessageId, emailData.From, securityInfo);
-                return new SmtpResponse(SmtpReplyCode.MailboxUnavailable, "Failed to process message");
-            }
+            _logger.LogInformation("✓ Email queued for processing - MessageId: {MessageId}, QueueId: {QueueId}, From: {From}, Security: {Security}",
+                message.MessageId, queueId, emailData.From, securityInfo);
+            
+            return SmtpResponse.Ok;
         }
         catch (Exception ex)
         {
@@ -265,23 +259,3 @@ public class MailMessageStore : MessageStore
     }
 }
 
-public class EmailWebhookData
-{
-    public string From { get; set; } = "";
-    public List<string> To { get; set; } = new();
-    public string Subject { get; set; } = "";
-    public string? Html { get; set; }
-    public string? Text { get; set; }
-    public Dictionary<string, string> Headers { get; set; } = new();
-    public List<AttachmentData> Attachments { get; set; } = new();
-    public string? MessageId { get; set; }
-    public DateTime Date { get; set; }
-    public string RawEmail { get; set; } = "";
-}
-
-public class AttachmentData
-{
-    public string Filename { get; set; } = "";
-    public string ContentType { get; set; } = "";
-    public string Content { get; set; } = ""; // Base64 encoded
-}
