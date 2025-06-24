@@ -140,7 +140,7 @@ public class MailMessageStore : MessageStore
         return attachments;
     }
     
-    private static string? GetDecodedHtmlBody(MimeMessage message)
+    private string? GetDecodedHtmlBody(MimeMessage message)
     {
         try
         {
@@ -154,8 +154,17 @@ public class MailMessageStore : MessageStore
             // If that doesn't work, manually find HTML parts
             var htmlPart = message.BodyParts.OfType<TextPart>()
                 .FirstOrDefault(part => part.ContentType.IsMimeType("text", "html"));
+            
+            if (htmlPart != null)
+            {
+                _logger.LogDebug("HTML part encoding: {Encoding}, Charset: {Charset}", 
+                    htmlPart.ContentTransferEncoding, htmlPart.ContentType.Charset);
                 
-            return htmlPart?.Text;
+                // The Text property should automatically decode
+                return htmlPart.Text;
+            }
+            
+            return null;
         }
         catch
         {

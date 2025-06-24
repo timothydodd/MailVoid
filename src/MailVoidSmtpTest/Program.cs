@@ -267,7 +267,7 @@ SMTP Test"
             }
             else
             {
-                await client.ConnectAsync(host, port, SecureSocketOptions.None);
+                await client.ConnectAsync(host, port, SecureSocketOptions.Auto);
             }
 
             Console.WriteLine($"[DEBUG] Connection established successfully");
