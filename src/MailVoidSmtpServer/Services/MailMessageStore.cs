@@ -1,8 +1,6 @@
 ﻿using System.Buffers;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using MimeKit;
-using MimeKit.Utils;
 using SmtpServer;
 using SmtpServer.Protocol;
 using SmtpServer.Storage;
@@ -26,14 +24,14 @@ public class MailMessageStore : MessageStore
         {
             // SECURITY: This server is for receiving emails only - never relay or send emails
             _logger.LogDebug("Email relay is disabled - this server only receives emails for testing");
-            
+
             var isSecure = context.EndpointDefinition.IsSecure;
             var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
             var endpoint = context.EndpointDefinition.Endpoint;
             var portInfo = endpoint?.Port.ToString() ?? "unknown";
-            
+
             _logger.LogDebug("Processing new email from session {SessionId}", context.SessionId);
-            _logger.LogDebug("Connection details - Remote: {RemoteEndPoint}, Port: {Port}, Security: {Security}", 
+            _logger.LogDebug("Connection details - Remote: {RemoteEndPoint}, Port: {Port}, Security: {Security}",
                 endpoint, portInfo, securityInfo);
             // Convert buffer to raw email string
             await using var stream = new MemoryStream();
@@ -59,7 +57,7 @@ public class MailMessageStore : MessageStore
                 message.Attachments.Count(),
                 message.MessageId,
                 message.BodyParts.Count());
-                
+
             // Log body part types for debugging
             foreach (var part in message.BodyParts.Take(5)) // Limit to first 5 parts
             {
@@ -79,7 +77,7 @@ public class MailMessageStore : MessageStore
                 To = message.To.Mailboxes.Select(m => m.Address).ToList(),
                 Subject = message.Subject ?? "(no subject)",
                 Html = GetDecodedHtmlBody(message),
-                Text = GetDecodedTextBody(message),
+                Text = GetDecodedTextBody(message) ?? "",
                 Headers = message.Headers
                     .GroupBy(h => h.Field)
                     .ToDictionary(g => g.Key, g => string.Join("; ", g.Select(h => h.Value))),
@@ -139,7 +137,7 @@ public class MailMessageStore : MessageStore
 
         return attachments;
     }
-    
+
     private string? GetDecodedHtmlBody(MimeMessage message)
     {
         try
@@ -150,20 +148,20 @@ public class MailMessageStore : MessageStore
             {
                 return htmlBody;
             }
-            
+
             // If that doesn't work, manually find HTML parts
             var htmlPart = message.BodyParts.OfType<TextPart>()
                 .FirstOrDefault(part => part.ContentType.IsMimeType("text", "html"));
-            
+
             if (htmlPart != null)
             {
-                _logger.LogDebug("HTML part encoding: {Encoding}, Charset: {Charset}", 
+                _logger.LogDebug("HTML part encoding: {Encoding}, Charset: {Charset}",
                     htmlPart.ContentTransferEncoding, htmlPart.ContentType.Charset);
-                
+
                 // The Text property should automatically decode
                 return htmlPart.Text;
             }
-            
+
             return null;
         }
         catch
@@ -171,8 +169,8 @@ public class MailMessageStore : MessageStore
             return null;
         }
     }
-    
-    private static string GetDecodedTextBody(MimeMessage message)
+
+    private string GetDecodedTextBody(MimeMessage message)
     {
         try
         {
@@ -182,16 +180,16 @@ public class MailMessageStore : MessageStore
             {
                 return textBody;
             }
-            
+
             // If that doesn't work, manually find text parts
             var textPart = message.BodyParts.OfType<TextPart>()
                 .FirstOrDefault(part => part.ContentType.IsMimeType("text", "plain"));
-                
+
             if (textPart?.Text != null)
             {
                 return textPart.Text;
             }
-            
+
             // Fallback to HTML body if no text body
             return GetDecodedHtmlBody(message) ?? "";
         }
