@@ -5,26 +5,11 @@
   font: normal 0.875rem "Roboto", sans-serif;
 }
 
-/* Responsive */
+/* Component-specific responsive overrides */
 @media (max-width: 768px) {
-  .header-cell { display: none; }
-
-  .cell {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-color);
-    
-    &:last-child { border-bottom: none; }
-    
-    &::before {
-      content: attr(data-label);
-      font-weight: 600;
-      color: var(--comment);
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      margin-right: 0.5rem;
-      min-width: 80px;
-    }
+  .actions { 
+    display: flex;
+    flex-wrap: wrap; 
+    gap: 0.5rem;
   }
-
-  .actions { flex-wrap: wrap; }
 }

@@ -64,16 +64,16 @@ import { UserManagementService } from '../../_services/user-management.service';
           <div class="no-users">No users found</div>
         } @else {
           <div class="users-table">
-            <div class="table-header">
+            <div class="table-grid header">
               <div class="header-cell">Username</div>
               <div class="header-cell">Role</div>
               <div class="header-cell">Created</div>
               <div class="header-cell">Actions</div>
             </div>
             @for (user of users(); track user.id) {
-              <div class="table-row">
-                <div class="cell username">{{ user.userName }}</div>
-                <div class="cell role">
+              <div class="table-grid row">
+                <div class="cell username" data-label="Username">{{ user.userName }}</div>
+                <div class="cell role" data-label="Role">
                   @if (editingRoleUserId() === user.id) {
                     <select class="role-select" [value]="user.role" (change)="onRoleChange($event, user.id)">
                       <option value="0">User</option>
@@ -85,8 +85,8 @@ import { UserManagementService } from '../../_services/user-management.service';
                     </span>
                   }
                 </div>
-                <div class="cell timestamp">{{ formatDate(user.timeStamp) }}</div>
-                <div class="cell actions">
+                <div class="cell timestamp" data-label="Created">{{ formatDate(user.timeStamp) }}</div>
+                <div class="cell actions" data-label="Actions">
                   @if (editingRoleUserId() === user.id) {
                     <button class="btn btn-sm btn-secondary" (click)="cancelRoleEdit()">Cancel</button>
                   } @else {
