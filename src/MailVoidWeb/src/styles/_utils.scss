@@ -2,12 +2,15 @@
 
 /* Badges */
 .badge {
-  padding: 0.25rem 0.75rem;
+  padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .badge-primary {
@@ -40,12 +43,7 @@
 
 /* Role & Status Badges */
 .role-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  @extend .badge;
 
   &.role-admin {
     background-color: rgba(var(--primary-rgb), 0.1);
@@ -59,24 +57,14 @@
 }
 
 .private-label {
+  @extend .badge;
   color: var(--orange);
   background-color: rgba(255, 184, 0, 0.1);
   border: 1px solid rgba(255, 184, 0, 0.3);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
 }
 
 .group-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
+  @extend .badge;
   
   &.public {
     background-color: rgba(80, 250, 123, 0.2);
@@ -92,27 +80,17 @@
 }
 
 .owner-badge {
+  @extend .badge;
   background-color: rgba(255, 184, 0, 0.2);
   color: var(--orange);
   border: 1px solid rgba(255, 184, 0, 0.3);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
 }
 
 .admin-badge {
+  @extend .badge;
   background-color: rgba(111, 131, 190, 0.2);
   color: var(--primary);
   border: 1px solid rgba(111, 131, 190, 0.3);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
 }
 
 /* Messages */

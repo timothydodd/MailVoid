@@ -9,38 +9,49 @@ export class MailService {
   getMailboxes() {
     return this.http.get<MailBox[]>(`${environment.apiUrl}/api/mail/boxes`).pipe(
       map((boxes) => {
-        const groups: MailBoxGroups[] = [{ groupName: '', mailBoxes: [] }];
+        const groups: MailBoxGroups[] = [];
 
         // Separate claimed and regular mailboxes
-        const claimedBoxes: string[] = [];
+        const claimedBoxes: MailBox[] = [];
         const regularBoxes: MailBox[] = [];
 
         boxes.forEach((box) => {
           if (box.path?.startsWith('user-')) {
-            claimedBoxes.push(box.name);
+            claimedBoxes.push(box);
           } else {
             regularBoxes.push(box);
           }
         });
 
-        // Add "My Boxes" section if there are claimed mailboxes
+        // Add "My Boxes" section if there are claimed mailboxes (always first)
         if (claimedBoxes.length > 0) {
-          groups.push({ groupName: 'My Boxes', mailBoxes: claimedBoxes });
+          groups.push({ groupName: 'My Boxes', mailBoxes: claimedBoxes, isOwner: true, isPublic: false });
         }
 
         // Process regular mailboxes
         regularBoxes.forEach((box) => {
-          const groupName = box.mailBoxName ?? box.path ?? '';
-          const mailBoxName = box.name;
+          const groupName = box.mailBoxName ?? box.path ?? 'Ungrouped';
           const group = groups.find((g) => g.groupName === groupName);
           if (group) {
-            group.mailBoxes.push(mailBoxName);
+            group.mailBoxes.push(box);
           } else {
-            groups.push({ groupName: groupName, mailBoxes: [mailBoxName] });
+            groups.push({
+              groupName: groupName,
+              mailBoxes: [box],
+              isOwner: box.isOwner,
+              isPublic: box.isPublic,
+            });
           }
         });
 
-        return groups;
+        // Sort groups: My Boxes first, then alphabetically, with Ungrouped last
+        return groups.sort((a, b) => {
+          if (a.groupName === 'My Boxes') return -1;
+          if (b.groupName === 'My Boxes') return 1;
+          if (a.groupName === 'Ungrouped') return 1;
+          if (b.groupName === 'Ungrouped') return -1;
+          return a.groupName.localeCompare(b.groupName);
+        });
       })
     );
   }
@@ -119,10 +130,14 @@ export interface MailBox {
   path: string | null;
   name: string;
   mailBoxName: string;
+  isOwner: boolean;
+  isPublic: boolean;
 }
 export interface MailBoxGroups {
   groupName: string;
-  mailBoxes: string[];
+  mailBoxes: MailBox[];
+  isOwner: boolean;
+  isPublic: boolean;
 }
 export interface GrantAccessRequest {
   userId: string;

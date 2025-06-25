@@ -29,16 +29,30 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
           <div class="group-section">
             <div class="group-header">
               <h3 class="group-title">{{ group.groupName }}</h3>
-              <span class="group-count">{{ group.mailBoxes.length }}</span>
+              <div class="group-indicators">
+                @if (group.isOwner) {
+                  <lucide-icon name="crown" size="12" class="group-owner-icon" title="You own this group"></lucide-icon>
+                }
+                @if (group.isPublic) {
+                  <lucide-icon name="users" size="12" class="group-public-icon" title="Public group"></lucide-icon>
+                } @else {
+                  <lucide-icon name="lock" size="12" class="group-private-icon" title="Private group"></lucide-icon>
+                }
+              </div>
             </div>
             <div class="mailbox-list">
               @for (item of group.mailBoxes; track $index) {
-                <div class="mailbox-item" [class.selected]="selectedBox() === item">
-                  <button class="mailbox-button" (click)="clickBox(item)" [title]="item">
-                    <span class="mailbox-name">{{ item }}</span>
+                <div class="mailbox-item" [class.selected]="selectedBox() === item.name">
+                  <button class="mailbox-button" (click)="clickBox(item.name)" [title]="item.name">
+                    <span class="mailbox-name">
+                      <span class="email-address">{{ item.name }}</span>
+                      @if (item.mailBoxName && group.groupName === 'My Boxes') {
+                        <span class="mailbox-subdomain">{{ item.mailBoxName }}</span>
+                      }
+                    </span>
                   </button>
                   <app-box-menu
-                    [item]="item"
+                    [item]="item.name"
                     [groupName]="group.groupName"
                     (deleteEvent)="deleteEvent.emit($event)"
                   >
@@ -68,17 +82,8 @@ export class BoxListComponent {
     const mb = this.mailboxes();
     if (!mb) return null;
 
-    return [...mb].sort((a, b) => {
-      // Put ungrouped items (empty or default group names) at the bottom
-      const aIsUngrouped = !a.groupName || a.groupName === 'Ungrouped' || a.groupName === '';
-      const bIsUngrouped = !b.groupName || b.groupName === 'Ungrouped' || b.groupName === '';
-
-      if (aIsUngrouped && !bIsUngrouped) return 1;
-      if (!aIsUngrouped && bIsUngrouped) return -1;
-
-      // Both are grouped or both are ungrouped, sort alphabetically
-      return a.groupName.localeCompare(b.groupName);
-    });
+    // Sorting is now handled in the service, just return as-is
+    return mb;
   });
 
   clickBox(box: string | null) {

@@ -12,11 +12,13 @@ import {
   ChevronRight,
   ChevronUp,
   Cog,
+  Crown,
   Edit,
   EllipsisVertical,
   Folder,
   Inbox,
   Info,
+  Lock,
   LucideAngularModule,
   Mail,
   Menu,
@@ -29,7 +31,7 @@ import {
   UploadIcon,
   User,
   Users,
-  X
+  X,
 } from 'lucide-angular';
 import { provideToastr } from 'ngx-toastr';
 import { environment } from '../environments/environment';
@@ -86,6 +88,8 @@ export const appConfig: ApplicationConfig = {
         Trash,
         Menu,
         ArrowLeft,
+        Crown,
+        Lock,
       })
     ),
     provideToastr(),

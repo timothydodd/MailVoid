@@ -28,13 +28,25 @@
       letter-spacing: 0.05em;
     }
     
-    .group-count {
-      font-size: 0.75rem;
-      color: var(--comment);
-      background: var(--bGLight);
-      padding: 0.25rem 0.5rem;
-      border-radius: 12px;
-      font-weight: 500;
+    .group-indicators {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      
+      .group-owner-icon {
+        color: var(--warning);
+        stroke-width: 2;
+      }
+      
+      .group-public-icon {
+        color: var(--success);
+        stroke-width: 2;
+      }
+      
+      .group-private-icon {
+        color: var(--comment);
+        stroke-width: 2;
+      }
     }
   }
 }
@@ -115,7 +127,7 @@
     flex: 1;
     display: flex;
     align-items: center;
-    padding: 0.25rem 0.5rem;
+    padding: 0.375rem 0.5rem;
     border: none;
     background: none;
     color: var(--foreground);
@@ -137,12 +149,35 @@
     }
     
     .mailbox-name {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.125rem;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       width: 100%;
       min-width: 0;
+      flex: 1;
+      
+      .email-address {
+        font-weight: 500;
+        color: var(--foreground);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100%;
+      }
+      
+      .mailbox-subdomain {
+        font-size: 0.75rem;
+        color: var(--comment);
+        font-weight: 400;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100%;
+      }
     }
+    
   }
   
   app-box-menu {

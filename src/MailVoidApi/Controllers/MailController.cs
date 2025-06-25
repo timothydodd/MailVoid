@@ -63,7 +63,8 @@ public class MailController : ControllerBase
                 Name = x.To,
                 Path = x.MailGroupPath,
                 MailBoxName = x.MailGroup != null ? x.MailGroup.Subdomain : null,
-                IsPrivate = x.MailGroup != null ? !x.MailGroup.IsPublic : false,
+                IsPublic = x.MailGroup != null ? x.MailGroup.IsPublic : false,
+                IsOwner = x.MailGroup != null && (x.MailGroup.OwnerUserId == currentUserId)
             })
             .Distinct()
             .ToListAsync();
@@ -388,6 +389,6 @@ public class MailBox
     public string? Path { get; set; }
     public required string Name { get; set; }
     public string? MailBoxName { get; set; }
-    public bool IsPrivate { get; set; }
-    public bool IsUsers { get; set; }
+    public bool IsPublic { get; set; }
+    public bool IsOwner { get; set; }
 }
