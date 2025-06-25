@@ -33,7 +33,7 @@ public class SmtpServerService
                 builder.Port(25, isSecure: false)
                 .AllowUnsecureAuthentication(true)   // Allow plain text for port 25
                 .AuthenticationRequired(false);      // Optional auth for relay
-                // No certificate for plain text only
+                /certificate for plain text only
             })
 
 
