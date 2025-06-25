@@ -7,27 +7,6 @@
   min-height: 600px;
 }
 
-.groups-container {
-  background-color: var(--bGDark);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.groups-count {
-  color: var(--comment);
-  font-size: 0.875rem;
-  background-color: var(--bGLighter);
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-}
-
-.groups-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem;
-  padding: 1rem;
-}
 
 .group-card {
   background-color: var(--bGLighter);
@@ -119,49 +98,6 @@
   justify-content: flex-end;
 }
 
-.private-label,
-.group-badge,
-.owner-badge,
-.admin-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-}
-
-.private-label {
-  color: var(--orange);
-  background-color: rgba(255, 184, 0, 0.1);
-  border: 1px solid rgba(255, 184, 0, 0.3);
-}
-
-.group-badge {
-  &.public {
-    background-color: rgba(80, 250, 123, 0.2);
-    color: var(--green);
-    border: 1px solid rgba(80, 250, 123, 0.3);
-  }
-
-  &.private {
-    background-color: rgba(255, 85, 85, 0.2);
-    color: var(--red);
-    border: 1px solid rgba(255, 85, 85, 0.3);
-  }
-}
-
-.owner-badge {
-  background-color: rgba(255, 184, 0, 0.2);
-  color: var(--orange);
-  border: 1px solid rgba(255, 184, 0, 0.3);
-}
-
-.admin-badge {
-  background-color: rgba(111, 131, 190, 0.2);
-  color: var(--primary);
-  border: 1px solid rgba(111, 131, 190, 0.3);
-}
 
 .edit-panel, .users-panel {
   background-color: var(--bGDark);

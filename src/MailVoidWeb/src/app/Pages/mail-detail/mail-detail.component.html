@@ -13,22 +13,22 @@
       <div class="mail-meta">
         <div class="meta-row">
           <div class="meta-item">
-            <span class="label">From</span>
-            <span class="value">{{ mail()?.from }}</span>
+            <span class="meta-label">From</span>
+            <span class="meta-value">{{ mail()?.from }}</span>
           </div>
           <div class="meta-item">
-            <span class="label">To</span>
-            <span class="value">{{ mail()?.to }}</span>
+            <span class="meta-label">To</span>
+            <span class="meta-value">{{ mail()?.to }}</span>
           </div>
           <div class="meta-item date">
-            <span class="label">Date</span>
-            <span class="value">{{ mail()?.createdOn | date: 'medium' }}</span>
+            <span class="meta-label">Date</span>
+            <span class="meta-value">{{ mail()?.createdOn | date: 'medium' }}</span>
           </div>
         </div>
         <div class="meta-row">
           <div class="meta-item subject">
-            <span class="label">Subject</span>
-            <span class="value">{{ mail()?.subject }}</span>
+            <span class="meta-label">Subject</span>
+            <span class="meta-value">{{ mail()?.subject }}</span>
           </div>
         </div>
       </div>

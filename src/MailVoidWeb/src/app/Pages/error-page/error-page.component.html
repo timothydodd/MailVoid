@@ -35,10 +35,10 @@
           <div>App Server</div>
           @if (this.healthData) {
             @if (isHealthy) {
-              <lucide-icon name="circle-check"></lucide-icon>
+              <lucide-icon name="circle-check" class="status-icon success"></lucide-icon>
             }
             @if (!isHealthy) {
-              <lucide-icon name="circle-x"></lucide-icon>
+              <lucide-icon name="circle-x" class="status-icon error"></lucide-icon>
             }
           }
           @if (!this.healthData) {

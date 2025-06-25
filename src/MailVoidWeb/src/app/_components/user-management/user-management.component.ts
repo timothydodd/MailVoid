@@ -116,11 +116,11 @@ import { UserManagementService } from '../../_services/user-management.service';
       </div>
 
       @if (errorMessage()) {
-        <div class="error-message">{{ errorMessage() }}</div>
+        <div class="message message-error">{{ errorMessage() }}</div>
       }
 
       @if (successMessage()) {
-        <div class="success-message">{{ successMessage() }}</div>
+        <div class="message message-success">{{ successMessage() }}</div>
       }
     </div>
   `,
