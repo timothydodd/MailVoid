@@ -116,9 +116,15 @@ public class MailController : ControllerBase
     {
         var currentUserId = _userService.GetUserId();
         
-        // Check if current user is owner of the mail group
+        // Check if current user is owner or admin editing public group
         var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
-        if (mailGroup == null || mailGroup.OwnerUserId != currentUserId)
+        if (mailGroup == null)
+            return NotFound();
+            
+        var isOwner = mailGroup.OwnerUserId == currentUserId;
+        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
+        
+        if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
         // Prevent sharing private user mailboxes
@@ -134,9 +140,15 @@ public class MailController : ControllerBase
     {
         var currentUserId = _userService.GetUserId();
         
-        // Check if current user is owner of the mail group
+        // Check if current user is owner or admin editing public group
         var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
-        if (mailGroup == null || mailGroup.OwnerUserId != currentUserId)
+        if (mailGroup == null)
+            return NotFound();
+            
+        var isOwner = mailGroup.OwnerUserId == currentUserId;
+        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
+        
+        if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
         // Prevent modifying access to private user mailboxes
@@ -156,7 +168,11 @@ public class MailController : ControllerBase
         if (mailGroup == null)
             return NotFound();
             
-        if (mailGroup.OwnerUserId != currentUserId)
+        // Allow owner or admin to edit public groups
+        var isOwner = mailGroup.OwnerUserId == currentUserId;
+        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
+        
+        if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
         // Prevent modifying private user mailboxes public status
@@ -180,7 +196,7 @@ public class MailController : ControllerBase
             Description = mailGroup.Description ?? "",
             mailGroup.IsPublic,
             mailGroup.CreatedAt,
-            IsOwner = true,
+            IsOwner = isOwner,
             mailGroup.IsUserPrivate
         });
     }
@@ -194,7 +210,10 @@ public class MailController : ControllerBase
         if (mailGroup == null)
             return NotFound();
             
-        if (mailGroup.OwnerUserId != currentUserId)
+        var isOwner = mailGroup.OwnerUserId == currentUserId;
+        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
+        
+        if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
         var groupUsers = await _context.MailGroupUsers

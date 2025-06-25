@@ -1,66 +1,120 @@
-.table-wrap{
-    border-radius: 8px;
-        border: 1px solid var(--border-color);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.374);
- 
+.table-wrap {
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bGDark);
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
+
 table {
     width: 100%;
     border-collapse: collapse;
+    background-color: transparent;
+}
+
+/* Header Styles */
+thead {
     background-color: var(--bGLight);
-    border-radius: 8px;
-
-}
-thead th:first-child {
-    border-top-left-radius: 8px;
- }
- thead th:last-child {
-    border-top-right-radius: 8px;
- }
-
-th, td {
-    padding: 1rem;
-    text-align: left;
-
-}
-th,
-tr:not(:last-child) td {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
 }
 
 th {
-    background-color: var(--header-bg);
-    color: var(--foreground);
-    font-weight: bold;
+    padding: 1.25rem 1rem;
+    text-align: left;
+    color: var(--comment);
+    font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.05em;
-}
-tr{
-    background-color: var(--bGDark);
-}
-tr:nth-child(even) {
-    background-color: var(--header-bg);
-}
-tr:last-child td:first-child {
-    border-bottom-left-radius: 8px;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
 }
 
-tr:last-child td:last-child {
-    border-bottom-right-radius: 8px;
-}
+/* Body Styles */
 tbody tr {
+    background-color: var(--bGDark);
+    border-bottom: 1px solid rgba(98, 115, 164, 0.15);
     cursor: pointer;
-    transition: background-color 0.4s ease, transform 0.5s ease;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+tbody tr:last-child {
+    border-bottom: none;
 }
 
 tbody tr:hover {
-    background-color: var(--purple);
-    color: #282a36;
-    transform: scale(1.02);
-   
+    background-color: rgba(189, 147, 249, 0.1);
+    transform: translateX(4px);
 }
 
+tbody tr:hover td {
+    color: var(--foreground);
+}
+
+td {
+    padding: 1rem;
+    color: var(--foreground);
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+/* Email-specific styles */
+td:first-child { /* From */
+    font-weight: 500;
+    color: var(--cyan);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+td:nth-child(2) { /* To */
+    color: var(--comment);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+td:nth-child(3) { /* Subject */
+    font-weight: 400;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: relative;
+}
+
+td:nth-child(4) { /* Date */
+    color: var(--comment);
+    font-size: 0.8rem;
+    text-align: right;
+    white-space: nowrap;
+    min-width: 120px;
+}
+
+/* Unread email indicator */
+tbody tr.unread {
+    background-color: rgba(189, 147, 249, 0.05);
+}
+
+tbody tr.unread td:nth-child(3) {
+    font-weight: 600;
+}
+
+tbody tr.unread td:nth-child(3)::before {
+    content: "";
+    position: absolute;
+    left: -0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 60%;
+    background-color: var(--purple);
+    border-radius: 2px;
+}
+
+/* Status styles */
 td.status-active {
     color: var(--green);
     font-weight: bold;
@@ -74,4 +128,30 @@ td.status-pending {
 td.status-offline {
     color: var(--danger);
     font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    td:nth-child(3) { /* Subject */
+        max-width: 250px;
+    }
+}
+
+@media (max-width: 768px) {
+    th, td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    td {
+        font-size: 0.8rem;
+    }
+    
+    td:first-child,
+    td:nth-child(2) {
+        max-width: 100px;
+    }
+    
+    td:nth-child(3) {
+        max-width: 150px;
+    }
 }

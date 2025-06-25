@@ -1,6 +1,5 @@
 :host { display: block; }
 
-/* Layout */
 .mail-group-layout {
   display: flex;
   flex-direction: column;
@@ -8,64 +7,11 @@
   min-height: 600px;
 }
 
-/* Info Banner */
-.info-banner {
-  background-color: var(--bGLight);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.info-content {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.info-icon {
-  color: var(--primary);
-  margin-top: 0.125rem;
-}
-
-.info-text {
-  flex: 1;
-}
-
-.info-text h5 {
-  margin: 0 0 0.5rem 0;
-  color: var(--foreground);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.info-text p {
-  margin: 0;
-  color: var(--comment);
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-
-/* Groups Container */
 .groups-container {
   background-color: var(--bGDark);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   overflow: hidden;
-}
-
-.container-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background-color: var(--bGLight);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.container-title {
-  color: var(--foreground);
-  font: 600 1.125rem "Roboto", sans-serif;
-  margin: 0;
 }
 
 .groups-count {
@@ -76,36 +22,6 @@
   border-radius: 12px;
 }
 
-/* Empty states */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem 2rem;
-  text-align: center;
-}
-
-.empty-icon {
-  color: var(--comment);
-  margin-bottom: 1rem;
-}
-
-.empty-title {
-  color: var(--foreground);
-  font-size: 1.125rem;
-  font-weight: 500;
-  margin: 0 0 0.5rem 0;
-}
-
-.empty-message {
-  color: var(--comment);
-  font-size: 0.875rem;
-  margin: 0;
-  line-height: 1.4;
-}
-
-/* Groups Grid */
 .groups-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -113,7 +29,6 @@
   padding: 1rem;
 }
 
-/* Group Cards */
 .group-card {
   background-color: var(--bGLighter);
   border: 1px solid var(--border-color);
@@ -204,28 +119,25 @@
   justify-content: flex-end;
 }
 
-.private-label {
-  color: var(--orange);
+.private-label,
+.group-badge,
+.owner-badge,
+.admin-badge {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 0.25rem 0.5rem;
-  background-color: rgba(255, 184, 0, 0.1);
-  border: 1px solid rgba(255, 184, 0, 0.3);
   border-radius: 12px;
 }
 
-/* Badges */
-.group-badge {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.private-label {
+  color: var(--orange);
+  background-color: rgba(255, 184, 0, 0.1);
+  border: 1px solid rgba(255, 184, 0, 0.3);
+}
 
+.group-badge {
   &.public {
     background-color: rgba(80, 250, 123, 0.2);
     color: var(--green);
@@ -240,11 +152,17 @@
 }
 
 .owner-badge {
-  @extend .badge !optional;
-  @extend .badge-warning !optional;
+  background-color: rgba(255, 184, 0, 0.2);
+  color: var(--orange);
+  border: 1px solid rgba(255, 184, 0, 0.3);
 }
 
-/* Panels */
+.admin-badge {
+  background-color: rgba(111, 131, 190, 0.2);
+  color: var(--primary);
+  border: 1px solid rgba(111, 131, 190, 0.3);
+}
+
 .edit-panel, .users-panel {
   background-color: var(--bGDark);
   border: 1px solid var(--border-color);
@@ -252,44 +170,10 @@
   overflow: hidden;
 }
 
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background-color: var(--bGLight);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.panel-title {
-  color: var(--foreground);
-  font: 600 1.125rem "Roboto", sans-serif;
-  margin: 0;
-}
-
-.panel-content {
-  padding: 1rem;
-}
-
-/* Forms */
-/* Form overrides specific to mail group component */
-.form-group {
-  margin-bottom: 1.5rem;
-  &:last-child { margin-bottom: 0; }
-}
-
-/* User Management */
 .add-user-section {
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--border-color);
-
-  h5 {
-    color: var(--foreground);
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 1rem 0;
-  }
 }
 
 .add-user-form {
@@ -302,41 +186,10 @@
   flex: 1;
 }
 
-.current-users-section {
-  h5 {
-    color: var(--foreground);
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 1rem 0;
-  }
-}
-
 .users-list {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-}
-
-.user-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  background-color: var(--bGLighter);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.user-name {
-  color: var(--foreground);
-  font-size: 0.875rem;
-  font-weight: 500;
 }
 
 .user-granted {
@@ -344,7 +197,6 @@
   font-size: 0.75rem;
 }
 
-/* Component-specific text styling */
 .italic-text {
   font-style: italic;
 }
@@ -362,16 +214,6 @@
   font-size: 0.875rem;
 }
 
-/* Actions */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 1rem;
-  background-color: var(--bGLight);
-  border-top: 1px solid var(--border-color);
-}
-
 .editor-empty {
   display: flex;
   align-items: center;
@@ -379,23 +221,6 @@
   height: 100%;
 }
 
-/* Component-specific button overrides */
-.btn-icon {
-  padding: 0.5rem;
-  background: transparent;
-  border: none;
-  color: var(--comment);
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background-color: var(--bGLighter);
-    color: var(--foreground);
-  }
-}
-
-/* Responsive */
 @media (max-width: 1024px) {
   .groups-grid {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -418,10 +243,7 @@
     padding: 0.75rem;
   }
 
-  .group-card,
-  .panel-header,
-  .panel-content,
-  .form-actions {
+  .group-card {
     padding: 0.75rem;
   }
 
@@ -442,24 +264,8 @@
     margin-top: 0.5rem;
   }
 
-  .form-actions {
-    flex-direction: column;
-    gap: 0.75rem;
-    
-    .btn {
-      width: 100%;
-      justify-content: center;
-    }
-  }
-
   .add-user-form {
     flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .user-item {
-    flex-direction: column;
-    align-items: flex-start;
     gap: 0.75rem;
   }
 }

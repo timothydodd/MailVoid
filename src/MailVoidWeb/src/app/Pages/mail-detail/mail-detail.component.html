@@ -1,18 +1,43 @@
 @if (!!mail()) {
-  <div class="container flex-grow flex-column">
-    <div class="section-card flex-grow flex-column">
-      <div class="section-header">
-        <h2>Email Details</h2>
-        <strong>From:</strong> {{ mail()?.from }} <strong>To:</strong> {{ mail()?.to }} <strong>Subject:</strong
-        >{{ mail()?.subject }} <strong>Sent On:</strong> {{ mail()?.createdOn | date: 'short' }}
-      </div>
-      <div class="section-body flex-grow">
-        @if (mail()?.isHtml) {
-          <iframe #emailContent style="width: 100%; height: 100%; border: none"> </iframe>
-        } @else {
-          <div class="email-content" style="white-space: pre-wrap">{{ mail()?.text }}</div>
-        }
+  <div class="mail-detail-container">
+    <!-- Header Section -->
+    <div class="mail-header">
+      <div class="mail-meta">
+        <div class="meta-row">
+          <div class="meta-item">
+            <span class="label">From</span>
+            <span class="value">{{ mail()?.from }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="label">To</span>
+            <span class="value">{{ mail()?.to }}</span>
+          </div>
+        </div>
+        <div class="meta-row">
+          <div class="meta-item subject">
+            <span class="label">Subject</span>
+            <span class="value">{{ mail()?.subject }}</span>
+          </div>
+          <div class="meta-item date">
+            <span class="label">Date</span>
+            <span class="value">{{ mail()?.createdOn | date: 'medium' }}</span>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Content Section -->
+    <div class="mail-content">
+      @if (mail()?.isHtml) {
+        <iframe #emailContent class="html-content"></iframe>
+      } @else {
+        <div class="text-content">{{ mail()?.text }}</div>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading email...</p>
   </div>
 }

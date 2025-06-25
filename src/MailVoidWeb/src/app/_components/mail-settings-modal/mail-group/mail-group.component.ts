@@ -11,6 +11,7 @@ import {
   MailService,
   User,
 } from '../../../_services/api/mail.service';
+import { AuthService } from '../../../_services/auth-service';
 @Component({
   selector: 'app-mail-group',
   imports: [CommonModule, LucideAngularModule, ReactiveFormsModule, FormsModule, NgSelectModule, ValdemortModule],
@@ -67,6 +68,9 @@ import {
                     @if (group.isOwner) {
                       <span class="owner-badge">Owner</span>
                     }
+                    @if (!group.isOwner && authService.isAdmin() && group.isPublic) {
+                      <span class="admin-badge">Admin Access</span>
+                    }
                   </div>
                 </div>
 
@@ -81,7 +85,7 @@ import {
                   </div>
                 </div>
 
-                @if (group.isOwner && !group.isUserPrivate) {
+                @if (canEditGroup(group) && !group.isUserPrivate) {
                   <div class="group-actions">
                     <button class="btn btn-outline btn-sm" (click)="editGroup(group)" title="Edit Group">
                       <lucide-icon name="edit" size="14"></lucide-icon>
@@ -91,10 +95,12 @@ import {
                       <lucide-icon name="users" size="14"></lucide-icon>
                       Users
                     </button>
-                    <button class="btn btn-outline btn-sm btn-danger" (click)="deleteGroup(group)" title="Delete Group">
-                      <lucide-icon name="trash" size="14"></lucide-icon>
-                      Delete
-                    </button>
+                    @if (group.isOwner) {
+                      <button class="btn btn-outline btn-sm btn-danger" (click)="deleteGroup(group)" title="Delete Group">
+                        <lucide-icon name="trash" size="14"></lucide-icon>
+                        Delete
+                      </button>
+                    }
                   </div>
                 }
                 @if (group.isUserPrivate) {
@@ -293,6 +299,7 @@ import {
 })
 export class MailGroupComponent {
   mailService = inject(MailService);
+  authService = inject(AuthService);
 
   // Data signals
   mailGroups = signal<MailGroup[]>([]);
@@ -350,6 +357,16 @@ export class MailGroupComponent {
       month: 'short',
       day: 'numeric',
     });
+  }
+
+  canEditGroup(group: MailGroup): boolean {
+    // Owner can always edit their own groups
+    if (group.isOwner) return true;
+    
+    // Admin can edit public groups
+    if (this.authService.isAdmin() && group.isPublic) return true;
+    
+    return false;
   }
 
   // Group editing methods
