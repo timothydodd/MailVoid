@@ -36,30 +36,62 @@ public class MailController : ControllerBase
         return Ok(email);
     }
     [HttpGet("boxes")]
-    public async Task<IEnumerable<MailBox>> GetBoxes()
+    public async Task<IEnumerable<MailBox>> GetBoxes(bool showAll = false)
     {
-        var boxes = await _context.Mails
-            .Select(m => new { m.To, m.MailGroupPath })
+        var currentUserId = _userService.GetUserId();
+        var role = _userService.GetRole();
+        var isAdmin = role == "Admin";
+
+        return await _context.Mails
+            .GroupJoin(_context.MailGroups,
+                       mail => mail.MailGroupPath,
+                       mailGroup => mailGroup.Path, // adjust this to your actual key field
+                       (mail, mailGroups) => new
+                       {
+                           mail.To,
+                           mail.MailGroupPath,
+                           MailGroup = mailGroups.FirstOrDefault()
+                       })
+            .Where(x => (isAdmin && showAll) ||
+                        (x.MailGroup != null &&
+                         (x.MailGroup.IsPublic ||
+                          x.MailGroup.OwnerUserId == currentUserId ||
+                          x.MailGroup.MailGroupUsers != null && x.MailGroup.MailGroupUsers.Any(mgu => mgu.UserId == currentUserId))) ||
+                        (x.MailGroup == null && isAdmin))
+            .Select(x => new MailBox()
+            {
+                Name = x.To,
+                Path = x.MailGroupPath,
+                MailBoxName = x.MailGroup != null ? x.MailGroup.Subdomain : null,
+                IsPrivate = x.MailGroup != null ? !x.MailGroup.IsPublic : false,
+            })
             .Distinct()
             .ToListAsync();
-            
-        return boxes.Select(x => new MailBox()
-        {
-            Name = x.To,
-            Path = x.MailGroupPath
-        });
     }
     [HttpPost]
     public async Task<PagedResults<Mail>> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
     {
+        var currentUserId = _userService.GetUserId();
+        var role = _userService.GetRole();
+        var isAdmin = role == "Admin";
+
         var results = new PagedResults<Mail>();
         options ??= new FilterOptions();
 
-        var query = _context.Mails.AsQueryable();
+        var query = _context.Mails
+                    .GroupJoin(_context.MailGroups,
+                       mail => mail.MailGroupPath,
+                       mailGroup => mailGroup.Path, // adjust this to your actual key field
+                       (mail, mailGroups) => new
+                       {
+                           Mail = mail,
+                           MailGroup = mailGroups.FirstOrDefault()
+                       })
+            .AsQueryable();
 
         if (!string.IsNullOrEmpty(options.To))
         {
-            query = query.Where(m => m.To == options.To);
+            query = query.Where(m => m.Mail.To == options.To);
         }
 
         if (options.PageSize == 1)
@@ -67,10 +99,11 @@ public class MailController : ControllerBase
             results.TotalCount = await query.CountAsync();
         }
 
-        query = query.OrderByDescending(m => m.CreatedOn);
+        query = query.OrderByDescending(m => m.Mail.CreatedOn);
         results.Items = await query
             .Skip((options.Page - 1) * options.PageSize)
             .Take(options.PageSize)
+            .Select(m => m.Mail)
             .ToListAsync();
 
         return results;
@@ -84,10 +117,10 @@ public class MailController : ControllerBase
         var mailsToDelete = await _context.Mails
             .Where(m => m.To == options.To)
             .ToListAsync();
-            
+
         _context.Mails.RemoveRange(mailsToDelete);
         await _context.SaveChangesAsync();
-        
+
         return Ok();
     }
     [HttpGet("groups")]
@@ -95,14 +128,15 @@ public class MailController : ControllerBase
     {
         var userId = _userService.GetUserId();
         var groups = await _context.MailGroups
-            .Where(mg => mg.Subdomain != null && !mg.IsUserPrivate && (mg.IsPublic || mg.OwnerUserId == userId || 
+            .Where(mg => mg.Subdomain != null && !mg.IsUserPrivate && (mg.IsPublic || mg.OwnerUserId == userId ||
                         mg.MailGroupUsers.Any(mgu => mgu.UserId == userId)))
-            .Select(mg => new { 
-                mg.Id, 
+            .Select(mg => new
+            {
+                mg.Id,
                 Path = mg.Path ?? "",
                 Subdomain = mg.Subdomain ?? "",
                 Description = mg.Description ?? "",
-                mg.IsPublic, 
+                mg.IsPublic,
                 mg.CreatedAt,
                 IsOwner = mg.OwnerUserId == userId,
                 mg.IsUserPrivate
@@ -115,15 +149,15 @@ public class MailController : ControllerBase
     public async Task<IActionResult> GrantAccess(long mailGroupId, [FromBody] GrantAccessRequest request)
     {
         var currentUserId = _userService.GetUserId();
-        
+
         // Check if current user is owner or admin editing public group
         var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
         if (mailGroup == null)
             return NotFound();
-            
+
         var isOwner = mailGroup.OwnerUserId == currentUserId;
         var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-        
+
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
@@ -139,15 +173,15 @@ public class MailController : ControllerBase
     public async Task<IActionResult> RevokeAccess(long mailGroupId, Guid userId)
     {
         var currentUserId = _userService.GetUserId();
-        
+
         // Check if current user is owner or admin editing public group
         var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
         if (mailGroup == null)
             return NotFound();
-            
+
         var isOwner = mailGroup.OwnerUserId == currentUserId;
         var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-        
+
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
@@ -163,15 +197,15 @@ public class MailController : ControllerBase
     public async Task<IActionResult> UpdateMailGroup(long id, [FromBody] UpdateMailGroupRequest request)
     {
         var currentUserId = _userService.GetUserId();
-        
+
         var mailGroup = await _context.MailGroups.FindAsync(id);
         if (mailGroup == null)
             return NotFound();
-            
+
         // Allow owner or admin to edit public groups
         var isOwner = mailGroup.OwnerUserId == currentUserId;
         var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-        
+
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
@@ -186,10 +220,11 @@ public class MailController : ControllerBase
             mailGroup.Description = request.Description;
             mailGroup.IsPublic = request.IsPublic;
         }
-        
+
         await _context.SaveChangesAsync();
-        
-        return Ok(new {
+
+        return Ok(new
+        {
             mailGroup.Id,
             Path = mailGroup.Path ?? "",
             Subdomain = mailGroup.Subdomain ?? "",
@@ -205,26 +240,28 @@ public class MailController : ControllerBase
     public async Task<IActionResult> GetMailGroupUsers(long mailGroupId)
     {
         var currentUserId = _userService.GetUserId();
-        
+
         var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
         if (mailGroup == null)
             return NotFound();
-            
+
         var isOwner = mailGroup.OwnerUserId == currentUserId;
         var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-        
+
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
         var groupUsers = await _context.MailGroupUsers
             .Include(mgu => mgu.User)
             .Where(mgu => mgu.MailGroupId == mailGroupId)
-            .Select(mgu => new {
+            .Select(mgu => new
+            {
                 mgu.Id,
                 mgu.MailGroupId,
                 mgu.UserId,
                 mgu.GrantedAt,
-                User = new {
+                User = new
+                {
                     mgu.User.Id,
                     mgu.User.UserName,
                     mgu.User.Role,
@@ -232,7 +269,7 @@ public class MailController : ControllerBase
                 }
             })
             .ToListAsync();
-            
+
         return Ok(groupUsers);
     }
 
@@ -240,14 +277,15 @@ public class MailController : ControllerBase
     public async Task<IActionResult> GetUsers()
     {
         var users = await _context.Users
-            .Select(u => new {
+            .Select(u => new
+            {
                 u.Id,
                 u.UserName,
                 u.Role,
                 u.TimeStamp
             })
             .ToListAsync();
-            
+
         return Ok(users);
     }
 
@@ -255,16 +293,16 @@ public class MailController : ControllerBase
     public async Task<IActionResult> CreateMailGroup([FromBody] CreateMailGroupRequest request)
     {
         var userId = _userService.GetUserId();
-        
+
         // Check if subdomain already exists
         var existingGroup = await _context.MailGroups
             .FirstOrDefaultAsync(mg => mg.Subdomain == request.Subdomain);
-            
+
         if (existingGroup != null)
         {
             return BadRequest(new { message = "A mail group with this subdomain already exists." });
         }
-        
+
         var mailGroup = new MailGroup
         {
             Path = EmailSubdomainHelper.GenerateMailGroupPath(request.Subdomain),
@@ -276,11 +314,12 @@ public class MailController : ControllerBase
             IsDefaultMailbox = false,
             CreatedAt = DateTime.UtcNow
         };
-        
+
         _context.MailGroups.Add(mailGroup);
         await _context.SaveChangesAsync();
-        
-        return Ok(new {
+
+        return Ok(new
+        {
             id = mailGroup.Id,
             path = mailGroup.Path,
             subdomain = mailGroup.Subdomain,
@@ -295,27 +334,27 @@ public class MailController : ControllerBase
     {
         var userId = _userService.GetUserId();
         var mailGroup = await _context.MailGroups.FindAsync(id);
-        
+
         if (mailGroup == null)
         {
             return NotFound();
         }
-        
+
         // Prevent deleting default mailboxes
         if (mailGroup.IsDefaultMailbox)
         {
             return BadRequest(new { message = "Cannot delete default mailbox." });
         }
-        
+
         // Only owner or admin can delete
         if (mailGroup.OwnerUserId != userId && !User.IsInRole("Admin"))
         {
             return Forbid();
         }
-        
+
         _context.MailGroups.Remove(mailGroup);
         await _context.SaveChangesAsync();
-        
+
         return Ok();
     }
 
@@ -348,5 +387,7 @@ public class MailBox
 {
     public string? Path { get; set; }
     public required string Name { get; set; }
-
+    public string? MailBoxName { get; set; }
+    public bool IsPrivate { get; set; }
+    public bool IsUsers { get; set; }
 }

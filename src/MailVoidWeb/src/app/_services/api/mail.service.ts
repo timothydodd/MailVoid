@@ -10,11 +10,11 @@ export class MailService {
     return this.http.get<MailBox[]>(`${environment.apiUrl}/api/mail/boxes`).pipe(
       map((boxes) => {
         const groups: MailBoxGroups[] = [{ groupName: '', mailBoxes: [] }];
-        
+
         // Separate claimed and regular mailboxes
         const claimedBoxes: string[] = [];
         const regularBoxes: MailBox[] = [];
-        
+
         boxes.forEach((box) => {
           if (box.path?.startsWith('user-')) {
             claimedBoxes.push(box.name);
@@ -22,15 +22,15 @@ export class MailService {
             regularBoxes.push(box);
           }
         });
-        
+
         // Add "My Boxes" section if there are claimed mailboxes
         if (claimedBoxes.length > 0) {
           groups.push({ groupName: 'My Boxes', mailBoxes: claimedBoxes });
         }
-        
+
         // Process regular mailboxes
         regularBoxes.forEach((box) => {
-          const groupName = box.path ?? '';
+          const groupName = box.mailBoxName ?? box.path ?? '';
           const mailBoxName = box.name;
           const group = groups.find((g) => g.groupName === groupName);
           if (group) {
@@ -39,7 +39,7 @@ export class MailService {
             groups.push({ groupName: groupName, mailBoxes: [mailBoxName] });
           }
         });
-        
+
         return groups;
       })
     );
@@ -56,32 +56,32 @@ export class MailService {
   getMailGroups() {
     return this.http.get<MailGroup[]>(`${environment.apiUrl}/api/mail/groups`);
   }
-  
+
   updateMailGroup(mailGroup: Partial<MailGroup> & { id: number }) {
     return this.http.put<MailGroup>(`${environment.apiUrl}/api/mail/groups/${mailGroup.id}`, mailGroup);
   }
-  
+
   getUsers() {
     return this.http.get<User[]>(`${environment.apiUrl}/api/mail/users`);
   }
-  
+
   getMailGroupUsers(mailGroupId: number) {
     return this.http.get<MailGroupUser[]>(`${environment.apiUrl}/api/mail/groups/${mailGroupId}/users`);
   }
-  
+
   grantUserAccess(mailGroupId: number, userId: string) {
     return this.http.post(`${environment.apiUrl}/api/mail/groups/${mailGroupId}/access`, { userId });
   }
-  
+
   revokeUserAccess(mailGroupId: number, userId: string) {
     return this.http.delete(`${environment.apiUrl}/api/mail/groups/${mailGroupId}/access/${userId}`);
   }
-  
+
   // Mail Group management
   createMailGroup(data: CreateMailGroupRequest) {
     return this.http.post<MailGroup>(`${environment.apiUrl}/api/mail/mail-groups`, data);
   }
-  
+
   deleteMailGroup(id: number) {
     return this.http.delete(`${environment.apiUrl}/api/mail/mail-groups/${id}`);
   }
@@ -118,6 +118,7 @@ export interface PagedResults<T> {
 export interface MailBox {
   path: string | null;
   name: string;
+  mailBoxName: string;
 }
 export interface MailBoxGroups {
   groupName: string;
