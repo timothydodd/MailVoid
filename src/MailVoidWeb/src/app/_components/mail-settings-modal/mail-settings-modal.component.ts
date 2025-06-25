@@ -1,11 +1,11 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
 import { ModalService } from '../modal/modal.service';
 import { MailGroupComponent } from './mail-group/mail-group.component';
 
 @Component({
   selector: 'app-mail-settings-modal',
-  imports: [CommonModule, MailGroupComponent],
+  imports: [MailGroupComponent],
   template: `
     <ng-template #modalHeader>
       <div class="settings-header">

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectionStrategy, Component, EventEmitter, forwardRef, Input, input, Output } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR, ReactiveFormsModule } from '@angular/forms';
 
@@ -11,7 +11,7 @@ const CUSTOM_VALUE_ACCESSOR: any = {
 @Component({
   selector: 'app-check',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [FormsModule, ReactiveFormsModule],
   providers: [CUSTOM_VALUE_ACCESSOR],
   template: `
     <div class="checkbox-wrapper-33">

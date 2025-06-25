@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -10,7 +10,7 @@ import { ChangePasswordComponent } from './change-password/change-password.compo
 @Component({
   selector: 'app-user-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ChangePasswordComponent, UserManagementComponent],
+  imports: [FormsModule, LucideAngularModule, ChangePasswordComponent, UserManagementComponent],
   template: `
     <ng-template #modalHeader>
       <div class="settings-header">

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectionStrategy, Component, computed, input, model, output } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 import { MailBoxGroups } from '../../../_services/api/mail.service';
@@ -7,7 +7,7 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
 @Component({
   selector: 'app-box-list',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, BoxMenuComponent],
+  imports: [LucideAngularModule, BoxMenuComponent],
   template: `
     <div class="box-list-container">
       <!-- Show All option -->

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, inject, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -13,7 +13,7 @@ import { AuthService } from '../../_services/auth-service';
   templateUrl: './error-page.component.html',
   styleUrls: ['./error-page.component.scss'],
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [LucideAngularModule],
 })
 export class ErrorPageComponent implements OnInit {
   public sanitizer = inject(DomSanitizer);

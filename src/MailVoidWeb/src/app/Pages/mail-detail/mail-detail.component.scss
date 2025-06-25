@@ -1,27 +1,28 @@
 :host {
   display: block;
   width: 100%;
-}
 
 
-.back-button-container {
-  margin-bottom: 0.5rem;
-  
-  button {
+
+
+
+  .btn.btn-outline {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
-    
+    color: var(--purple);
     lucide-icon {
       transition: transform 0.2s ease;
+      color: var(--purple);
     }
     
     &:hover lucide-icon {
       transform: translateX(-2px);
     }
-  }
+  
+}
 }
 
 

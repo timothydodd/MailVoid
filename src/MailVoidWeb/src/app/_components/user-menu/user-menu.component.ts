@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
 
 import { LucideAngularModule } from 'lucide-angular';
@@ -11,7 +11,7 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
 @Component({
   selector: 'app-user-menu',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, UserSettingsComponent, ClickOutsideDirective],
+  imports: [LucideAngularModule, UserSettingsComponent, ClickOutsideDirective],
   template: `
     @if (user()) {
       <button type="button" class="btn-icon" (click)="isOpen.set(!isOpen())">

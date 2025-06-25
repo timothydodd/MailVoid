@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CreateUserRequest, Role, UpdateUserRoleRequest, User } from '../../_models/user.model';
@@ -7,7 +7,7 @@ import { UserManagementService } from '../../_services/user-management.service';
 
 @Component({
   selector: 'app-user-management',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   template: `
     <div class="user-management">
       <!-- Create User Form -->

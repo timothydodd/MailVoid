@@ -428,11 +428,12 @@
 }
 
 .mail-header {
-  background: linear-gradient(135deg, var(--bGLight) 0%, var(--current-line) 100%);
+  background: var(--bGLight);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 1rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  flex-grow: 1;
 }
 
 .mail-meta {

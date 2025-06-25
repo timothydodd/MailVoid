@@ -1,34 +1,34 @@
 @if (!!mail()) {
   <div class="mail-detail-container">
     <!-- Back Button -->
-    <div class="back-button-container">
-      <button class="btn btn-outline" (click)="goBack()">
-        <lucide-icon name="arrow-left" size="16"></lucide-icon>
-        Back to Mail List
-      </button>
-    </div>
 
     <!-- Header Section -->
-    <div class="mail-header">
-      <div class="mail-meta">
-        <div class="meta-row">
-          <div class="meta-item">
-            <span class="meta-label">From</span>
-            <span class="meta-value">{{ mail()?.from }}</span>
+    <div class="flex-row gap10">
+      <button class="btn btn-outline" (click)="goBack()">
+        <lucide-icon name="arrow-left" size="16"></lucide-icon>
+      </button>
+
+      <div class="mail-header">
+        <div class="mail-meta">
+          <div class="meta-row">
+            <div class="meta-item">
+              <span class="meta-label">From</span>
+              <span class="meta-value">{{ mail()?.from }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">To</span>
+              <span class="meta-value">{{ mail()?.to }}</span>
+            </div>
+            <div class="meta-item date">
+              <span class="meta-label">Date</span>
+              <span class="meta-value">{{ mail()?.createdOn | date: 'medium' }}</span>
+            </div>
           </div>
-          <div class="meta-item">
-            <span class="meta-label">To</span>
-            <span class="meta-value">{{ mail()?.to }}</span>
-          </div>
-          <div class="meta-item date">
-            <span class="meta-label">Date</span>
-            <span class="meta-value">{{ mail()?.createdOn | date: 'medium' }}</span>
-          </div>
-        </div>
-        <div class="meta-row">
-          <div class="meta-item subject">
-            <span class="meta-label">Subject</span>
-            <span class="meta-value">{{ mail()?.subject }}</span>
+          <div class="meta-row">
+            <div class="meta-item subject">
+              <span class="meta-label">Subject</span>
+              <span class="meta-value">{{ mail()?.subject }}</span>
+            </div>
           </div>
         </div>
       </div>
