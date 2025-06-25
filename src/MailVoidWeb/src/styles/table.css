@@ -1,7 +1,7 @@
 .table-wrap {
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    background-color: var(--bGDark);
+    background-color: #222f453a;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
@@ -31,7 +31,7 @@ th {
 
 /* Body Styles */
 tbody tr {
-    background-color: var(--background);
+    background-color: rgba(111, 131, 190, 0.3);
     border-bottom: 1px solid rgba(98, 115, 164, 0.15);
     cursor: pointer;
     transition: all 0.2s ease;
@@ -43,8 +43,9 @@ tbody tr:last-child {
 }
 
 tbody tr:hover {
-    background-color: rgba(111, 131, 190, 0.3);
+    background-color: rgba(111, 131, 190, 0.5);
     transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(111, 131, 190, 0.2);
 }
 
 tbody tr:hover td {

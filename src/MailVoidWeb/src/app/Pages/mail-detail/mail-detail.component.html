@@ -7,7 +7,7 @@
         Back to Mail List
       </button>
     </div>
-    
+
     <!-- Header Section -->
     <div class="mail-header">
       <div class="mail-meta">
@@ -20,15 +20,15 @@
             <span class="label">To</span>
             <span class="value">{{ mail()?.to }}</span>
           </div>
+          <div class="meta-item date">
+            <span class="label">Date</span>
+            <span class="value">{{ mail()?.createdOn | date: 'medium' }}</span>
+          </div>
         </div>
         <div class="meta-row">
           <div class="meta-item subject">
             <span class="label">Subject</span>
             <span class="value">{{ mail()?.subject }}</span>
-          </div>
-          <div class="meta-item date">
-            <span class="label">Date</span>
-            <span class="value">{{ mail()?.createdOn | date: 'medium' }}</span>
           </div>
         </div>
       </div>
