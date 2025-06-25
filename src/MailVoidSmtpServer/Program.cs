@@ -1,9 +1,11 @@
 ﻿using MailVoidSmtpServer.Services;
+using MailVoidSmtpServer.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SmtpServer.Storage;
+using SmtpServer.Authentication;
 
 namespace MailVoidSmtpServer;
 
@@ -11,6 +13,13 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
+        // Check if running password hash utility
+        if (args.Length > 0 && args[0] == "hash-password")
+        {
+            Utils.PasswordHasher.GeneratePasswordHash(args);
+            return;
+        }
+
         // Debug environment variables before anything else
         Console.WriteLine($"ASPNETCORE_ENVIRONMENT from system: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
 
@@ -33,10 +42,19 @@ public class Program
                 services.Configure<MailVoidApiOptions>(hostContext.Configuration.GetSection("MailVoidApi"));
                 services.Configure<EmailQueueOptions>(hostContext.Configuration.GetSection("EmailQueue"));
                 services.Configure<QueueMonitoringOptions>(hostContext.Configuration.GetSection("QueueMonitoring"));
+                services.Configure<MailboxFilterOptions>(hostContext.Configuration.GetSection("MailboxFilter"));
 
                 services.AddHttpClient<MailForwardingService>();
                 services.AddTransient<IMessageStore, MailMessageStore>();
                 services.AddSingleton<SmtpServerService>();
+                
+                // Security services
+                services.AddSingleton<MailVoidMailboxFilter>();
+                services.AddSingleton<IMailboxFilter>(provider => provider.GetRequiredService<MailVoidMailboxFilter>());
+                services.AddSingleton<IMailboxFilterFactory>(provider => provider.GetRequiredService<MailVoidMailboxFilter>());
+                
+                services.AddSingleton<NoAuthenticator>();
+                services.AddSingleton<IUserAuthenticator>(provider => provider.GetRequiredService<NoAuthenticator>());
                 
                 // Queue services
                 services.AddSingleton<IInboundEmailQueueService, InboundEmailQueueService>();
@@ -94,6 +112,7 @@ public class Program
 public class SmtpServerOptions
 {
     public int Port { get; set; } = 25;
+    public int TestPort { get; set; } = 2580;
     public string Name { get; set; } = "MailVoid SMTP Server";
     public int MaxMessageSize { get; set; } = 10 * 1024 * 1024; // 10MB
     public string? CertificatePath { get; set; }

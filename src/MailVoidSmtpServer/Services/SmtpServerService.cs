@@ -23,25 +23,25 @@ public class SmtpServerService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Starting SMTP server on port {Port}", _options.Port);
+        _logger.LogInformation("Starting SMTP server on ports {Port} and {TestPort} with mailbox filtering enabled", 
+            _options.Port, _options.TestPort);
 
         var options = new SmtpServerOptionsBuilder()
             .ServerName(_options.Name)
             .MaxMessageSize(_options.MaxMessageSize)
             .Endpoint((builder) =>
             {
-                builder.Port(25, isSecure: false)
-                .AllowUnsecureAuthentication(true)   // Allow plain text for port 25
-                .AuthenticationRequired(false);      // Optional auth for relay
-                /certificate for plain text only
+                builder.Port(_options.Port, isSecure: false)
+                .AllowUnsecureAuthentication(true)
+                .AuthenticationRequired(false);
             })
-
-
-
-
-
+            .Endpoint((builder) =>
+            {
+                builder.Port(_options.TestPort, isSecure: false)
+                .AllowUnsecureAuthentication(true)
+                .AuthenticationRequired(false);
+            })
             .Build();
-
 
         _server = new SmtpServer.SmtpServer(options, _serviceProvider);
 
@@ -63,9 +63,8 @@ public class SmtpServerService
             }
         }, cancellationToken);
 
-
-
-        _logger.LogInformation("SMTP server started successfully on port 25 (plain text only)");
+        _logger.LogInformation("SMTP server started successfully on ports {Port} and {TestPort} with authentication: {AuthRequired}, MailboxFilter: Enabled",
+            _options.Port, _options.TestPort, false);
         return Task.CompletedTask;
     }
 
@@ -128,7 +127,6 @@ public class SmtpServerService
             e.Context.EndpointDefinition.Endpoint,
             securityInfo);
     }
-
 }
 
 public class SmtpServerHostedService : IHostedService

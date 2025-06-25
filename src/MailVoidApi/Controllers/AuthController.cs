@@ -1,5 +1,4 @@
-﻿using System.Security.Claims;
-using MailVoidApi.Data;
+﻿using MailVoidApi.Data;
 using MailVoidApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -67,13 +66,13 @@ public class AuthController : Controller
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePasswordAsync([FromBody] ChangePasswordRequest request)
     {
-        var userName = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-        if (userName == null)
+        var userId = _authService.GetUserIdFromPrincipal(User);
+        if (userId == null)
         {
             return Unauthorized();
         }
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == userName);
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null)
         {
             return NotFound();

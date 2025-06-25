@@ -25,32 +25,51 @@ class Program
         var config = _configuration.GetSection("SmtpTest");
         var smtpHost = config["Host"] ?? "localhost";
         var standardPort = int.Parse(config["StandardPort"] ?? "25");
+        var testPort = int.Parse(config["TestPort"] ?? "2580");
         var sslPort = int.Parse(config["SslPort"] ?? "465");
-        var fromEmail = config["FromEmail"] ?? "test@example.com";
-        var toEmail = config["ToEmail"] ?? "recipient@example.com";
-        var enableSslOption = bool.Parse(config["EnableSslOption"] ?? "true");
+        var fromEmail = config["FromEmail"] ?? "sender@testdomain.com";
+        var toEmail = config["ToEmail"] ?? "recipient@mailvoid.com";
+        var enableSslOption = bool.Parse(config["EnableSslOption"] ?? "false");
 
         int smtpPort;
         bool useSsl;
 
-        // Check if SSL option is enabled
+        // Ask user which port to test
+        Console.WriteLine("Select SMTP port to test:");
+        Console.WriteLine($"1. Port {standardPort} (Standard SMTP - Production)");
+        Console.WriteLine($"2. Port {testPort} (Test SMTP - Recommended)");
         if (enableSslOption)
         {
-            // Ask user which port to test
-            Console.WriteLine("Select SMTP port to test:");
-            Console.WriteLine($"1. Port {standardPort} (Standard SMTP)");
-            Console.WriteLine($"2. Port {sslPort} (SMTP with SSL/TLS)");
-            Console.WriteLine($"3. Port {standardPort} (SMTP with SSL/TLS)");
-            Console.Write("Enter choice (1 or 2 or 3): ");
-
-            var choice = Console.ReadLine();
-            smtpPort = choice == "2" ? sslPort : standardPort;
-            useSsl = choice != "1";
+            Console.WriteLine($"3. Port {sslPort} (SMTP with SSL/TLS)");
+            Console.WriteLine($"4. Port {standardPort} (SMTP with SSL/TLS)");
         }
-        else
+        Console.Write($"Enter choice (1, 2{(enableSslOption ? ", 3, or 4" : "")}): ");
+
+        var choice = Console.ReadLine();
+        
+        switch (choice)
         {
-            smtpPort = standardPort;
-            useSsl = false;
+            case "1":
+                smtpPort = standardPort;
+                useSsl = false;
+                break;
+            case "2":
+                smtpPort = testPort;
+                useSsl = false;
+                break;
+            case "3" when enableSslOption:
+                smtpPort = sslPort;
+                useSsl = true;
+                break;
+            case "4" when enableSslOption:
+                smtpPort = standardPort;
+                useSsl = true;
+                break;
+            default:
+                Console.WriteLine("Invalid choice, defaulting to test port...");
+                smtpPort = testPort;
+                useSsl = false;
+                break;
         }
 
         Console.WriteLine($"\nTesting SMTP server at {smtpHost}:{smtpPort} (SSL: {useSsl})");
@@ -71,7 +90,11 @@ class Program
         // Test 4: Email with multiple recipients
         Console.WriteLine("\nTest 4: Sending email with multiple recipients...");
         await SendEmailWithMultipleRecipients(smtpHost, smtpPort, useSsl, fromEmail,
-            new[] { toEmail, "cc@example.com", "bcc@example.com" });
+            new[] { toEmail, "cc@mailvoid.com", "bcc@test.mailvoid.com" });
+
+        // Test 5: Authentication blocking test
+        Console.WriteLine("\nTest 5: Testing authentication blocking...");
+        await TestAuthenticationBlocked(smtpHost, smtpPort, useSsl, fromEmail, toEmail);
 
         Console.WriteLine("\nAll tests completed!");
         Console.WriteLine("Check the MailVoid web interface to see if emails were received.");
@@ -241,6 +264,102 @@ SMTP Test"
         catch (Exception ex)
         {
             Console.WriteLine($"✗ Failed to send email with multiple recipients: {ex.Message}");
+        }
+    }
+
+    static async Task TestAuthenticationBlocked(string host, int port, bool useSsl, string from, string to)
+    {
+        try
+        {
+            Console.WriteLine("Testing that user authentication is properly blocked...");
+            
+            // Create message for testing
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress("Test Sender", from));
+            message.To.Add(new MailboxAddress("Test Recipient", to));
+            message.Subject = "Authentication Test Email";
+            message.Body = new TextPart("plain") { Text = "This email tests that authentication is blocked." };
+
+            using var client = new SmtpClient();
+            
+            // For self-signed certificates in development
+            var allowSelfSigned = bool.Parse(_configuration?["SmtpTest:AllowSelfSignedCertificates"] ?? "true");
+            if (allowSelfSigned)
+            {
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+            }
+
+            Console.WriteLine($"[AUTH TEST] Connecting to {host}:{port}...");
+            
+            if (useSsl)
+            {
+                await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+            }
+            else
+            {
+                await client.ConnectAsync(host, port, SecureSocketOptions.Auto);
+            }
+
+            Console.WriteLine("[AUTH TEST] Connected successfully");
+
+            // Test 1: Try authentication with fake credentials
+            Console.WriteLine("[AUTH TEST] Attempting authentication with username 'testuser' and password 'testpass'...");
+            
+            try
+            {
+                await client.AuthenticateAsync("testuser", "testpass");
+                Console.WriteLine("✗ SECURITY ISSUE: Authentication succeeded when it should be blocked!");
+            }
+            catch (AuthenticationException)
+            {
+                Console.WriteLine("✓ Authentication correctly blocked (AuthenticationException)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✓ Authentication blocked with exception: {ex.GetType().Name}");
+            }
+
+            // Test 2: Try authentication with admin credentials
+            Console.WriteLine("[AUTH TEST] Attempting authentication with username 'admin' and password 'admin123'...");
+            
+            try
+            {
+                await client.AuthenticateAsync("admin", "admin123");
+                Console.WriteLine("✗ SECURITY ISSUE: Admin authentication succeeded when it should be blocked!");
+            }
+            catch (AuthenticationException)
+            {
+                Console.WriteLine("✓ Admin authentication correctly blocked (AuthenticationException)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✓ Admin authentication blocked with exception: {ex.GetType().Name}");
+            }
+
+            // Test 3: Verify we can still send emails without authentication
+            Console.WriteLine("[AUTH TEST] Testing email sending without authentication...");
+            
+            try
+            {
+                await client.SendAsync(message);
+                Console.WriteLine("✓ Email sent successfully without authentication (as expected)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ Failed to send email without authentication: {ex.Message}");
+            }
+
+            await client.DisconnectAsync(true);
+            Console.WriteLine("✓ Authentication blocking test completed successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"✗ Authentication test failed: {ex.Message}");
+            Console.WriteLine($"   Exception type: {ex.GetType().Name}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"   Inner exception: {ex.InnerException.Message}");
+            }
         }
     }
 
