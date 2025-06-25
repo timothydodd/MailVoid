@@ -31,7 +31,7 @@ th {
 
 /* Body Styles */
 tbody tr {
-    background-color: var(--bGDark);
+    background-color: var(--background);
     border-bottom: 1px solid rgba(98, 115, 164, 0.15);
     cursor: pointer;
     transition: all 0.2s ease;
@@ -43,7 +43,7 @@ tbody tr:last-child {
 }
 
 tbody tr:hover {
-    background-color: rgba(189, 147, 249, 0.1);
+    background-color: rgba(111, 131, 190, 0.3);
     transform: translateX(4px);
 }
 

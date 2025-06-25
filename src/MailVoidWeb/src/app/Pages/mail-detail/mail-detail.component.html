@@ -1,5 +1,13 @@
 @if (!!mail()) {
   <div class="mail-detail-container">
+    <!-- Back Button -->
+    <div class="back-button-container">
+      <button class="btn btn-outline" (click)="goBack()">
+        <lucide-icon name="arrow-left" size="16"></lucide-icon>
+        Back to Mail List
+      </button>
+    </div>
+    
     <!-- Header Section -->
     <div class="mail-header">
       <div class="mail-meta">

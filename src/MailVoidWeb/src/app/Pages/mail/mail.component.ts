@@ -6,6 +6,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { catchError, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
 import { FilterOptions, Mail, MailBoxGroups, MailService } from '../../_services/api/mail.service';
+import { MobileMenuService } from '../../_services/mobile-menu.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
 type SortColumn = 'from' | 'to' | 'subject' | 'createdOn';
@@ -16,24 +17,36 @@ type SortDirection = 'asc' | 'desc';
   standalone: true,
   imports: [CommonModule, BoxListComponent, LucideAngularModule, MailSettingsModalComponent],
   template: `
-    <div class="container d-flex flex-row flex-grow">
-      <div class="left-side">
-        <div class="section-card">
-          <div class="section-header" style="padding: 5px">
-            <button class="btn btn-icon align-self-end" (click)="mailSettings.show()" title="Mail Settings">
+    <div class="mail-container">
+      <!-- Left Sidebar (Hidden on mobile, shown as overlay when menu is open) -->
+      <div class="mail-sidebar" [class.mobile-menu-open]="isMobileMenuOpen()">
+        <div class="sidebar-card">
+          <div class="sidebar-header">
+            <button class="btn btn-icon mobile-close-btn" (click)="closeMobileMenu()" title="Close">
+              <lucide-icon name="x" size="24"></lucide-icon>
+            </button>
+            <button class="btn btn-icon" (click)="mailSettings.show()" title="Mail Settings">
               <lucide-icon name="cog"></lucide-icon>
             </button>
           </div>
-          <div class="section-body">
+          <div class="sidebar-body">
             <app-box-list
               [mailboxes]="mailboxes()"
               [(selectedBox)]="selectedBox"
               (deleteEvent)="deleteBox($event)"
+              (boxClick)="onMobileBoxSelect($event)"
             ></app-box-list>
           </div>
         </div>
       </div>
-      <div class="right-side ">
+
+      <!-- Overlay backdrop for mobile -->
+      @if (isMobileMenuOpen()) {
+        <div class="mobile-overlay" (click)="closeMobileMenu()"></div>
+      }
+
+      <!-- Main Content Area -->
+      <div class="mail-content">
         <div class="table-wrap">
           <table>
             <thead>
@@ -80,7 +93,7 @@ type SortDirection = 'asc' | 'desc';
               @if (paginatedEmails()) {
                 @for (email of paginatedEmails(); track email.id) {
                   <tr (click)="clickMail(email)">
-                    <td>{{ email.from }}</td>
+                    <td class="from-email">{{ email.from }}</td>
                     <td style="max-width: 100px;overflow:hidden;">{{ email.to }}</td>
                     <td style="max-width: 300px;word-break: break-all;">
                       {{ email.subject }}
@@ -116,9 +129,11 @@ type SortDirection = 'asc' | 'desc';
 export class MailComponent {
   router = inject(Router);
   mailService = inject(MailService);
+  mobileMenuService = inject(MobileMenuService);
   mailboxes = signal<MailBoxGroups[] | null>(null);
   emails = signal<Mail[] | null>(null);
   selectedBox = signal<string | null>(null);
+  isMobileMenuOpen = signal(false);
 
   // Sorting
   sortColumn = signal<SortColumn>('createdOn');
@@ -190,6 +205,9 @@ export class MailComponent {
         this.currentPage.set(1); // Reset to first page when emails change
       });
     this.refreshMail();
+    this.mobileMenuService.menuToggled.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.toggleMobileMenu();
+    });
   }
 
   refreshMail() {
@@ -208,7 +226,6 @@ export class MailComponent {
       this.refreshMail();
     });
   }
-
 
   toggleSort(column: SortColumn) {
     if (this.sortColumn() === column) {
@@ -231,5 +248,18 @@ export class MailComponent {
     if (this.currentPage() > 1) {
       this.currentPage.update((page) => page - 1);
     }
+  }
+
+  toggleMobileMenu() {
+    this.isMobileMenuOpen.update((isOpen) => !isOpen);
+  }
+
+  closeMobileMenu() {
+    this.isMobileMenuOpen.set(false);
+  }
+
+  onMobileBoxSelect(box: string | null) {
+    this.selectedBox.set(box);
+    this.closeMobileMenu();
   }
 }

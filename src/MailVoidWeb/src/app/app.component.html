@@ -1,8 +1,8 @@
 @if (authService.isLoggedIn | async) {
   <app-main-nav></app-main-nav>
 }
-<div class="container d-flex flex-column flex-grow">
-  <main role="main" class="pb-3 d-flex flex-column flex-grow">
+<div class="app-container">
+  <main role="main" class="app-main">
     <router-outlet />
   </main>
 </div>

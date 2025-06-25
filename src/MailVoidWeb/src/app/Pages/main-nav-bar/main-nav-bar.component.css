@@ -1,37 +1,95 @@
 :host {
-  display: flex;
-  flex-direction: column;
+  display: block;
   width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
 
-  border-bottom: 1px solid var(--border-color);
+.navbar {
+  width: 100%;
   background-color: var(--bGDark);
-}
-.container{
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px 0px;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.btn-icon::after {
-  content: none;
-  display: none;
+.navbar-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
-@media screen and (max-width: 768px) {
-  :host {
-    flex-direction: column;
+
+.navbar-logo {
+  height: 32px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.navbar-toolbar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2rem;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.mobile-menu-btn {
+  display: none;
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--foreground);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--bGLight);
+    border-color: var(--border-color);
+  }
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .navbar-container {
+    padding: 0.75rem 1rem;
+  }
+  
+  .navbar-toolbar {
+    padding: 0 1rem;
+  }
+  
+  .navbar-logo {
+    height: 28px;
+  }
+  
+  .mobile-menu-btn {
+    display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px 0;
-    position: relative;
-    gap: 20px;
   }
-  :host app-main-menu {
-    position: absolute;
-    top: 18px;
-    right: 10px;
+}
+
+@media (max-width: 480px) {
+  .navbar-container {
+    padding: 0.5rem 0.75rem;
   }
-  ::ng-deep app-share-link-display {
-    display: block;
-    width: 100%;
+  
+  .navbar-toolbar {
+    display: none; /* Hide toolbar on very small screens */
+  }
+  
+  .navbar-logo {
+    height: 24px;
   }
 }

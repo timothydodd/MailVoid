@@ -6,31 +6,44 @@ import { RouterModule } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { UserMenuComponent } from '../../_components/user-menu/user-menu.component';
 import { AuthService, User } from '../../_services/auth-service';
+import { MobileMenuService } from '../../_services/mobile-menu.service';
 
 @Component({
   selector: 'app-main-nav',
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, RouterModule, UserMenuComponent],
   template: `
-    <div class="container flex-row">
-      <img src="logo-s.png" width="32" alt="Logo" class="logo" />
+    <nav class="navbar">
+      <div class="navbar-container">
+        <img src="logo-s.png" width="32" alt="Logo" class="navbar-logo" />
 
-      @if (templateRef()) {
-        <ng-container class="toolbar" *ngTemplateOutlet="templateRef()"></ng-container>
-      }
-      @if (user() !== null) {
-        <app-user-menu></app-user-menu>
-      }
-    </div>
+        @if (templateRef()) {
+          <div class="navbar-toolbar">
+            <ng-container *ngTemplateOutlet="templateRef()"></ng-container>
+          </div>
+        }
+        
+        <div class="navbar-actions">
+          @if (user() !== null) {
+            <button class="btn btn-icon mobile-menu-btn" (click)="onMobileMenuClick()" title="Mailboxes">
+              <lucide-icon name="inbox" size="20"></lucide-icon>
+            </button>
+            <app-user-menu></app-user-menu>
+          }
+        </div>
+      </div>
+    </nav>
   `,
   styleUrl: './main-nav-bar.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainNavBarComponent {
   private authService = inject(AuthService);
+  private mobileMenuService = inject(MobileMenuService);
 
   templateRef = signal<TemplateRef<any> | null>(null);
   user = signal<User | null>(null);
+  
   constructor() {
     this.authService
       .getUser()
@@ -38,5 +51,9 @@ export class MainNavBarComponent {
       .subscribe((x) => {
         this.user.set(x);
       });
+  }
+  
+  onMobileMenuClick() {
+    this.mobileMenuService.toggleMenu();
   }
 }

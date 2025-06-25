@@ -5,6 +5,7 @@ import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@a
 import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
 import { JwtModule } from '@auth0/angular-jwt';
 import {
+  ArrowLeft,
   Calendar,
   ChevronDown,
   ChevronLeft,
@@ -18,6 +19,7 @@ import {
   Info,
   LucideAngularModule,
   Mail,
+  Menu,
   Pencil,
   Plus,
   PlusCircle,
@@ -27,7 +29,7 @@ import {
   UploadIcon,
   User,
   Users,
-  X,
+  X
 } from 'lucide-angular';
 import { provideToastr } from 'ngx-toastr';
 import { environment } from '../environments/environment';
@@ -82,6 +84,8 @@ export const appConfig: ApplicationConfig = {
         Users,
         Plus,
         Trash,
+        Menu,
+        ArrowLeft,
       })
     ),
     provideToastr(),

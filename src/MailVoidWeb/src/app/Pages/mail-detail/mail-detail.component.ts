@@ -1,14 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 import { filter, map, switchMap, take } from 'rxjs';
 import { Mail, MailService } from '../../_services/api/mail.service';
 
 @Component({
   selector: 'app-mail-detail',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideAngularModule],
   templateUrl: './mail-detail.component.html',
   styleUrl: './mail-detail.component.scss',
 })
@@ -16,6 +17,7 @@ export class MailDetailComponent {
   mail = signal<Mail | null>(null);
   mailService = inject(MailService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   emailContent = viewChild<ElementRef<HTMLIFrameElement>>('emailContent');
   constructor() {
     this.route.paramMap
@@ -56,5 +58,9 @@ export class MailDetailComponent {
           emailContent?.contentWindow?.document.close();
         }
       });
+  }
+
+  goBack() {
+    this.router.navigate(['/mail']);
   }
 }

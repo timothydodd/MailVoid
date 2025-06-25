@@ -10,6 +10,20 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
   imports: [CommonModule, LucideAngularModule, BoxMenuComponent],
   template: `
     <div class="box-list-container">
+      <!-- Show All option -->
+      <div class="group-section">
+        <div class="mailbox-list">
+          <div class="mailbox-item show-all-item" [class.selected]="selectedBox() === null">
+            <button class="mailbox-button" (click)="clickBox(null)" title="Show all emails">
+              <span class="mailbox-name">
+                <lucide-icon name="inbox" size="16"></lucide-icon>
+                Show All
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
       @if (sortedMailboxes(); as mb) {
         @for (group of mb; track $index) {
           <div class="group-section">
@@ -48,6 +62,7 @@ export class BoxListComponent {
   mailboxes = input.required<MailBoxGroups[] | null>();
   selectedBox = model<string | null>();
   deleteEvent = output<string>();
+  boxClick = output<string | null>();
 
   sortedMailboxes = computed(() => {
     const mb = this.mailboxes();
@@ -66,8 +81,9 @@ export class BoxListComponent {
     });
   });
 
-  clickBox(box: string) {
+  clickBox(box: string | null) {
     this.selectedBox.set(box);
+    this.boxClick.emit(box);
   }
 
   deleteClick(item: string) {

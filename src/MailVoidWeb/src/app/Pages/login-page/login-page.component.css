@@ -1,13 +1,77 @@
 /* Login page specific styles - most styles are now global */
 
+/* Background vortex animation */
+.auth-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-container::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    rgba(189, 147, 249, 0.1) 30deg,
+    transparent 60deg,
+    rgba(111, 131, 190, 0.08) 120deg,
+    transparent 150deg,
+    rgba(139, 233, 253, 0.06) 210deg,
+    transparent 240deg,
+    rgba(189, 147, 249, 0.1) 300deg,
+    transparent 360deg
+  );
+  animation: vortex-spin 40s linear infinite;
+  z-index: 0;
+}
+
+.auth-container::after {
+  content: '';
+  position: fixed;
+  top: -25%;
+  left: -25%;
+  width: 150%;
+  height: 150%;
+  background: conic-gradient(
+    from 180deg at 50% 50%,
+    transparent 0deg,
+    rgba(189, 147, 249, 0.05) 45deg,
+    transparent 90deg,
+    rgba(111, 131, 190, 0.04) 180deg,
+    transparent 225deg,
+    rgba(139, 233, 253, 0.03) 315deg,
+    transparent 360deg
+  );
+  animation: vortex-spin 60s linear infinite reverse;
+  z-index: 1;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 10;
+}
+
+@keyframes vortex-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Logo animation and sizing for login page */
 .auth-logo-animated {
   width: 74px;
   height: 74px;
-  animation: slow-spin 20s linear infinite;
+  animation: fast-spin 6s linear infinite;
 }
 
-@keyframes slow-spin {
+@keyframes fast-spin {
   from {
     transform: rotate(0deg);
   }
