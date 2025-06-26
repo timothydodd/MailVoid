@@ -25,11 +25,12 @@ public class MailForwardingService
 
     public async Task<bool> ForwardEmailAsync(EmailWebhookData emailData, CancellationToken cancellationToken = default)
     {
+        var url = $"{_options.BaseUrl.TrimEnd('/')}{_options.WebhookEndpoint}";
+        
         try
         {
-            _logger.LogDebug("Starting email forwarding for message from {From} to {To}",
-                emailData.From, string.Join(", ", emailData.To));
-            var url = $"{_options.BaseUrl.TrimEnd('/')}{_options.WebhookEndpoint}";
+            _logger.LogInformation("🚀 Forwarding email from {From} to {To} via {Url}",
+                emailData.From, string.Join(", ", emailData.To), url);
 
             // Convert to MailData format that the webhook expects
             var mailData = ConvertToMailData(emailData);
@@ -41,29 +42,47 @@ public class MailForwardingService
             {
                 _httpClient.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("ApiKey", _options.ApiKey);
+                _logger.LogDebug("Using API key: {ApiKey}", _options.ApiKey);
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ No API key configured for MailVoid API forwarding");
             }
 
-            _logger.LogDebug("Forwarding email to {Url} with payload size: {Size} bytes", url, json.Length);
-            _logger.LogTrace("Email JSON payload: {Payload}", json);
+            _logger.LogDebug("Payload size: {Size} bytes", json.Length);
 
             var response = await _httpClient.PostAsync(url, content, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Successfully forwarded email to MailVoid API. Status: {StatusCode}", response.StatusCode);
+                _logger.LogInformation("✅ Successfully forwarded email to MailVoid API - Status: {StatusCode}, From: {From}, Subject: {Subject}",
+                    response.StatusCode, emailData.From, emailData.Subject ?? "(no subject)");
                 return true;
             }
             else
             {
                 var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("Failed to forward email. Status: {StatusCode}, Response: {Response}",
-                    response.StatusCode, responseBody);
+                _logger.LogError("❌ Failed to forward email to MailVoid API - Status: {StatusCode}, From: {From}, Subject: {Subject}, URL: {Url}, Response: {Response}",
+                    response.StatusCode, emailData.From, emailData.Subject ?? "(no subject)", url, responseBody);
                 return false;
             }
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "🔌 Network error forwarding email to MailVoid API - URL: {Url}, From: {From}, Error: {Error}",
+                url, emailData.From, ex.Message);
+            return false;
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            _logger.LogError(ex, "⏰ Timeout forwarding email to MailVoid API - URL: {Url}, From: {From}",
+                url, emailData.From);
+            return false;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Exception occurred while forwarding email to MailVoid API");
+            _logger.LogError(ex, "💥 Unexpected error forwarding email to MailVoid API - URL: {Url}, From: {From}, Error: {Error}",
+                url, emailData.From, ex.Message);
             return false;
         }
     }

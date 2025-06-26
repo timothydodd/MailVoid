@@ -120,15 +120,15 @@ public class OutboundEmailQueueService : IOutboundEmailQueueService
                 email.NextRetryAt = DateTime.UtcNow.Add(delay);
                 _retryQueue[emailId] = email;
 
-                _logger.LogWarning("Outbound email failed, will retry - ID: {EmailId}, Attempt: {Attempt}/{MaxAttempts}, Next retry at: {NextRetry}, Error: {Error}",
-                    emailId, email.RetryAttempts, _options.MaxRetryAttempts, email.NextRetryAt, error);
+                _logger.LogWarning("🔄 Outbound email failed, scheduling retry - ID: {EmailId}, From: {From}, Subject: {Subject}, Attempt: {Attempt}/{MaxAttempts}, Next retry: {NextRetry}, Delay: {Delay}s, Error: {Error}",
+                    emailId, email.EmailData.From, email.EmailData.Subject ?? "(no subject)", email.RetryAttempts, _options.MaxRetryAttempts, email.NextRetryAt?.ToString("HH:mm:ss"), delay.TotalSeconds, error);
             }
             else
             {
                 // Max retries exceeded, move to permanently failed queue
                 _failedEmails[emailId] = email;
-                _logger.LogError("Outbound email failed permanently - ID: {EmailId}, From: {From}, Final error: {Error}",
-                    emailId, email.EmailData.From, error);
+                _logger.LogError("💀 Outbound email failed permanently after {Attempts} attempts - ID: {EmailId}, From: {From}, Subject: {Subject}, Final error: {Error}",
+                    email.RetryAttempts, emailId, email.EmailData.From, email.EmailData.Subject ?? "(no subject)", error);
             }
         }
         return Task.CompletedTask;
@@ -165,8 +165,8 @@ public class OutboundEmailQueueService : IOutboundEmailQueueService
                     _queue.Enqueue(item);
                     _queueSemaphore.Release();
 
-                    _logger.LogDebug("Moved email from retry queue back to main queue - ID: {EmailId}, Attempt: {Attempt}",
-                        item.Id, item.RetryAttempts);
+                    _logger.LogInformation("⏰ Retry time reached - Moving email back to queue - ID: {EmailId}, From: {From}, Attempt: {Attempt}/{MaxAttempts}",
+                        item.Id, item.EmailData.From, item.RetryAttempts, _options.MaxRetryAttempts);
                 }
             }
         }

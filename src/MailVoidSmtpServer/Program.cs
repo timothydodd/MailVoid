@@ -45,6 +45,7 @@ public class Program
                 services.Configure<MailboxFilterOptions>(hostContext.Configuration.GetSection("MailboxFilter"));
 
                 services.AddHttpClient<MailForwardingService>();
+                services.AddHttpClient<DiagnosticsService>();
                 services.AddTransient<IMessageStore, MailMessageStore>();
                 services.AddSingleton<SmtpServerService>();
                 
@@ -65,6 +66,7 @@ public class Program
                 services.AddHostedService<InboundEmailProcessorService>();
                 services.AddHostedService<OutboundEmailProcessorService>();
                 services.AddHostedService<QueueMonitoringService>();
+                services.AddHostedService<DiagnosticsService>();
 
                 // Debug configuration loading
                 var configuration = hostContext.Configuration;

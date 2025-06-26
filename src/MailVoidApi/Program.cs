@@ -3,10 +3,10 @@ using System.IO.Compression;
 using System.Text;
 using MailVoidApi.Authentication;
 using MailVoidApi.Data;
+using MailVoidApi.Middleware;
 using MailVoidApi.Services;
 using MailVoidWeb;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +17,7 @@ namespace MailVoidApi;
 
 public class Program
 {
-    [Obsolete]
+
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
@@ -89,25 +89,24 @@ public class Program
                 OnAuthenticationFailed = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                    logger.LogError("Authentication failed.", context.Exception);
+                    logger.LogError(context.Exception, "JWT Authentication failed for {Path}", context.Request.Path);
                     return Task.CompletedTask;
                 },
                 OnChallenge = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                    logger.LogError("OnChallenge error", context.Error, context.ErrorDescription);
-                    return Task.CompletedTask;
-                },
-                OnMessageReceived = context =>
-                {
-                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                    logger.LogInformation("Message received: {0}", context.Token);
+                    if (!string.IsNullOrEmpty(context.Error))
+                    {
+                        logger.LogWarning("JWT Challenge - Error: {Error}, Description: {ErrorDescription}, Path: {Path}", 
+                            context.Error, context.ErrorDescription, context.Request.Path);
+                    }
                     return Task.CompletedTask;
                 },
                 OnTokenValidated = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                    logger.LogInformation("Token validated");
+                    logger.LogDebug("JWT Token validated successfully for user {User} on path {Path}", 
+                        context.Principal?.Identity?.Name, context.Request.Path);
                     return Task.CompletedTask;
                 }
             };
@@ -142,6 +141,7 @@ public class Program
             });
 
             logging.AddDebug();
+            logging.SetMinimumLevel(LogLevel.Information);
         });
         builder.Services.Configure<BackgroundTaskQueueOptions>(options =>
         {
@@ -180,9 +180,17 @@ public class Program
 
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
         var app = builder.Build();
+        
+        // Add request logging middleware
+        app.UseMiddleware<RequestLoggingMiddleware>();
+        
         if (app.Environment.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
+        }
+        else
+        {
+            app.UseMiddleware<ExceptionHandlingMiddleware>();
         }
 
         // Initialize database
