@@ -157,6 +157,7 @@
       width: 100%;
       min-width: 0;
       flex: 1;
+      position: relative;
       
       .email-address {
         font-weight: 500;
@@ -175,6 +176,19 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         width: 100%;
+      }
+
+      .activity-indicator {
+        position: absolute;
+        top: -2px;
+        right: -8px;
+        width: 8px;
+        height: 8px;
+        background: var(--danger);
+        border: 2px solid var(--background);
+        border-radius: 50%;
+        flex-shrink: 0;
+        animation: pulse 2s infinite;
       }
     }
     
@@ -223,5 +237,20 @@
         font-size: 0.8rem;
       }
     }
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }

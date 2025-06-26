@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore.Metadata;
+﻿using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -234,6 +233,13 @@ namespace MailVoidApi.Migrations
                 table: "User",
                 column: "UserName",
                 unique: true);
+
+            migrationBuilder.AddColumn<bool>(
+            name: "IsDefaultMailbox",
+            table: "MailGroup",
+            type: "tinyint(1)",
+            nullable: false,
+            defaultValue: false);
         }
 
         /// <inheritdoc />
@@ -257,6 +263,7 @@ namespace MailVoidApi.Migrations
 
             migrationBuilder.DropTable(
                 name: "User");
+
         }
     }
 }

@@ -119,6 +119,7 @@ export interface MailGroup {
   isPublic: boolean;
   isUserPrivate: boolean;
   createdAt: string;
+  lastActivity: string | null;
   isOwner: boolean;
 }
 export interface PagedResults<T> {

@@ -34,6 +34,8 @@ namespace MailVoidWeb
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         
+        public DateTime? LastActivity { get; set; }
+        
         public virtual ICollection<MailGroupUser> MailGroupUsers { get; set; } = new List<MailGroupUser>();
         
         /// <summary>

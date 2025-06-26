@@ -3,9 +3,10 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { catchError, of, switchMap } from 'rxjs';
+import { catchError, combineLatest, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
-import { FilterOptions, Mail, MailBoxGroups, MailService } from '../../_services/api/mail.service';
+import { FilterOptions, Mail, MailBoxGroups, MailGroup, MailService } from '../../_services/api/mail.service';
+import { LastSeenService } from '../../_services/last-seen.service';
 import { MobileMenuService } from '../../_services/mobile-menu.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
@@ -32,6 +33,7 @@ type SortDirection = 'asc' | 'desc';
           <div class="sidebar-body">
             <app-box-list
               [mailboxes]="mailboxes()"
+              [mailGroups]="mailGroups()"
               [(selectedBox)]="selectedBox"
               (deleteEvent)="deleteBox($event)"
               (boxClick)="onMobileBoxSelect($event)"
@@ -129,8 +131,10 @@ type SortDirection = 'asc' | 'desc';
 export class MailComponent {
   router = inject(Router);
   mailService = inject(MailService);
+  lastSeenService = inject(LastSeenService);
   mobileMenuService = inject(MobileMenuService);
   mailboxes = signal<MailBoxGroups[] | null>(null);
+  mailGroups = signal<MailGroup[] | null>(null);
   emails = signal<Mail[] | null>(null);
   selectedBox = signal<string | null>(null);
   isMobileMenuOpen = signal(false);
@@ -211,12 +215,17 @@ export class MailComponent {
   }
 
   refreshMail() {
-    this.mailService.getMailboxes().subscribe((mailboxes) => {
+    combineLatest([
+      this.mailService.getMailboxes(),
+      this.mailService.getMailGroups()
+    ]).subscribe(([mailboxes, mailGroups]) => {
       this.mailboxes.set(mailboxes);
+      this.mailGroups.set(mailGroups);
     });
   }
   clickBox(box: string) {
     this.selectedBox.set(box);
+    this.updateLastSeen(box);
   }
   clickMail(mail: Mail) {
     this.router.navigate(['mail', mail.id]);
@@ -260,6 +269,34 @@ export class MailComponent {
 
   onMobileBoxSelect(box: string | null) {
     this.selectedBox.set(box);
+    this.updateLastSeen(box);
     this.closeMobileMenu();
+  }
+
+  private updateLastSeen(box: string | null) {
+    if (!box) return; // Don't track "Show All"
+    
+    // Find the mailgroup path for this box
+    const mailGroups = this.mailGroups();
+    if (!mailGroups) return;
+    
+    // Find matching mailgroup by looking for one that would contain this email address
+    const matchingGroup = mailGroups.find(group => {
+      const mailboxes = this.mailboxes();
+      if (!mailboxes) return false;
+      
+      // Look for this box in any group and check if it matches the mailgroup path
+      for (const mbGroup of mailboxes) {
+        const foundBox = mbGroup.mailBoxes.find(mb => mb.name === box);
+        if (foundBox && foundBox.path === group.path) {
+          return true;
+        }
+      }
+      return false;
+    });
+    
+    if (matchingGroup && matchingGroup.path) {
+      this.lastSeenService.setLastSeen(matchingGroup.path);
+    }
   }
 }

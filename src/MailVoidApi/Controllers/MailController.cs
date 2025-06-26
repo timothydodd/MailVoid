@@ -139,6 +139,7 @@ public class MailController : ControllerBase
                 Description = mg.Description ?? "",
                 mg.IsPublic,
                 mg.CreatedAt,
+                mg.LastActivity,
                 IsOwner = mg.OwnerUserId == userId,
                 mg.IsUserPrivate
             })

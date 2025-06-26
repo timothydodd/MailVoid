@@ -2,6 +2,7 @@
 using MailVoidApi.Data;
 using MailVoidApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 namespace MailVoidWeb.Controllers;
 
 [ApiController]
@@ -32,8 +33,18 @@ public class WebhookController : ControllerBase
         {
             var mail = await _mailDataExtractionService.ExtractMailFromDataAsync(mailData);
 
-
             await _mailGroupService.SetMailPath(mail);
+
+            // Update the mailgroup's LastActivity when new mail arrives
+            if (!string.IsNullOrEmpty(mail.MailGroupPath))
+            {
+                var mailGroup = await _context.MailGroups
+                    .FirstOrDefaultAsync(mg => mg.Path == mail.MailGroupPath);
+                if (mailGroup != null)
+                {
+                    mailGroup.LastActivity = DateTime.UtcNow;
+                }
+            }
 
             _context.Mails.Add(mail);
             await _context.SaveChangesAsync();
