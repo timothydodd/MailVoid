@@ -14,9 +14,9 @@ COPY ["MailVoidWeb/void-web.esproj", "MailVoidWeb/"]
 RUN dotnet restore "./MailVoidApi/MailVoidApi.csproj"
 
 # Install Node.js and Angular CLI
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g @angular/cli@18
+    && npm install -g @angular/cli@20
 
 
 
