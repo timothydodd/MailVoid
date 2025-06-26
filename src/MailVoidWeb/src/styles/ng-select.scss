@@ -1,8 +1,8 @@
 // ng-select custom theme overrides
 .ng-select {
     &.ng-select-single .ng-select-container {
-        background-color: $ng-select-bg;
-        border-color: $ng-select-border;
+        background-color: var(--input-bg);
+        border-color: var(--input-border);
         min-height: 38px;
         
         &:hover {
@@ -23,14 +23,14 @@
         }
         
         .ng-value {
-            color: $ng-select-input-text;
+            color: var(--text-primary);
         }
     }
     
     &.ng-select-disabled {
         .ng-select-container {
             background-color: var(--bGDark);
-            color: $ng-select-disabled-text;
+            color: var(--text-secondary);
         }
     }
     
@@ -48,39 +48,39 @@
     
     .ng-input {
         input {
-            color: $ng-select-input-text;
+            color: var(--text-primary);
         }
     }
 }
 
 .ng-dropdown-panel {
     background-color: $ng-select-bg;
-    border: 1px solid $ng-select-border;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--input-border);
+    box-shadow: 0 4px 6px var(--shadow-color);
     
     &.ng-select-bottom {
-        border-top-color: $ng-select-border;
+        border-top-color: var(--input-border);
     }
     
     .ng-dropdown-panel-items {
         .ng-option {
-            color: $ng-select-dropdown-option-text;
-            background-color: $ng-select-bg;
+            color: var(--text-primary);
+            background-color: var(--input-bg);
             
             &.ng-option-selected,
             &.ng-option-selected.ng-option-marked {
-                color: $ng-select-input-text;
-                background-color: $ng-select-selected;
+                color: var(--text-primary);
+                background-color: var(--hover-bg);
                 font-weight: 600;
             }
             
             &.ng-option-marked {
-                background-color: $ng-select-highlight;
-                color: #44475a;
+                background-color: var(--primary);
+                color: var(--background);
             }
             
             &.ng-option-disabled {
-                color: $ng-select-disabled-text;
+                color: var(--text-secondary);
             }
             
             &:hover:not(.ng-option-marked) {

@@ -7,6 +7,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { UserMenuComponent } from '../../_components/user-menu/user-menu.component';
 import { AuthService, User } from '../../_services/auth-service';
 import { MobileMenuService } from '../../_services/mobile-menu.service';
+import { ThemeService } from '../../_services/theme.service';
 
 @Component({
   selector: 'app-main-nav',
@@ -28,6 +29,16 @@ import { MobileMenuService } from '../../_services/mobile-menu.service';
             <button class="btn btn-icon mobile-menu-btn" (click)="onMobileMenuClick()" title="Mailboxes">
               <lucide-icon name="inbox" size="20"></lucide-icon>
             </button>
+            <button 
+              class="btn btn-icon theme-toggle" 
+              (click)="toggleTheme()" 
+              [title]="themeService.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+            >
+              <lucide-icon 
+                [name]="themeService.theme() === 'dark' ? 'sun' : 'moon'" 
+                size="20"
+              ></lucide-icon>
+            </button>
             <app-user-menu></app-user-menu>
           }
         </div>
@@ -40,6 +51,7 @@ import { MobileMenuService } from '../../_services/mobile-menu.service';
 export class MainNavBarComponent {
   private authService = inject(AuthService);
   private mobileMenuService = inject(MobileMenuService);
+  themeService = inject(ThemeService);
 
   templateRef = signal<TemplateRef<any> | null>(null);
   user = signal<User | null>(null);
@@ -55,5 +67,9 @@ export class MainNavBarComponent {
   
   onMobileMenuClick() {
     this.mobileMenuService.toggleMenu();
+  }
+
+  toggleTheme() {
+    this.themeService.toggleTheme();
   }
 }

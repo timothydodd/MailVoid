@@ -1,9 +1,9 @@
 .table-wrap {
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    background-color: #222f453a;
+    background-color: var(--card-bg);
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 18px var(--shadow-color);
 }
 
 table {
@@ -14,7 +14,7 @@ table {
 
 /* Header Styles */
 thead {
-    background-color: var(--bGLight);
+    background-color: var(--bGDark);
     border-bottom: 2px solid var(--border-color);
 }
 
@@ -31,8 +31,8 @@ th {
 
 /* Body Styles */
 tbody tr {
-    background-color: rgba(111, 131, 190, 0.3);
-    border-bottom: 1px solid rgba(98, 115, 164, 0.15);
+    background-color: var(--bGLight);
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
@@ -43,9 +43,9 @@ tbody tr:last-child {
 }
 
 tbody tr:hover {
-    background-color: rgba(111, 131, 190, 0.5);
+    background-color: var(--table-row-hover-bg);
     transform: translateX(4px);
-    box-shadow: 0 2px 8px rgba(111, 131, 190, 0.2);
+    box-shadow: 0 2px 8px var(--table-hover-shadow);
 }
 
 tbody tr:hover td {
@@ -62,7 +62,7 @@ td {
 /* Email-specific styles */
 td:first-child { /* From */
     font-weight: 500;
-    color: var(--cyan);
+
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -70,7 +70,7 @@ td:first-child { /* From */
 }
 
 td:nth-child(2) { /* To */
-    color: var(--comment);
+   
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -87,7 +87,7 @@ td:nth-child(3) { /* Subject */
 }
 
 td:nth-child(4) { /* Date */
-    color: var(--comment);
+
     font-size: 0.8rem;
     text-align: right;
     white-space: nowrap;
@@ -111,7 +111,7 @@ tbody tr.unread td:nth-child(3)::before {
     transform: translateY(-50%);
     width: 4px;
     height: 60%;
-    background-color: var(--purple);
+    background-color: var(--primary);
     border-radius: 2px;
 }
 

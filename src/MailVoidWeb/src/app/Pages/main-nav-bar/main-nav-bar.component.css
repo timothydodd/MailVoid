@@ -10,7 +10,7 @@
   width: 100%;
   background-color: var(--bGDark);
   border-bottom: 1px solid var(--border-color);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
 }
 
 .navbar-container {

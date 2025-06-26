@@ -1,11 +1,14 @@
 
-:root {
+/* Dark Theme (default) */
+:root,
+:root[data-theme="dark"] {
   --background: #282a36;
   --current-line: #44475a;
   --foreground: #f8f8f2;
   --comment: #6f83be;
   --cyan: #8be9fd;
   --green: #50fa7b;
+  --blue: #70bbf9;
   --orange: #ecb478;
   --pink: #ff79c6;
   --purple: #bd93f9;
@@ -13,11 +16,104 @@
   --danger:var(--red);
   --yellow: #f1fa8c;
   --bGLighter: #424450;
-  --bGLight: #44475a;
+  --bGLight: #3f435a;
   --bGDark: #3a3c4e;
   --bGDarker: #191A21;
-  --primary: var(--comment);
+  --primary: #697afc;;
   --secondary: var(--orange);
   --header-bg: var(--bGLight);
-  --border-color: #6273a487;
+  --border-color: #4a567b;
+  
+  /* Additional theme-specific variables */
+  --text-primary: #f8f8f2;
+  --text-secondary: #a0a4b8;
+  --bg-gradient-start: #2a2f42;
+  --bg-gradient-mid: #282a36;
+  --bg-gradient-mid2: #252a3a;
+  --bg-gradient-end: #1e2132;
+  --card-bg: var(--bGDark);
+  --input-bg: var(--bGLighter);
+  --input-border: var(--border-color);
+  --hover-bg: var(--bGLight);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --table-row-border: rgba(98, 115, 164, 0.15);
+  --table-row-hover-bg: rgba(111, 131, 190, 0.5);
+  --table-hover-shadow: rgba(111, 131, 190, 0.2);
+  
+  /* Button gradient colors */
+  --btn-gradient-1: #ec4899;
+  --btn-gradient-2: #8b5cf6;
+  --btn-gradient-3: #3b82f6;
+  --btn-gradient-4: #1e40af;
+  --btn-gradient-hover-1: #db2777;
+  --btn-gradient-hover-2: #7c3aed;
+  --btn-gradient-hover-3: #2563eb;
+  --btn-gradient-hover-4: #1e3a8a;
+  --btn-gradient-active-1: #be185d;
+  --btn-gradient-active-2: #6b21a8;
+  --btn-gradient-active-3: #1d4ed8;
+  --btn-gradient-active-4: #172554;
+  --btn-border: rgba(139, 92, 246, 0.3);
+  --btn-shadow-1: rgba(79, 70, 229, 0.2);
+  --btn-shadow-2: rgba(79, 70, 229, 0.3);
+  --btn-focus-shadow: rgba(139, 92, 246, 0.4);
+}
+
+/* Light Theme */
+:root[data-theme="light"] {
+  --background: #ffffff;
+  --current-line: #f0f0f0;
+  --foreground: #1d232e;
+  --comment: #4a5568;
+  --cyan: #0891b2;
+  --green: #16a34a;
+  --orange: #ea580c;
+  --blue: #2b9af4;
+  --pink: #db2777;
+  --purple: #7c3aed;
+  --red: #dc2626;
+  --danger: var(--red);
+  --yellow: #eab308;
+  --bGLighter: #f9fafb;
+  --bGLight: #f3f4f6;
+  --bGDark: #e5e7eb;
+  --bGDarker: #d1d5db;
+  --primary: #3783ff;
+  --secondary: var(--orange);
+  --header-bg: #f8f9fa;
+  --border-color: #d5d6d7;
+  
+  /* Additional theme-specific variables */
+  --text-primary: #1a202c;
+  --text-secondary: #718096;
+  --bg-gradient-start: #f8f9fa;
+  --bg-gradient-mid: #ffffff;
+  --bg-gradient-mid2: #f8f9fa;
+  --bg-gradient-end: #f3f4f6;
+  --card-bg: #ffffff;
+  --input-bg: var(--border-color);
+  --input-border: #d1d5db;
+  --hover-bg: #f3f4f6;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --table-row-border: rgba(229, 231, 235, 0.5);
+  --table-row-hover-bg: rgba(59, 130, 246, 0.1);
+  --table-hover-shadow: rgba(59, 130, 246, 0.15);
+  
+  /* Button gradient colors - adjusted for light theme */
+  --btn-gradient-1: #f472b6;
+  --btn-gradient-2: #a78bfa;
+  --btn-gradient-3: #60a5fa;
+  --btn-gradient-4: #3730a3;
+  --btn-gradient-hover-1: #ec4899;
+  --btn-gradient-hover-2: #8b5cf6;
+  --btn-gradient-hover-3: #3b82f6;
+  --btn-gradient-hover-4: #312e81;
+  --btn-gradient-active-1: #db2777;
+  --btn-gradient-active-2: #7c3aed;
+  --btn-gradient-active-3: #2563eb;
+  --btn-gradient-active-4: #1e1b4b;
+  --btn-border: rgba(147, 51, 234, 0.3);
+  --btn-shadow-1: rgba(99, 102, 241, 0.2);
+  --btn-shadow-2: rgba(99, 102, 241, 0.3);
+  --btn-focus-shadow: rgba(147, 51, 234, 0.4);
 }

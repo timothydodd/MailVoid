@@ -22,7 +22,7 @@
     .group-title {
       font-size: 0.875rem;
       font-weight: 600;
-      color: var(--purple);
+      color: var(--primary);
       margin: 0;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -84,8 +84,8 @@
   }
   
   &.selected {
-    background: var(--purple);
-    border-color: var(--purple);
+    background: var(--primary);
+    border-color: var(--primary);
     
     .mailbox-button {
       color: var(--background);
@@ -94,12 +94,12 @@
   
   &:hover:not(.selected) {
     background: linear-gradient(135deg, rgba(189, 147, 249, 0.1) 0%, rgba(189, 147, 249, 0.2) 100%);
-    border-color: var(--purple);
+    border-color: var(--primary);
     transform: translateY(-1px);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
     
     .mailbox-button {
-      color: var(--purple);
+      color: var(--primary);
     }
   }
 }

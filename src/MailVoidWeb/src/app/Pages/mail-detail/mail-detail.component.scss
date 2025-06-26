@@ -12,10 +12,10 @@
     gap: 0.5rem;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
-    color: var(--purple);
+    color: var(--primary);
     lucide-icon {
       transition: transform 0.2s ease;
-      color: var(--purple);
+      color: var(--primary);
     }
     
     &:hover lucide-icon {

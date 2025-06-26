@@ -23,15 +23,15 @@
 // Only applied if using a defined Shiki theme
 
 // ng-select theme variables
-$ng-select-input-text: #f8f8f2;
-$ng-select-highlight: #bd93f9;
-$ng-select-primary-text: #f8f8f2;
-$ng-select-disabled-text: #f9f9f9;
-$ng-select-border: #191A21;
-$ng-select-bg: #424450;
-$ng-select-selected: #343746;
-$ng-select-dropdown-optgroup-marked: $ng-select-input-text;
-$ng-select-dropdown-option-text: $ng-select-primary-text;
+$ng-select-input-text: var(--text-primary);
+$ng-select-highlight: var(--primary);
+$ng-select-primary-text: var(--text-primary);
+$ng-select-disabled-text: var(--text-secondary);
+$ng-select-border: var(--input-border);
+$ng-select-bg: var(--input-bg);
+$ng-select-selected: var(--hover-bg);
+$ng-select-dropdown-optgroup-marked: var(--text-primary);
+$ng-select-dropdown-option-text: var(--text-primary);
 
 // Import base ng-select theme
 @import "@ng-select/ng-select/themes/default.theme.css";
@@ -61,7 +61,7 @@ html {
         flex-direction: column;
         margin: 0;
         color: var(--foreground);
-        background: radial-gradient(ellipse at center, #2a2f42 0%, #282a36 30%, #252a3a 60%, #1e2132 100%);
+        background: radial-gradient(ellipse at center, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 30%, var(--bg-gradient-mid2) 60%, var(--bg-gradient-end) 100%);
         background-attachment: fixed;
         overflow-x: hidden;
     }

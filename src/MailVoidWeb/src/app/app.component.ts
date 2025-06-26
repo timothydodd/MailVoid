@@ -6,6 +6,7 @@ import { ModalService } from './_components/modal/modal.service';
 import { ValidationDefaultsComponent } from './_components/validation-defaults/validation-defaults.component';
 import { AuthService } from './_services/auth-service';
 import { MainNavBarComponent } from './Pages/main-nav-bar/main-nav-bar.component';
+import { ThemeService } from './_services/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +19,9 @@ export class AppComponent {
   title = 'MailVoid';
   modalService = inject(ModalService);
   authService = inject(AuthService);
+  themeService = inject(ThemeService);
 
-  constructor() {}
+  constructor() {
+    // Theme service initializes automatically
+  }
 }

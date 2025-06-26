@@ -11,7 +11,7 @@ table {
     border-collapse: collapse;
     
     .from-email {
-        color: var(--orange);
+        color: var(--primary);
         font-weight: 500;
     }
     
@@ -24,7 +24,7 @@ table {
         
         &:hover {
             background-color: rgba(189, 147, 249, 0.1);
-            color: var(--purple);
+            color: var(--primary);
         }
         
         lucide-icon {
