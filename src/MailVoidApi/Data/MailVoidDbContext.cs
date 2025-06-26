@@ -22,6 +22,20 @@ public class MailVoidDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Configure DateTime properties to handle UTC conversion
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime) || property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime, DateTime>(
+                        v => v,
+                        v => DateTime.SpecifyKind(v, DateTimeKind.Utc)));
+                }
+            }
+        }
+
         // User configuration
         modelBuilder.Entity<User>(entity =>
         {

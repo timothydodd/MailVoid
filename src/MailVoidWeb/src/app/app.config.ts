@@ -1,5 +1,7 @@
-import { ApplicationConfig, importProvidersFrom, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, importProvidersFrom, LOCALE_ID, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
+import { registerLocaleData } from '@angular/common';
+import localeEn from '@angular/common/locales/en';
 
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
@@ -42,6 +44,8 @@ import { routes } from './app.routes';
 export function tokenGetter() {
   return localStorage.getItem('authToken');
 }
+
+registerLocaleData(localeEn);
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -97,5 +101,6 @@ export const appConfig: ApplicationConfig = {
       })
     ),
     provideToastr(),
+    { provide: LOCALE_ID, useValue: 'en-US' },
   ],
 };

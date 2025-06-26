@@ -19,7 +19,7 @@
   --bGLight: #3f435a;
   --bGDark: #3a3c4e;
   --bGDarker: #191A21;
-  --primary: #697afc;;
+  --primary: #4c91e1;;
   --secondary: var(--orange);
   --header-bg: var(--bGLight);
   --border-color: #4a567b;
@@ -61,7 +61,7 @@
 
 /* Light Theme */
 :root[data-theme="light"] {
-  --background: #ffffff;
+  --background: #dedddd;
   --current-line: #f0f0f0;
   --foreground: #1d232e;
   --comment: #4a5568;

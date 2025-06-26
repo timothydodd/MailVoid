@@ -61,8 +61,7 @@ html {
         flex-direction: column;
         margin: 0;
         color: var(--foreground);
-        background: radial-gradient(ellipse at center, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 30%, var(--bg-gradient-mid2) 60%, var(--bg-gradient-end) 100%);
-        background-attachment: fixed;
+        background-color: var(--background);
         overflow-x: hidden;
     }
 }/* @import url("components/panel.css"); */
