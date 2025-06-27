@@ -23,7 +23,7 @@ export class MailDetailComponent {
     this.route.paramMap
       .pipe(
         filter((x) => !!x.get('id')),
-        switchMap((x) => this.mailService.getEmail(<string>x.get('id'))),
+        switchMap((x) => this.mailService.getEmail(<string>x.get('id'), true)),
         takeUntilDestroyed()
       )
       .subscribe((d) => {

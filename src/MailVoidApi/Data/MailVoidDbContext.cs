@@ -17,6 +17,7 @@ public class MailVoidDbContext : DbContext
     public DbSet<MailGroupUser> MailGroupUsers { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Contact> Contacts { get; set; }
+    public DbSet<UserMailRead> UserMailReads { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -130,6 +131,28 @@ public class MailVoidDbContext : DbContext
             entity.HasIndex(e => e.From).IsUnique();
             entity.Property(e => e.From).IsRequired();
             entity.Property(e => e.Name).IsRequired();
+        });
+
+        // UserMailRead configuration
+        modelBuilder.Entity<UserMailRead>(entity =>
+        {
+            entity.ToTable("UserMailRead");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.MailId }).IsUnique();
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.MailId).IsRequired();
+            entity.Property(e => e.ReadAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Foreign key relationships
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Mail)
+                  .WithMany()
+                  .HasForeignKey(e => e.MailId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
     }

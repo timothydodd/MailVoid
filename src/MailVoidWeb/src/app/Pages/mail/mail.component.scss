@@ -39,6 +39,25 @@ table {
 
 
 
+/* Sidebar header styling */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    
+    .show-all-btn {
+        &.active {
+            background-color: var(--primary);
+            color: var(--background);
+            
+            &:hover {
+                background-color: var(--primary);
+                filter: brightness(1.1);
+            }
+        }
+    }
+}
+
 /* Mobile close button - hidden on desktop */
 .mobile-close-btn {
     display: none;

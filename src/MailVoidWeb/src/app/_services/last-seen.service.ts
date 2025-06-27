@@ -5,7 +5,7 @@ export interface LastSeenData {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class LastSeenService {
   private readonly STORAGE_KEY = 'mailvoid_last_seen';
@@ -35,10 +35,10 @@ export class LastSeenService {
    */
   hasUnseenActivity(mailGroupPath: string, lastActivity: Date | null): boolean {
     if (!lastActivity) return false;
-    
+
     const lastSeen = this.getLastSeen(mailGroupPath);
     if (!lastSeen) return true; // Never seen = has unseen activity
-    
+
     return lastActivity > lastSeen;
   }
 

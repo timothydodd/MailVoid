@@ -1,8 +1,6 @@
-
-import { ChangeDetectionStrategy, Component, computed, inject, input, model, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, model, output } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
-import { MailBoxGroups, MailGroup } from '../../../_services/api/mail.service';
-import { LastSeenService } from '../../../_services/last-seen.service';
+import { MailBoxGroups } from '../../../_services/api/mail.service';
 import { BoxMenuComponent } from './box-menu/box-menu.component';
 
 @Component({
@@ -11,20 +9,6 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
   imports: [LucideAngularModule, BoxMenuComponent],
   template: `
     <div class="box-list-container">
-      <!-- Show All option -->
-      <div class="group-section">
-        <div class="mailbox-list">
-          <div class="mailbox-item show-all-item" [class.selected]="selectedBox() === null">
-            <button class="mailbox-button" (click)="clickBox(null)" title="Show all emails">
-              <span class="mailbox-name">
-                <lucide-icon name="inbox" size="16"></lucide-icon>
-                Show All
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-      
       @if (sortedMailboxes(); as mb) {
         @for (group of mb; track $index) {
           <div class="group-section">
@@ -50,10 +34,10 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
                       @if (item.mailBoxName && group.groupName === 'My Boxes') {
                         <span class="mailbox-subdomain">{{ item.mailBoxName }}</span>
                       }
-                      @if (hasUnseenActivity(item.name)) {
-                        <span class="activity-indicator" title="New activity"></span>
-                      }
                     </span>
+                    @if (item.unreadCount > 0) {
+                      <span class="unread-count">{{ item.unreadCount }}</span>
+                    }
                   </button>
                   <app-box-menu
                     [item]="item.name"
@@ -78,12 +62,9 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
 })
 export class BoxListComponent {
   mailboxes = input.required<MailBoxGroups[] | null>();
-  mailGroups = input<MailGroup[] | null>(null);
   selectedBox = model<string | null>();
   deleteEvent = output<string>();
   boxClick = output<string | null>();
-  
-  private lastSeenService = inject(LastSeenService);
 
   sortedMailboxes = computed(() => {
     const mb = this.mailboxes();
@@ -101,33 +82,5 @@ export class BoxListComponent {
   deleteClick(item: string) {
     console.log('Deleted: ', item);
     this.deleteEvent.emit(item);
-  }
-
-  hasUnseenActivity(mailboxName: string): boolean {
-    const mailGroups = this.mailGroups();
-    const mailboxes = this.mailboxes();
-    
-    if (!mailGroups || !mailboxes) return false;
-    
-    // Find the mailbox and its associated mailgroup
-    let mailboxPath: string | null = null;
-    for (const group of mailboxes) {
-      const foundBox = group.mailBoxes.find(mb => mb.name === mailboxName);
-      if (foundBox) {
-        mailboxPath = foundBox.path;
-        break;
-      }
-    }
-    
-    if (!mailboxPath) return false;
-    
-    // Find the corresponding mailgroup
-    const mailGroup = mailGroups.find(mg => mg.path === mailboxPath);
-    if (!mailGroup || !mailGroup.lastActivity) return false;
-    
-    return this.lastSeenService.hasUnseenActivity(
-      mailboxPath, 
-      new Date(mailGroup.lastActivity)
-    );
   }
 }

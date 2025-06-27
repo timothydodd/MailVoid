@@ -26,15 +26,29 @@ public class MailController : ControllerBase
         _userService = userService;
     }
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetMail(long id)
+    public async Task<IActionResult> GetMail(long id, [FromQuery] bool markAsRead = false)
     {
         var email = await _context.Mails.FindAsync(id);
         if (email == null)
         {
             return NotFound();
         }
+
+        if (markAsRead)
+        {
+            var currentUserId = _userService.GetUserId();
+
+            // Use raw SQL to perform "INSERT IGNORE" or "INSERT ON DUPLICATE KEY" equivalent
+            // This is a single database operation that handles the check and insert atomically
+            await _context.Database.ExecuteSqlRawAsync(
+                @"INSERT IGNORE INTO UserMailRead (UserId, MailId, ReadAt) 
+                  VALUES ({0}, {1}, {2})",
+                currentUserId, id, DateTime.UtcNow);
+        }
+
         return Ok(email);
     }
+
     [HttpGet("boxes")]
     public async Task<IEnumerable<MailBox>> GetBoxes(bool showAll = false)
     {
@@ -42,10 +56,11 @@ public class MailController : ControllerBase
         var role = _userService.GetRole();
         var isAdmin = role == "Admin";
 
-        return await _context.Mails
+        // Get distinct mailboxes (by To address) with their mail group info
+        var mailboxes = await _context.Mails
             .GroupJoin(_context.MailGroups,
                        mail => mail.MailGroupPath,
-                       mailGroup => mailGroup.Path, // adjust this to your actual key field
+                       mailGroup => mailGroup.Path,
                        (mail, mailGroups) => new
                        {
                            mail.To,
@@ -58,31 +73,47 @@ public class MailController : ControllerBase
                           x.MailGroup.OwnerUserId == currentUserId ||
                           x.MailGroup.MailGroupUsers != null && x.MailGroup.MailGroupUsers.Any(mgu => mgu.UserId == currentUserId))) ||
                         (x.MailGroup == null && isAdmin))
-            .Select(x => new MailBox()
-            {
-                Name = x.To,
-                Path = x.MailGroupPath,
-                MailBoxName = x.MailGroup != null ? x.MailGroup.Subdomain : null,
-                IsPublic = x.MailGroup != null ? x.MailGroup.IsPublic : false,
-                IsOwner = x.MailGroup != null && (x.MailGroup.OwnerUserId == currentUserId)
-            })
-            .Distinct()
+            .GroupBy(x => x.To)
+            .Select(g => g.First())
             .ToListAsync();
+
+        // For each mailbox, calculate unread count
+        var result = new List<MailBox>();
+        foreach (var mailbox in mailboxes)
+        {
+            // Count unread emails for this mailbox (emails not in UserMailRead for current user)
+            var unreadCount = await _context.Mails
+                .Where(m => m.To == mailbox.To)
+                .Where(m => !_context.UserMailReads.Any(umr => umr.MailId == m.Id && umr.UserId == currentUserId))
+                .CountAsync();
+
+            result.Add(new MailBox()
+            {
+                Name = mailbox.To,
+                Path = mailbox.MailGroupPath,
+                MailBoxName = mailbox.MailGroup?.Subdomain,
+                IsPublic = mailbox.MailGroup?.IsPublic ?? false,
+                IsOwner = mailbox.MailGroup != null && (mailbox.MailGroup.OwnerUserId == currentUserId),
+                UnreadCount = unreadCount
+            });
+        }
+
+        return result;
     }
     [HttpPost]
-    public async Task<PagedResults<Mail>> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
+    public async Task<PagedResults<MailWithReadStatus>> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
     {
         var currentUserId = _userService.GetUserId();
         var role = _userService.GetRole();
         var isAdmin = role == "Admin";
 
-        var results = new PagedResults<Mail>();
+        var results = new PagedResults<MailWithReadStatus>();
         options ??= new FilterOptions();
 
         var query = _context.Mails
                     .GroupJoin(_context.MailGroups,
                        mail => mail.MailGroupPath,
-                       mailGroup => mailGroup.Path, // adjust this to your actual key field
+                       mailGroup => mailGroup.Path,
                        (mail, mailGroups) => new
                        {
                            Mail = mail,
@@ -101,11 +132,31 @@ public class MailController : ControllerBase
         }
 
         query = query.OrderByDescending(m => m.Mail.CreatedOn);
-        results.Items = await query
+        var mails = await query
             .Skip((options.Page - 1) * options.PageSize)
             .Take(options.PageSize)
             .Select(m => m.Mail)
             .ToListAsync();
+
+        // Get read status for each mail
+        var mailIds = mails.Select(m => m.Id).ToList();
+        var readMails = await _context.UserMailReads
+            .Where(umr => umr.UserId == currentUserId && mailIds.Contains(umr.MailId))
+            .Select(umr => umr.MailId)
+            .ToListAsync();
+
+        results.Items = mails.Select(mail => new MailWithReadStatus
+        {
+            Id = mail.Id,
+            To = mail.To,
+            From = mail.From,
+            Subject = mail.Subject,
+            Text = mail.IsHtml ? null : mail.Text,
+            Html = mail.IsHtml ? mail.Text : null,
+            CreatedOn = mail.CreatedOn,
+            MailGroupPath = mail.MailGroupPath,
+            IsRead = readMails.Contains(mail.Id)
+        }).ToList();
 
         return results;
     }
@@ -392,4 +443,18 @@ public class MailBox
     public string? MailBoxName { get; set; }
     public bool IsPublic { get; set; }
     public bool IsOwner { get; set; }
+    public int UnreadCount { get; set; }
+}
+
+public class MailWithReadStatus
+{
+    public long Id { get; set; }
+    public required string To { get; set; }
+    public required string From { get; set; }
+    public required string Subject { get; set; }
+    public string? Text { get; set; }
+    public string? Html { get; set; }
+    public DateTime CreatedOn { get; set; }
+    public string? MailGroupPath { get; set; }
+    public bool IsRead { get; set; }
 }

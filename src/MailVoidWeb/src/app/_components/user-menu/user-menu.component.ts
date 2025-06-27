@@ -14,8 +14,8 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
   imports: [LucideAngularModule, UserSettingsComponent, ClickOutsideDirective],
   template: `
     @if (user()) {
-      <button type="button" class="btn-icon" (click)="isOpen.set(!isOpen())">
-        <lucide-angular name="square-menu"></lucide-angular>
+      <button type="button" class="btn btn-icon user-menu-btn" (click)="isOpen.set(!isOpen())" title="User menu">
+        <lucide-icon name="user" size="20"></lucide-icon>
       </button>
       @if (isOpen()) {
         <div class="menu" appClickOutside (clickOutside)="isOpen.set(false)" [delayTime]="200">

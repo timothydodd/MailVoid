@@ -56,10 +56,11 @@ export class MailService {
     );
   }
   getEmails(options: FilterOptions | undefined) {
-    return this.http.post<PagedResults<Mail>>(`${environment.apiUrl}/api/mail`, options);
+    return this.http.post<PagedResults<MailWithReadStatus>>(`${environment.apiUrl}/api/mail`, options);
   }
-  getEmail(id: string) {
-    return this.http.get<Mail>(`${environment.apiUrl}/api/mail/${id}`);
+  getEmail(id: string, markAsRead: boolean = false) {
+    const params = markAsRead ? '?markAsRead=true' : '';
+    return this.http.get<Mail>(`${environment.apiUrl}/api/mail/${id}${params}`);
   }
   deleteBoxes(options: FilterOptions | undefined) {
     return this.http.delete(`${environment.apiUrl}/api/mail/boxes`, { body: options });
@@ -133,6 +134,19 @@ export interface MailBox {
   mailBoxName: string;
   isOwner: boolean;
   isPublic: boolean;
+  unreadCount: number;
+}
+
+export interface MailWithReadStatus {
+  id: number;
+  to: string;
+  from: string;
+  subject: string;
+  text: string;
+  html: string | null;
+  createdOn: string;
+  mailGroupPath: string | null;
+  isRead: boolean;
 }
 export interface MailBoxGroups {
   groupName: string;

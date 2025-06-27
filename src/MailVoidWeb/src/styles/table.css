@@ -115,6 +115,50 @@ tbody tr.unread td:nth-child(3)::before {
     border-radius: 2px;
 }
 
+/* Unread email styles - dot indicator on the left */
+tbody tr:not(.read) {
+    border-left: 4px solid var(--primary);
+}
+
+tbody tr:not(.read) td:first-child {
+    position: relative;
+}
+
+tbody tr:not(.read) td:first-child::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background-color: var(--primary);
+    border-radius: 50%;
+    border: 2px solid var(--background);
+}
+
+/* Read email styles - lighter text weight */
+tbody tr.read td {
+    font-weight: 400 !important;
+}
+
+/* Override the from-email bold styling for read emails */
+tbody tr.read .from-email {
+    font-weight: 400 !important;
+}
+
+/* Unread emails - bold text for from and subject columns only */
+tbody tr:not(.read) td:nth-child(1), /* From */
+tbody tr:not(.read) td:nth-child(3) { /* Subject */
+    font-weight: 600;
+}
+
+/* To and Date columns stay normal weight for unread */
+tbody tr:not(.read) td:nth-child(2), /* To */
+tbody tr:not(.read) td:nth-child(4) { /* Created On */
+    font-weight: 400;
+}
+
 /* Status styles */
 td.status-active {
     color: var(--green);

@@ -5,7 +5,13 @@ import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, combineLatest, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
-import { FilterOptions, Mail, MailBoxGroups, MailGroup, MailService } from '../../_services/api/mail.service';
+import {
+  FilterOptions,
+  MailBoxGroups,
+  MailGroup,
+  MailService,
+  MailWithReadStatus,
+} from '../../_services/api/mail.service';
 import { LastSeenService } from '../../_services/last-seen.service';
 import { MobileMenuService } from '../../_services/mobile-menu.service';
 import { BoxListComponent } from './box-list/box-list.component';
@@ -26,14 +32,21 @@ type SortDirection = 'asc' | 'desc';
             <button class="btn btn-icon mobile-close-btn" (click)="closeMobileMenu()" title="Close">
               <lucide-icon name="x" size="24"></lucide-icon>
             </button>
+            <button
+              class="btn btn-icon show-all-btn"
+              [class.active]="selectedBox() === null"
+              (click)="clickBox(null)"
+              title="Show all emails"
+            >
+              <lucide-icon name="inbox" size="20"></lucide-icon>
+            </button>
             <button class="btn btn-icon" (click)="mailSettings.show()" title="Mail Settings">
-              <lucide-icon name="cog"></lucide-icon>
+              <lucide-icon name="cog" size="20"></lucide-icon>
             </button>
           </div>
           <div class="sidebar-body">
             <app-box-list
               [mailboxes]="mailboxes()"
-              [mailGroups]="mailGroups()"
               [(selectedBox)]="selectedBox"
               (deleteEvent)="deleteBox($event)"
               (boxClick)="onMobileBoxSelect($event)"
@@ -94,7 +107,7 @@ type SortDirection = 'asc' | 'desc';
             <tbody>
               @if (paginatedEmails()) {
                 @for (email of paginatedEmails(); track email.id) {
-                  <tr (click)="clickMail(email)">
+                  <tr (click)="clickMail(email)" [class.read]="email.isRead">
                     <td class="from-email">{{ email.from }}</td>
                     <td style="max-width: 100px;overflow:hidden;">{{ email.to }}</td>
                     <td style="max-width: 300px;word-break: break-all;">
@@ -135,7 +148,7 @@ export class MailComponent {
   mobileMenuService = inject(MobileMenuService);
   mailboxes = signal<MailBoxGroups[] | null>(null);
   mailGroups = signal<MailGroup[] | null>(null);
-  emails = signal<Mail[] | null>(null);
+  emails = signal<MailWithReadStatus[] | null>(null);
   selectedBox = signal<string | null>(null);
   isMobileMenuOpen = signal(false);
 
@@ -215,19 +228,18 @@ export class MailComponent {
   }
 
   refreshMail() {
-    combineLatest([
-      this.mailService.getMailboxes(),
-      this.mailService.getMailGroups()
-    ]).subscribe(([mailboxes, mailGroups]) => {
-      this.mailboxes.set(mailboxes);
-      this.mailGroups.set(mailGroups);
-    });
+    combineLatest([this.mailService.getMailboxes(), this.mailService.getMailGroups()]).subscribe(
+      ([mailboxes, mailGroups]) => {
+        this.mailboxes.set(mailboxes);
+        this.mailGroups.set(mailGroups);
+      }
+    );
   }
-  clickBox(box: string) {
+  clickBox(box: string | null) {
     this.selectedBox.set(box);
     this.updateLastSeen(box);
   }
-  clickMail(mail: Mail) {
+  clickMail(mail: MailWithReadStatus) {
     this.router.navigate(['mail', mail.id]);
   }
   deleteBox(email: string) {
@@ -275,26 +287,26 @@ export class MailComponent {
 
   private updateLastSeen(box: string | null) {
     if (!box) return; // Don't track "Show All"
-    
+
     // Find the mailgroup path for this box
     const mailGroups = this.mailGroups();
     if (!mailGroups) return;
-    
+
     // Find matching mailgroup by looking for one that would contain this email address
-    const matchingGroup = mailGroups.find(group => {
+    const matchingGroup = mailGroups.find((group) => {
       const mailboxes = this.mailboxes();
       if (!mailboxes) return false;
-      
+
       // Look for this box in any group and check if it matches the mailgroup path
       for (const mbGroup of mailboxes) {
-        const foundBox = mbGroup.mailBoxes.find(mb => mb.name === box);
+        const foundBox = mbGroup.mailBoxes.find((mb) => mb.name === box);
         if (foundBox && foundBox.path === group.path) {
           return true;
         }
       }
       return false;
     });
-    
+
     if (matchingGroup && matchingGroup.path) {
       this.lastSeenService.setLastSeen(matchingGroup.path);
     }
