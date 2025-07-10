@@ -2,6 +2,7 @@
 
 # MailVoid
 MailVoid is a simple yet powerful tool designed for developers who need to manage multiple test emails without the hassle of creating multiple email accounts.
+![image](https://github.com/user-attachments/assets/320b036f-b522-44d7-8be3-b23d3f610128)
 
 > [!WARNING]  
  This project is currently in prototype status. Please be aware that things might change often
