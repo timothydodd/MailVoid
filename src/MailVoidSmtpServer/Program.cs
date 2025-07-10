@@ -43,10 +43,15 @@ public class Program
                 services.Configure<EmailQueueOptions>(hostContext.Configuration.GetSection("EmailQueue"));
                 services.Configure<QueueMonitoringOptions>(hostContext.Configuration.GetSection("QueueMonitoring"));
                 services.Configure<MailboxFilterOptions>(hostContext.Configuration.GetSection("MailboxFilter"));
+                services.Configure<LetsEncryptOptions>(hostContext.Configuration.GetSection("LetsEncrypt"));
+                services.Configure<CloudflareOptions>(hostContext.Configuration.GetSection("Cloudflare"));
 
                 services.AddHttpClient<MailForwardingService>();
                 services.AddHttpClient<DiagnosticsService>();
+                services.AddHttpClient<ICloudflareApiService, CloudflareApiService>();
                 services.AddTransient<IMessageStore, MailMessageStore>();
+                services.AddSingleton<ILetsEncryptService, LetsEncryptService>();
+                services.AddSingleton<ICertificateService, CertificateService>();
                 services.AddSingleton<SmtpServerService>();
                 
                 // Security services
@@ -63,6 +68,7 @@ public class Program
                 
                 // Background services
                 services.AddHostedService<SmtpServerHostedService>();
+                services.AddHostedService<LetsEncryptHostedService>();
                 services.AddHostedService<InboundEmailProcessorService>();
                 services.AddHostedService<OutboundEmailProcessorService>();
                 services.AddHostedService<QueueMonitoringService>();
@@ -115,10 +121,15 @@ public class SmtpServerOptions
 {
     public int Port { get; set; } = 25;
     public int TestPort { get; set; } = 2580;
+    public int SslPort { get; set; } = 465;  // Implicit TLS/SSL
+    public int StartTlsPort { get; set; } = 587;  // STARTTLS
     public string Name { get; set; } = "MailVoid SMTP Server";
     public int MaxMessageSize { get; set; } = 10 * 1024 * 1024; // 10MB
     public string? CertificatePath { get; set; }
     public string? CertificatePassword { get; set; }
+    public bool EnableSsl { get; set; } = false;
+    public string TlsProtocols { get; set; } = "Tls12,Tls13";  // Default to TLS 1.2 and 1.3
+    public string? LetsEncryptDomain { get; set; }  // Primary domain for Let's Encrypt integration
 }
 
 public class MailVoidApiOptions

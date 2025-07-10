@@ -1,0 +1,19 @@
+# Certificate files
+certs/
+*.pfx
+*.p12
+*.pem
+*.crt
+*.key
+*.cer
+
+# User secrets
+secrets.json
+
+# Local configuration overrides
+appsettings.Development.json
+appsettings.Local.json
+
+# Logs
+logs/
+*.log
