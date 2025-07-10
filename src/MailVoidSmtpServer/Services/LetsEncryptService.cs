@@ -18,16 +18,13 @@ public class LetsEncryptService : ILetsEncryptService
 {
     private readonly ILogger<LetsEncryptService> _logger;
     private readonly LetsEncryptOptions _options;
-    private readonly ICloudflareApiService _cloudflareApiService;
 
     public LetsEncryptService(
         ILogger<LetsEncryptService> logger,
-        IOptions<LetsEncryptOptions> options,
-        ICloudflareApiService cloudflareApiService)
+        IOptions<LetsEncryptOptions> options)
     {
         _logger = logger;
         _options = options.Value;
-        _cloudflareApiService = cloudflareApiService;
     }
 
     public async Task<bool> ObtainCertificateAsync(string domain, CancellationToken cancellationToken = default)
@@ -59,17 +56,6 @@ public class LetsEncryptService : ILetsEncryptService
             var certDir = Path.Combine(_options.CertificateDirectory, domain);
             Directory.CreateDirectory(certDir);
 
-            // Handle DNS challenge with Cloudflare if configured
-            if (_options.ChallengeMethod.ToLowerInvariant() == "dns-cloudflare")
-            {
-                var result = await ObtainCertificateWithCloudflareAsync(domain, cancellationToken);
-                if (result)
-                {
-                    await ConvertToPfxAsync(domain, cancellationToken);
-                    _logger.LogInformation("Successfully obtained certificate for domain: {Domain}", domain);
-                }
-                return result;
-            }
 
             // Build certbot command for other challenge methods
             var certbotArgs = BuildCertbotCommand(domain, isRenewal: false);
@@ -109,17 +95,6 @@ public class LetsEncryptService : ILetsEncryptService
         {
             _logger.LogInformation("Renewing Let's Encrypt certificate for domain: {Domain}", domain);
 
-            // Handle DNS challenge with Cloudflare if configured
-            if (_options.ChallengeMethod.ToLowerInvariant() == "dns-cloudflare")
-            {
-                var result = await RenewCertificateWithCloudflareAsync(domain, cancellationToken);
-                if (result)
-                {
-                    await ConvertToPfxAsync(domain, cancellationToken);
-                    _logger.LogInformation("Successfully renewed certificate for domain: {Domain}", domain);
-                }
-                return result;
-            }
 
             // Build certbot renew command for other challenge methods
             var certbotArgs = BuildCertbotCommand(domain, isRenewal: true);
@@ -394,98 +369,7 @@ public class LetsEncryptService : ILetsEncryptService
         return Path.Combine(_options.CertificateDirectory, "pfx", $"{domain}.pfx");
     }
 
-    private async Task<bool> ObtainCertificateWithCloudflareAsync(string domain, CancellationToken cancellationToken)
-    {
-        try
-        {
-            _logger.LogInformation("Starting Cloudflare DNS challenge for domain: {Domain}", domain);
 
-            // Create Cloudflare credentials file
-            var credentialsPath = await CreateCloudflareCredentialsFileAsync();
-            if (string.IsNullOrEmpty(credentialsPath))
-            {
-                _logger.LogError("Failed to create Cloudflare credentials file");
-                return false;
-            }
-
-            // Build certbot command with Cloudflare DNS plugin
-            var args = new List<string>
-            {
-                "certonly",
-                "--non-interactive",
-                "--agree-tos",
-                $"--email {_options.Email}",
-                "--dns-cloudflare",
-                $"--dns-cloudflare-credentials {credentialsPath}",
-                $"--domains {domain}"
-            };
-
-            if (!string.IsNullOrWhiteSpace(_options.CertificateDirectory))
-            {
-                args.Add($"--work-dir {_options.CertificateDirectory}/work");
-                args.Add($"--config-dir {_options.CertificateDirectory}/config");
-                args.Add($"--logs-dir {_options.CertificateDirectory}/logs");
-            }
-
-            var certbotArgs = string.Join(" ", args);
-            var result = await RunCertbotAsync(certbotArgs, cancellationToken);
-
-            // Clean up credentials file
-            if (File.Exists(credentialsPath))
-            {
-                File.Delete(credentialsPath);
-            }
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error obtaining certificate with Cloudflare DNS challenge for domain: {Domain}", domain);
-            return false;
-        }
-    }
-
-    private async Task<bool> RenewCertificateWithCloudflareAsync(string domain, CancellationToken cancellationToken)
-    {
-        try
-        {
-            _logger.LogInformation("Renewing certificate with Cloudflare DNS challenge for domain: {Domain}", domain);
-
-            // Create Cloudflare credentials file
-            var credentialsPath = await CreateCloudflareCredentialsFileAsync();
-            if (string.IsNullOrEmpty(credentialsPath))
-            {
-                _logger.LogError("Failed to create Cloudflare credentials file");
-                return false;
-            }
-
-            // Build certbot renewal command
-            var args = new List<string>
-            {
-                "renew",
-                "--quiet",
-                $"--cert-name {domain}",
-                "--dns-cloudflare",
-                $"--dns-cloudflare-credentials {credentialsPath}"
-            };
-
-            var certbotArgs = string.Join(" ", args);
-            var result = await RunCertbotAsync(certbotArgs, cancellationToken);
-
-            // Clean up credentials file
-            if (File.Exists(credentialsPath))
-            {
-                File.Delete(credentialsPath);
-            }
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error renewing certificate with Cloudflare DNS challenge for domain: {Domain}", domain);
-            return false;
-        }
-    }
 
     private async Task<string?> CreateCloudflareCredentialsFileAsync()
     {
@@ -537,7 +421,7 @@ public class LetsEncryptOptions
     public string CertbotPath { get; set; } = "certbot";
     public string CertificateDirectory { get; set; } = "/etc/letsencrypt";
     public string CertificatePassword { get; set; } = "mailvoid-ssl";
-    public string ChallengeMethod { get; set; } = "http"; // http, dns, webroot, dns-cloudflare
+    public string ChallengeMethod { get; set; } = "dns-cloudflare"; // http, dns, webroot, dns-cloudflare
     public string WebrootPath { get; set; } = "/var/www/html";
     public int? HttpPort { get; set; } = 80;
     public int RenewalDaysBeforeExpiry { get; set; } = 30;

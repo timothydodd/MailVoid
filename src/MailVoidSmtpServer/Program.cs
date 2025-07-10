@@ -44,11 +44,9 @@ public class Program
                 services.Configure<QueueMonitoringOptions>(hostContext.Configuration.GetSection("QueueMonitoring"));
                 services.Configure<MailboxFilterOptions>(hostContext.Configuration.GetSection("MailboxFilter"));
                 services.Configure<LetsEncryptOptions>(hostContext.Configuration.GetSection("LetsEncrypt"));
-                services.Configure<CloudflareOptions>(hostContext.Configuration.GetSection("Cloudflare"));
 
                 services.AddHttpClient<MailForwardingService>();
                 services.AddHttpClient<DiagnosticsService>();
-                services.AddHttpClient<ICloudflareApiService, CloudflareApiService>();
                 services.AddTransient<IMessageStore, MailMessageStore>();
                 services.AddSingleton<ILetsEncryptService, LetsEncryptService>();
                 services.AddSingleton<ICertificateService, CertificateService>();
