@@ -31,6 +31,15 @@ public class SmtpServerService
         var certificate = _certificateService.GetCertificate();
         var sslEnabled = _options.EnableSsl && certificate != null;
 
+        _logger.LogInformation("SMTP Server Configuration - EnableSsl: {EnableSsl}, Certificate Available: {CertificateAvailable}", 
+            _options.EnableSsl, certificate != null);
+
+        if (certificate != null)
+        {
+            _logger.LogInformation("Certificate Details - Subject: {Subject}, Expires: {Expires}, Thumbprint: {Thumbprint}", 
+                certificate.Subject, certificate.NotAfter, certificate.Thumbprint);
+        }
+
         if (sslEnabled)
         {
             ports.Add($"{_options.SslPort} (SSL)");
@@ -45,14 +54,33 @@ public class SmtpServerService
             .MaxMessageSize(_options.MaxMessageSize);
 
         // Plain text endpoint (port 25)
+        _logger.LogInformation("Configuring plain text endpoint - Port: {Port}, STARTTLS: {StartTlsSupported}", 
+            _options.Port, sslEnabled);
         optionsBuilder.Endpoint((builder) =>
         {
-            builder.Port(_options.Port, isSecure: false)
-                .AllowUnsecureAuthentication(true)
-                .AuthenticationRequired(false);
+            if (sslEnabled && certificate != null)
+            {
+                var tlsProtocols = ParseTlsProtocols(_options.TlsProtocols);
+                _logger.LogDebug("Port {Port} configured with certificate and TLS protocols: {TlsProtocols}", 
+                    _options.Port, _options.TlsProtocols);
+                builder.Port(_options.Port, isSecure: false)
+                    .Certificate(certificate)
+                    .SupportedSslProtocols(tlsProtocols)
+                    .AllowUnsecureAuthentication(true) // remote MTAs don't auth
+                    .AuthenticationRequired(false)
+                    .IsSecure(false); // STARTTLS support
+            }
+            else
+            {
+                _logger.LogDebug("Port {Port} configured as plain text only (no certificate/SSL)", _options.Port);
+                builder.Port(_options.Port, isSecure: false)
+                    .AllowUnsecureAuthentication(true)
+                    .AuthenticationRequired(false);
+            }
         });
 
         // Test port endpoint (plain text)
+        _logger.LogInformation("Configuring test endpoint - Port: {Port}, Plain text only", _options.TestPort);
         optionsBuilder.Endpoint((builder) =>
         {
             builder.Port(_options.TestPort, isSecure: false)
@@ -67,6 +95,7 @@ public class SmtpServerService
             var tlsProtocols = ParseTlsProtocols(_options.TlsProtocols);
 
             // Implicit SSL/TLS endpoint (port 465)
+            _logger.LogInformation("Configuring SSL endpoint - Port: {Port}, Implicit SSL/TLS", _options.SslPort);
             optionsBuilder.Endpoint((builder) =>
             {
                 builder.Port(_options.SslPort, isSecure: true)
@@ -77,6 +106,7 @@ public class SmtpServerService
             });
 
             // STARTTLS endpoint (port 587)
+            _logger.LogInformation("Configuring STARTTLS endpoint - Port: {Port}, Explicit STARTTLS", _options.StartTlsPort);
             optionsBuilder.Endpoint((builder) =>
             {
                 builder.Port(_options.StartTlsPort, isSecure: false)
