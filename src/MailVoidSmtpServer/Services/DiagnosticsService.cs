@@ -1,8 +1,6 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net.Http;
-using System.Text;
 
 namespace MailVoidSmtpServer.Services;
 
@@ -26,13 +24,13 @@ public class DiagnosticsService : BackgroundService
     {
         // Wait a bit for services to start up
         await Task.Delay(5000, stoppingToken);
-        
+
         await RunDiagnostics(stoppingToken);
-        
-        // Run diagnostics every 5 minutes
+
+        // Run diagnostics every 25 minutes
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+            await Task.Delay(TimeSpan.FromMinutes(25), stoppingToken);
             await RunDiagnostics(stoppingToken);
         }
     }
@@ -43,7 +41,7 @@ public class DiagnosticsService : BackgroundService
 
         // Check MailVoid API connectivity
         await CheckApiConnectivity(stoppingToken);
-        
+
         // Check API key configuration
         CheckApiKeyConfiguration();
     }
@@ -56,11 +54,11 @@ public class DiagnosticsService : BackgroundService
             _logger.LogInformation("🏥 Testing MailVoid API connectivity: {Url}", healthUrl);
 
             var response = await _httpClient.GetAsync(healthUrl, stoppingToken);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync(stoppingToken);
-                _logger.LogInformation("✅ MailVoid API is reachable - Status: {Status}, Response: {Response}", 
+                _logger.LogInformation("✅ MailVoid API is reachable - Status: {Status}, Response: {Response}",
                     response.StatusCode, content);
             }
             else
@@ -99,7 +97,7 @@ public class DiagnosticsService : BackgroundService
             _logger.LogInformation("🔑 API key is configured (length: {Length} chars)", _apiOptions.ApiKey.Length);
         }
 
-        _logger.LogInformation("🌐 API Configuration: BaseUrl={BaseUrl}, Endpoint={Endpoint}", 
+        _logger.LogInformation("🌐 API Configuration: BaseUrl={BaseUrl}, Endpoint={Endpoint}",
             _apiOptions.BaseUrl, _apiOptions.WebhookEndpoint);
     }
 }
