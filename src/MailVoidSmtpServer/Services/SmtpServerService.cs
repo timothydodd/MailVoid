@@ -168,15 +168,37 @@ public class SmtpServerService
     private void OnSessionCreated(object? sender, SessionEventArgs e)
     {
         var isSecure = e.Context.EndpointDefinition.IsSecure;
-        var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
-        var endpoint = e.Context.EndpointDefinition.Endpoint;
-        var portInfo = endpoint?.Port.ToString() ?? "unknown";
+        var context = e.Context;
+        var pipe = context.Pipe;
 
-        _logger.LogInformation("SMTP session created - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Port: {Port}, Security: {Security}",
-            e.Context.SessionId,
-            endpoint,
-            portInfo,
-            securityInfo);
+        if (pipe.IsSecure)
+        {
+            var endpointPort = context.EndpointDefinition.Endpoint.Port;
+
+            if (endpointPort == 465)
+            {
+                _logger.LogInformation(
+                    "OnSessionCreated - Session {SessionId} started with implicit TLS (port 465), TLS protocol: {Protocol}",
+                    context.SessionId,
+                    pipe.SslProtocol);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "OnSessionCreated - Session {SessionId} upgraded to TLS via STARTTLS (port {Port}), TLS protocol: {Protocol}",
+                    context.SessionId,
+                    endpointPort,
+                    pipe.SslProtocol);
+            }
+        }
+        else
+        {
+            _logger.LogWarning(
+                "OnSessionCreated - Session {SessionId} remained plaintext on port {Port} from {RemoteEndPoint}",
+                context.SessionId,
+                context.EndpointDefinition.Endpoint.Port,
+                context.EndpointDefinition.Endpoint.Address);
+        }
     }
 
     private void OnSessionCompleted(object? sender, SessionEventArgs e)
@@ -192,14 +214,14 @@ public class SmtpServerService
             if (endpointPort == 465)
             {
                 _logger.LogInformation(
-                    "Session {SessionId} started with implicit TLS (port 465), TLS protocol: {Protocol}",
+                    "OnSessionCompleted - Session {SessionId} started with implicit TLS (port 465), TLS protocol: {Protocol}",
                     context.SessionId,
                     pipe.SslProtocol);
             }
             else
             {
                 _logger.LogInformation(
-                    "Session {SessionId} upgraded to TLS via STARTTLS (port {Port}), TLS protocol: {Protocol}",
+                    "OnSessionCompleted - Session {SessionId} upgraded to TLS via STARTTLS (port {Port}), TLS protocol: {Protocol}",
                     context.SessionId,
                     endpointPort,
                     pipe.SslProtocol);
@@ -208,7 +230,7 @@ public class SmtpServerService
         else
         {
             _logger.LogWarning(
-                "Session {SessionId} remained plaintext on port {Port} from {RemoteEndPoint}",
+                "OnSessionCompleted - Session {SessionId} remained plaintext on port {Port} from {RemoteEndPoint}",
                 context.SessionId,
                 context.EndpointDefinition.Endpoint.Port,
                 context.EndpointDefinition.Endpoint.Address);
