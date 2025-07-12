@@ -36,6 +36,12 @@ namespace MailVoidWeb
         
         public DateTime? LastActivity { get; set; }
         
+        /// <summary>
+        /// Number of days to retain emails in this mailbox. Null or 0 means no auto-deletion.
+        /// Default is 3 days for new mailboxes.
+        /// </summary>
+        public int? RetentionDays { get; set; } = 3;
+        
         public virtual ICollection<MailGroupUser> MailGroupUsers { get; set; } = new List<MailGroupUser>();
         
         /// <summary>

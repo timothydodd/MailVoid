@@ -411,6 +411,136 @@ public class MailController : ControllerBase
         return Ok();
     }
 
+    [HttpGet("mailbox/{id}/retention")]
+    public async Task<IActionResult> GetRetentionSettings(long id)
+    {
+        var userId = _userService.GetUserId();
+        var mailGroup = await _context.MailGroups.FindAsync(id);
+        
+        if (mailGroup == null)
+        {
+            return NotFound();
+        }
+
+        // Check if user has access to this mailbox
+        if (!mailGroup.IsPublic && 
+            mailGroup.OwnerUserId != userId && 
+            !await _context.MailGroupUsers.AnyAsync(mgu => mgu.MailGroupId == id && mgu.UserId == userId))
+        {
+            return Forbid();
+        }
+
+        return Ok(new RetentionSettingsResponse
+        {
+            MailGroupId = mailGroup.Id,
+            RetentionDays = mailGroup.RetentionDays,
+            Path = mailGroup.Path
+        });
+    }
+
+    [HttpPut("mailbox/{id}/retention")]
+    public async Task<IActionResult> UpdateRetentionSettings(long id, [FromBody] UpdateRetentionRequest request)
+    {
+        var userId = _userService.GetUserId();
+        var mailGroup = await _context.MailGroups.FindAsync(id);
+        
+        if (mailGroup == null)
+        {
+            return NotFound();
+        }
+
+        // Only the owner can update retention settings
+        if (mailGroup.OwnerUserId != userId)
+        {
+            return Forbid();
+        }
+
+        // Validate retention days (0-365)
+        if (request.RetentionDays.HasValue && (request.RetentionDays < 0 || request.RetentionDays > 365))
+        {
+            return BadRequest(new { message = "Retention days must be between 0 and 365." });
+        }
+
+        mailGroup.RetentionDays = request.RetentionDays;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation($"Updated retention settings for mailbox {mailGroup.Path} to {request.RetentionDays} days");
+
+        return Ok(new RetentionSettingsResponse
+        {
+            MailGroupId = mailGroup.Id,
+            RetentionDays = mailGroup.RetentionDays,
+            Path = mailGroup.Path
+        });
+    }
+
+    [HttpPost("mark-all-read")]
+    public async Task<IActionResult> MarkAllAsRead([FromBody] MarkAllAsReadRequest request)
+    {
+        var userId = _userService.GetUserId();
+        
+        // Get emails for the specified mailbox that are accessible to the user
+        var emailsQuery = _context.Mails.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(request.MailboxPath))
+        {
+            emailsQuery = emailsQuery.Where(m => m.MailGroupPath == request.MailboxPath);
+            
+            // Check if user has access to this mailbox
+            var mailGroup = await _context.MailGroups
+                .FirstOrDefaultAsync(mg => mg.Path == request.MailboxPath);
+                
+            if (mailGroup != null)
+            {
+                var isAdmin = _userService.IsAdmin();
+                if (!mailGroup.IsPublic && 
+                    mailGroup.OwnerUserId != userId && 
+                    !await _context.MailGroupUsers.AnyAsync(mgu => mgu.MailGroupId == mailGroup.Id && mgu.UserId == userId) &&
+                    !isAdmin)
+                {
+                    return Forbid();
+                }
+            }
+        }
+        
+        var emailIds = await emailsQuery.Select(m => m.Id).ToListAsync();
+        
+        if (!emailIds.Any())
+        {
+            return Ok(new { message = "No emails found to mark as read.", markedCount = 0 });
+        }
+        
+        // Get emails that are not already marked as read by this user
+        var alreadyReadIds = await _context.UserMailReads
+            .Where(r => r.UserId == userId && emailIds.Contains(r.MailId))
+            .Select(r => r.MailId)
+            .ToListAsync();
+            
+        var unreadEmailIds = emailIds.Except(alreadyReadIds).ToList();
+        
+        if (!unreadEmailIds.Any())
+        {
+            return Ok(new { message = "All emails are already marked as read.", markedCount = 0 });
+        }
+        
+        // Create read records for unread emails
+        var readRecords = unreadEmailIds.Select(emailId => new UserMailRead
+        {
+            UserId = userId,
+            MailId = emailId,
+            ReadAt = DateTime.UtcNow
+        }).ToList();
+        
+        _context.UserMailReads.AddRange(readRecords);
+        await _context.SaveChangesAsync();
+        
+        _logger.LogInformation(
+            "User {UserId} marked {Count} emails as read in mailbox '{MailboxPath}'",
+            userId, unreadEmailIds.Count, request.MailboxPath ?? "all");
+        
+        return Ok(new { message = $"Marked {unreadEmailIds.Count} emails as read.", markedCount = unreadEmailIds.Count });
+    }
+
 }
 
 public record GrantAccessRequest
@@ -457,4 +587,21 @@ public class MailWithReadStatus
     public DateTime CreatedOn { get; set; }
     public string? MailGroupPath { get; set; }
     public bool IsRead { get; set; }
+}
+
+public record UpdateRetentionRequest
+{
+    public int? RetentionDays { get; set; }
+}
+
+public record RetentionSettingsResponse
+{
+    public long MailGroupId { get; set; }
+    public int? RetentionDays { get; set; }
+    public string? Path { get; set; }
+}
+
+public record MarkAllAsReadRequest
+{
+    public string? MailboxPath { get; set; }
 }

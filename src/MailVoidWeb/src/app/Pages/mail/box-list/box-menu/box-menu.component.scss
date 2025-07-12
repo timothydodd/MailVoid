@@ -3,17 +3,17 @@
   position: relative;
   
   .menu {
-    position: absolute;
+    position: fixed;
     width: auto;
+    max-width: 200px;
     min-width: 150px;
-    top: 20px;
-    right: 0;
     padding: 5px;
     background: var(--bGDark);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
+    z-index: 9999;
+    white-space: nowrap;
     
     button[dropdown-item] {
       display: flex;
@@ -29,6 +29,7 @@
       cursor: pointer;
       border-radius: 4px;
       transition: background-color 0.2s ease;
+      white-space: nowrap;
       
       &:hover {
         background-color: var(--bGLight);
@@ -37,6 +38,12 @@
       lucide-angular {
         flex-shrink: 0;
       }
+    }
+    
+    .menu-divider {
+      height: 1px;
+      background-color: var(--border-color);
+      margin: 4px 8px;
     }
   }
 }

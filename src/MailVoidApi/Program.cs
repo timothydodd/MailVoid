@@ -39,6 +39,7 @@ public class Program
 
         builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
         builder.Services.AddHostedService<BackgroundWorkerService>();
+        builder.Services.AddHostedService<MailCleanupService>();
         builder.Services.AddControllers();
         builder.Services.AddMemoryCache();
         // Register HttpContextAccessor

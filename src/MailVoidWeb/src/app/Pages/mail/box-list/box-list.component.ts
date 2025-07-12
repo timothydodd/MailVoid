@@ -42,7 +42,9 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
                   <app-box-menu
                     [item]="item.name"
                     [groupName]="group.groupName"
+                    [unreadCount]="item.unreadCount"
                     (deleteEvent)="deleteEvent.emit($event)"
+                    (markAllAsReadEvent)="markAllAsReadEvent.emit($event)"
                   >
                   </app-box-menu>
                 </div>
@@ -64,6 +66,7 @@ export class BoxListComponent {
   mailboxes = input.required<MailBoxGroups[] | null>();
   selectedBox = model<string | null>();
   deleteEvent = output<string>();
+  markAllAsReadEvent = output<string>();
   boxClick = output<string | null>();
 
   sortedMailboxes = computed(() => {

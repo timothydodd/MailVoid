@@ -1,28 +1,39 @@
 :host {
   display: block;
   width: 100%;
-
-
-
-
-
-  .btn.btn-outline {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    color: var(--primary);
-    lucide-icon {
-      transition: transform 0.2s ease;
-      color: var(--primary);
-    }
-    
-    &:hover lucide-icon {
-      transform: translateX(-2px);
-    }
-  
 }
+
+.mail-header {
+  flex-grow: 0 !important;
+  height: auto !important;
+}
+
+.mail-header-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.back-button.btn.btn-outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--primary);
+  flex-shrink: 0;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  
+  lucide-icon {
+    transition: transform 0.2s ease;
+    color: var(--primary);
+  }
+  
+  &:hover lucide-icon {
+    transform: translateX(-2px);
+  }
 }
 
 

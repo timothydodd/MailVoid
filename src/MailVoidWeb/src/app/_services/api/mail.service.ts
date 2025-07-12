@@ -97,6 +97,24 @@ export class MailService {
   deleteMailGroup(id: number) {
     return this.http.delete(`${environment.apiUrl}/api/mail/mail-groups/${id}`);
   }
+
+  // Retention settings
+  getRetentionSettings(mailboxId: number) {
+    return this.http.get<RetentionSettingsResponse>(`${environment.apiUrl}/api/mail/mailbox/${mailboxId}/retention`);
+  }
+
+  updateRetentionSettings(mailboxId: number, retentionDays: number | null) {
+    return this.http.put<RetentionSettingsResponse>(`${environment.apiUrl}/api/mail/mailbox/${mailboxId}/retention`, {
+      retentionDays,
+    });
+  }
+
+  // Mark all emails as read
+  markAllAsRead(mailboxPath?: string) {
+    return this.http.post<MarkAllAsReadResponse>(`${environment.apiUrl}/api/mail/mark-all-read`, {
+      mailboxPath,
+    });
+  }
 }
 export interface FilterOptions {
   to: string | null;
@@ -177,4 +195,15 @@ export interface MailGroupUser {
   userId: string;
   grantedAt: string;
   user: User;
+}
+
+export interface RetentionSettingsResponse {
+  mailGroupId: number;
+  retentionDays: number | null;
+  path: string | null;
+}
+
+export interface MarkAllAsReadResponse {
+  message: string;
+  markedCount: number;
 }

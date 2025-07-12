@@ -80,6 +80,11 @@ npm run format                # Format code with Prettier
 - Route guards for authentication
 - BehaviorSubject for state management in services
 - Component-specific SCSS styling
+- **IMPORTANT**: When adding new Lucide icons to components, you MUST update `src/app/app.config.ts`:
+  1. Add the icon to the import statement from 'lucide-angular'
+  2. Add the icon to the `LucideAngularModule.pick({})` configuration
+  3. Example: For Clock icon, add `Clock` to both the import and the pick object
+- **IMPORTANT**: For Lucide icons, ALWAYS use the `size` attribute instead of setting `width` and `height` in CSS. Use `<lucide-icon name="icon-name" size="16"></lucide-icon>` format.
 
 ## Authentication Flow
 1. Login with username/password receives JWT access token + refresh token

@@ -7,6 +7,7 @@ import { catchError, combineLatest, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
 import {
   FilterOptions,
+  MailBox,
   MailBoxGroups,
   MailGroup,
   MailService,
@@ -49,6 +50,7 @@ type SortDirection = 'asc' | 'desc';
               [mailboxes]="mailboxes()"
               [(selectedBox)]="selectedBox"
               (deleteEvent)="deleteBox($event)"
+              (markAllAsReadEvent)="markAllAsRead($event)"
               (boxClick)="onMobileBoxSelect($event)"
             ></app-box-list>
           </div>
@@ -245,6 +247,34 @@ export class MailComponent {
   deleteBox(email: string) {
     this.mailService.deleteBoxes({ to: email } as FilterOptions).subscribe(() => {
       this.refreshMail();
+    });
+  }
+
+  markAllAsRead(mailboxName: string) {
+    // Find the mailbox path for this mailbox name
+    const mailboxGroups = this.mailboxes();
+    let mailboxPath: string | undefined;
+    
+    if (mailboxGroups) {
+      // Look through all groups to find the mailbox with this name
+      for (const group of mailboxGroups) {
+        const mailbox = group.mailBoxes.find((mb: MailBox) => mb.name === mailboxName);
+        if (mailbox) {
+          mailboxPath = mailbox.path || undefined;
+          break;
+        }
+      }
+    }
+    
+    this.mailService.markAllAsRead(mailboxPath).subscribe({
+      next: (response) => {
+        console.log(response.message);
+        // Refresh mail data to update unread counts
+        this.refreshMail();
+      },
+      error: (error) => {
+        console.error('Error marking emails as read:', error);
+      }
     });
   }
 
