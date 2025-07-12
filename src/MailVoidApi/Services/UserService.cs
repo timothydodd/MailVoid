@@ -44,9 +44,24 @@ public class UserService : IUserService
         return roleClaim.Value;
     }
 
+    // Check if user is admin
+    public bool IsAdmin()
+    {
+        try
+        {
+            var role = GetRole();
+            return role.Equals("admin", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
 }
 public interface IUserService
 {
     Guid GetUserId();
     string GetRole();
+    bool IsAdmin();
 }

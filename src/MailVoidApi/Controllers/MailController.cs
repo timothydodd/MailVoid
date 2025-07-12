@@ -2,6 +2,7 @@
 using MailVoidApi.Data;
 using MailVoidApi.Services;
 using MailVoidWeb;
+using MailVoidWeb.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
