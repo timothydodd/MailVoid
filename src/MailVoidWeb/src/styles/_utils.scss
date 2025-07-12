@@ -288,7 +288,7 @@
 /* Dropdown Menu */
 .dropdown-menu {
   border: 1px solid var(--border-color);
-  box-shadow: 3px 2px 21px -3px rgba(0, 0, 0, 0.31);
+  box-shadow: 3px 2px 21px -3px var(--dropdown-shadow);
 }
 
 /* Avatar */

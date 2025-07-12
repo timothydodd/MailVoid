@@ -91,12 +91,12 @@
 
   &:hover {
     border-color: var(--primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px var(--shadow-color);
   }
 
   &.selected {
     border-color: var(--primary);
-    box-shadow: 0 0 0 1px rgba(111, 131, 190, 0.2);
+    box-shadow: 0 0 0 1px var(--table-hover-shadow);
   }
 }
 
@@ -163,7 +163,7 @@ section h5 {
   background-color: var(--bGDarker);
   border-radius: 12px;
   border: 1px solid var(--border-color);
-  box-shadow: 2px 4px 15px rgba(0, 0, 0, 0.14);
+  box-shadow: 2px 4px 15px var(--shadow-color);
   display: flex;
   flex-direction: column;
 }
@@ -183,7 +183,7 @@ section h5 {
     background: var(--bGDark);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px var(--shadow-color);
   }
   
   .page-info {

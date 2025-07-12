@@ -34,7 +34,7 @@
   background-color:var(--bGLight);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--shadow-color);
   overflow: hidden;
 }
 
@@ -391,7 +391,7 @@
   border-radius: 12px;
   border: 1px solid var(--border-color);
   overflow: hidden;
-  box-shadow: 2px 4px 15px rgba(0, 0, 0, 0.14);
+  box-shadow: 2px 4px 15px var(--shadow-color);
 }
 
 .sidebar-header {
@@ -432,7 +432,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--shadow-color);
   flex-grow: 1;
 }
 

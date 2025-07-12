@@ -35,10 +35,11 @@
   --input-bg: var(--bGLighter);
   --input-border: var(--border-color);
   --hover-bg: var(--bGLight);
-  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-color: transparent;
+  --dropdown-shadow: rgba(0, 0, 0, 0.3);
   --table-row-border: rgba(98, 115, 164, 0.15);
   --table-row-hover-bg: rgba(111, 131, 190, 0.5);
-  --table-hover-shadow: rgba(111, 131, 190, 0.2);
+  --table-hover-shadow: transparent;
   
   /* Button gradient colors */
   --btn-gradient-1: #ec4899;
@@ -61,7 +62,7 @@
 
 /* Light Theme */
 :root[data-theme="light"] {
-  --background: #dedddd;
+  --background: #f3f3f3;
   --current-line: #f0f0f0;
   --foreground: #1d232e;
   --comment: #374151;
@@ -76,8 +77,8 @@
   --yellow: #eab308;
   --bGLighter: #f9fafb;
   --bGLight: #f3f4f6;
-  --bGDark: #e5e7eb;
-  --bGDarker: #d1d5db;
+  --bGDark: #e5e6e9;
+  --bGDarker: #949495;
   --primary: #3783ff;
   --secondary: var(--orange);
   --header-bg: #f8f9fa;
@@ -94,10 +95,11 @@
   --input-bg: var(--border-color);
   --input-border: #d1d5db;
   --hover-bg: #f3f4f6;
-  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-color: transparent;
+  --dropdown-shadow: rgba(0, 0, 0, 0.1);
   --table-row-border: rgba(229, 231, 235, 0.5);
   --table-row-hover-bg: rgba(59, 130, 246, 0.1);
-  --table-hover-shadow: rgba(59, 130, 246, 0.15);
+  --table-hover-shadow: transparent;
   
   /* Button gradient colors - adjusted for light theme */
   --btn-gradient-1: #f472b6;
@@ -113,7 +115,7 @@
   --btn-gradient-active-3: #2563eb;
   --btn-gradient-active-4: #1e1b4b;
   --btn-border: rgba(147, 51, 234, 0.3);
-  --btn-shadow-1: rgba(99, 102, 241, 0.2);
-  --btn-shadow-2: rgba(99, 102, 241, 0.3);
-  --btn-focus-shadow: rgba(147, 51, 234, 0.4);
+  --btn-shadow-1: transparent;
+  --btn-shadow-2: transparent;
+  --btn-focus-shadow: transparent;
 }

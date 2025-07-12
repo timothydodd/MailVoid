@@ -130,7 +130,7 @@
 
 .btn-close:focus {
   outline: 0;
-  box-shadow: 0 0 0 0.25rem rgba(111, 131, 190, 0.25);
+  box-shadow: 0 0 0 0.25rem var(--shadow-color);
   opacity: 1;
 }
 

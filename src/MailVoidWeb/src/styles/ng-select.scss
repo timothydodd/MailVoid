@@ -13,7 +13,7 @@
     &.ng-select-focused {
         .ng-select-container {
             border-color: var(--primary);
-            box-shadow: 0 0 0 0.2rem rgba(189, 147, 249, 0.25);
+            box-shadow: 0 0 0 0.2rem var(--shadow-color);
         }
     }
     
@@ -56,7 +56,7 @@
 .ng-dropdown-panel {
     background-color: $ng-select-bg;
     border: 1px solid var(--input-border);
-    box-shadow: 0 4px 6px var(--shadow-color);
+    box-shadow: 0 4px 6px var(--dropdown-shadow);
     
     &.ng-select-bottom {
         border-top-color: var(--input-border);

@@ -55,7 +55,7 @@
   outline: none;
   border-color: var(--primary);
   background-color: var(--bGLight);
-  box-shadow: 0 0 0 2px rgba(111, 131, 190, 0.2);
+  box-shadow: 0 0 0 2px var(--shadow-color);
 }
 
 .form-control:disabled {
@@ -133,7 +133,7 @@
 
 .form-control.is-valid:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(80, 250, 123, 0.2);
+  box-shadow: 0 0 0 2px var(--shadow-color);
 }
 
 .form-control.is-invalid {
@@ -142,7 +142,7 @@
 
 .form-control.is-invalid:focus {
   border-color: var(--red);
-  box-shadow: 0 0 0 2px rgba(255, 85, 85, 0.2);
+  box-shadow: 0 0 0 2px var(--shadow-color);
 }
 
 .valid-feedback {
@@ -205,7 +205,7 @@
 .form-check-input:focus {
   border-color: var(--primary);
   outline: 0;
-  box-shadow: 0 0 0 0.25rem rgba(111, 131, 190, 0.25);
+  box-shadow: 0 0 0 0.25rem var(--shadow-color);
 }
 
 .form-check-input:checked {
@@ -249,7 +249,7 @@
 .form-select:focus {
   border-color: var(--primary);
   outline: 0;
-  box-shadow: 0 0 0 0.25rem rgba(111, 131, 190, 0.25);
+  box-shadow: 0 0 0 0.25rem var(--shadow-color);
 }
 
 .form-select:disabled {
@@ -286,7 +286,7 @@ textarea.form-control {
 }
 
 .form-range:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 1px var(--background), 0 0 0 0.25rem rgba(111, 131, 190, 0.25);
+  box-shadow: 0 0 0 1px var(--background), 0 0 0 0.25rem var(--shadow-color);
 }
 
 .form-range::-webkit-slider-track {
