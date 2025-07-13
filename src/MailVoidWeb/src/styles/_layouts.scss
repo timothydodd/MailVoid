@@ -371,7 +371,6 @@
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  min-height: calc(100vh - 60px);
   padding: 1.5rem;
   gap: 1.5rem;
   position: relative;
@@ -422,7 +421,6 @@
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  min-height: calc(100vh - 60px);
   padding: 1.5rem;
   gap: 1.5rem;
 }
@@ -532,7 +530,6 @@
     padding: 0;
     gap: 0;
     max-width: 100%;
-    min-height: 100vh;
   }
   
   .mail-detail-container {
