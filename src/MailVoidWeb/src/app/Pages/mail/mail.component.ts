@@ -15,6 +15,7 @@ import {
 } from '../../_services/api/mail.service';
 import { LastSeenService } from '../../_services/last-seen.service';
 import { MobileMenuService } from '../../_services/mobile-menu.service';
+import { SignalRService } from '../../services/signalr.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
 type SortColumn = 'from' | 'to' | 'subject' | 'createdOn';
@@ -148,6 +149,8 @@ export class MailComponent {
   mailService = inject(MailService);
   lastSeenService = inject(LastSeenService);
   mobileMenuService = inject(MobileMenuService);
+  signalRService = inject(SignalRService);
+
   mailboxes = signal<MailBoxGroups[] | null>(null);
   mailGroups = signal<MailGroup[] | null>(null);
   emails = signal<MailWithReadStatus[] | null>(null);
@@ -227,6 +230,23 @@ export class MailComponent {
     this.mobileMenuService.menuToggled.pipe(takeUntilDestroyed()).subscribe(() => {
       this.toggleMobileMenu();
     });
+
+    // Subscribe to new mail notifications
+    this.signalRService.newMail$.pipe(takeUntilDestroyed()).subscribe((mail) => {
+      // Refresh the current email list when new mail arrives
+      const currentBox = this.selectedBox();
+      if (!currentBox || mail.to === currentBox || (mail.mailGroupPath && currentBox.includes(mail.mailGroupPath))) {
+        // Refresh emails for the current view
+        this.mailService
+          .getEmails(currentBox ? ({ to: currentBox } as FilterOptions) : undefined)
+          .pipe(catchError(() => of({ items: null, totalCount: 0 })))
+          .subscribe((result) => {
+            this.emails.set(result?.items);
+          });
+      }
+      // Always refresh mailboxes to update counts
+      this.refreshMail();
+    });
   }
 
   refreshMail() {
@@ -254,7 +274,7 @@ export class MailComponent {
     // Find the mailbox path for this mailbox name
     const mailboxGroups = this.mailboxes();
     let mailboxPath: string | undefined;
-    
+
     if (mailboxGroups) {
       // Look through all groups to find the mailbox with this name
       for (const group of mailboxGroups) {
@@ -265,7 +285,7 @@ export class MailComponent {
         }
       }
     }
-    
+
     this.mailService.markAllAsRead(mailboxPath).subscribe({
       next: (response) => {
         console.log(response.message);
@@ -274,7 +294,7 @@ export class MailComponent {
       },
       error: (error) => {
         console.error('Error marking emails as read:', error);
-      }
+      },
     });
   }
 

@@ -12,21 +12,26 @@ export class AuthService {
   private refreshTokenKey = 'refreshToken';
   private isRefreshing = false;
   private refreshTokenSubject = new BehaviorSubject<string | null>(null);
+  private currentUserSubject = new BehaviorSubject<User | null>(null);
 
   private http = inject(HttpClient);
   private router = inject(Router);
 
   isLoggedIn = new BehaviorSubject<boolean>(false);
+  currentUser$ = this.currentUserSubject.asObservable();
 
   constructor() {
     const token = this.getToken();
     this.isLoggedIn.next(token !== null);
+    // Don't load user data in constructor to avoid circular dependency
+    // User data will be loaded when needed or on login
   }
   login(userName: string, password: string) {
     return this.http.post<LoginResponse>(`${environment.apiUrl}/api/auth/login`, { userName, password }).pipe(
       tap((response) => {
         this.storeTokens(response.accessToken, response.refreshToken);
         this.isLoggedIn.next(true);
+        this.loadCurrentUser();
       })
     );
   }
@@ -49,6 +54,7 @@ export class AuthService {
 
     this.clearTokens();
     this.isLoggedIn.next(false);
+    this.currentUserSubject.next(null);
     this.router.navigate(['/login']);
   }
 
@@ -171,8 +177,27 @@ export class AuthService {
   clearAuthState() {
     this.clearTokens();
     this.isLoggedIn.next(false);
+    this.currentUserSubject.next(null);
     this.isRefreshing = false;
     this.refreshTokenSubject.next(null);
+  }
+
+  private loadCurrentUser() {
+    this.getUser().subscribe({
+      next: (user) => this.currentUserSubject.next(user),
+      error: (error) => {
+        console.error('Failed to load current user:', error);
+        this.currentUserSubject.next(null);
+      }
+    });
+  }
+
+  // Method to initialize user data after service is fully constructed
+  public initializeCurrentUser() {
+    const token = this.getToken();
+    if (token !== null && !this.isTokenExpired()) {
+      this.loadCurrentUser();
+    }
   }
 
   async refreshToken(): Promise<string | null> {
@@ -220,6 +245,7 @@ export class AuthService {
       console.error('Token refresh failed:', error);
       this.clearTokens();
       this.isLoggedIn.next(false);
+      this.currentUserSubject.next(null);
       this.refreshTokenSubject.next('');
       // Don't navigate here to avoid conflicts with interceptor
     } finally {

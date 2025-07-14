@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using MailVoidApi.Authentication;
 using MailVoidApi.Data;
+using MailVoidApi.Hubs;
 using MailVoidApi.Middleware;
 using MailVoidApi.Services;
 using MailVoidWeb;
@@ -41,6 +42,7 @@ public class Program
         builder.Services.AddHostedService<BackgroundWorkerService>();
         builder.Services.AddHostedService<MailCleanupService>();
         builder.Services.AddControllers();
+        builder.Services.AddSignalR();
         builder.Services.AddMemoryCache();
         // Register HttpContextAccessor
         builder.Services.AddHttpContextAccessor();
@@ -83,7 +85,8 @@ public class Program
                 ValidIssuer = jwtSettings["Issuer"],
                 ValidAudience = jwtSettings["Audience"],
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Secret"])),
-                ClockSkew = TimeSpan.FromMinutes(5) // Allow 5 minute clock skew
+                ClockSkew = TimeSpan.FromMinutes(5), // Allow 5 minute clock skew
+                NameClaimType = "sub"
             };
             options.Events = new JwtBearerEvents
             {
@@ -108,6 +111,16 @@ public class Program
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                     logger.LogDebug("JWT Token validated successfully for user {User} on path {Path}", 
                         context.Principal?.Identity?.Name, context.Request.Path);
+                    return Task.CompletedTask;
+                },
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    var path = context.HttpContext.Request.Path;
+                    if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    {
+                        context.Token = accessToken;
+                    }
                     return Task.CompletedTask;
                 }
             };
@@ -162,7 +175,8 @@ public class Program
                                             .AllowAnyHeader()
                                             .AllowAnyMethod()
                                             .SetIsOriginAllowed(x => true)
-                                            .AllowCredentials();
+                                            .AllowCredentials()
+                                            .WithExposedHeaders("X-Total-Count");
                     });
             });
         }
@@ -174,7 +188,8 @@ public class Program
                 builder => builder
                     .AllowAnyOrigin()
                     .AllowAnyMethod()
-                    .AllowAnyHeader());
+                    .AllowAnyHeader()
+                    .WithExposedHeaders("X-Total-Count"));
             });
         }
 
@@ -256,6 +271,7 @@ public class Program
         app.UseDefaultFiles();
         app.UseStaticFiles();
         app.MapControllers();
+        app.MapHub<MailNotificationHub>("/hubs/mail");
         app.UseHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = HealthCheck.WriteResponse });
         app.MapFallbackToFile("/index.html");
 

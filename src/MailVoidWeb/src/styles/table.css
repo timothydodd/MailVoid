@@ -33,6 +33,7 @@ th {
 tbody tr {
     background-color: var(--bGLight);
     border-bottom: 1px solid var(--border-color);
+    border-left: 1px solid transparent;
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
@@ -46,11 +47,14 @@ tbody tr:hover {
     background-color: var(--table-row-hover-bg);
     transform: translateX(4px);
     box-shadow: 0 2px 8px var(--table-hover-shadow);
+    border-left-color: var(--primary);
+    border-left-width: 3px;
 }
 
 tbody tr:hover td {
     color: var(--foreground);
 }
+
 
 td {
     padding: 1rem;
@@ -117,7 +121,7 @@ tbody tr.unread td:nth-child(3)::before {
 
 /* Unread email styles - dot indicator on the left */
 tbody tr:not(.read) {
-    border-left: 4px solid var(--primary);
+    border-left: 4px solid var(--red);
 }
 
 tbody tr:not(.read) td:first-child {

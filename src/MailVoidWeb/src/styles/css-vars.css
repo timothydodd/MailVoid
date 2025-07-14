@@ -98,8 +98,8 @@
   --shadow-color: transparent;
   --dropdown-shadow: rgba(0, 0, 0, 0.1);
   --table-row-border: rgba(229, 231, 235, 0.5);
-  --table-row-hover-bg: rgba(59, 130, 246, 0.1);
-  --table-hover-shadow: transparent;
+  --table-row-hover-bg: rgb(203, 221, 252);
+  --table-hover-shadow: 0 2px 12px rgba(59, 130, 246, 0);
   
   /* Button gradient colors - adjusted for light theme */
   --btn-gradient-1: #f472b6;

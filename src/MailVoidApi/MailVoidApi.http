@@ -1,0 +1,296 @@
+### MailVoid API Testing
+# API Documentation for MailVoid - Developer Email Testing Tool
+# Base URL: http://localhost:5133
+
+@baseUrl = http://localhost:5133
+@contentType = application/json
+
+### Variables (Update these values as needed)
+@username = admin
+@password = admin
+@accessToken = your_access_token_here
+@refreshToken = your_refresh_token_here
+@mailId = 1
+@mailGroupId = 1
+@userId = your_user_id_here
+
+#############################################
+# AUTHENTICATION ENDPOINTS
+#############################################
+
+### 1. Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+    "userName": "{{username}}",
+    "password": "{{password}}"
+}
+
+### 2. Get Current User Info
+GET {{baseUrl}}/api/auth/user
+Authorization: Bearer {{accessToken}}
+
+### 3. Change Password
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "oldPassword": "{{password}}",
+    "newPassword": "newPassword123"
+}
+
+### 4. Refresh Token
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: {{contentType}}
+
+{
+    "accessToken": "{{accessToken}}",
+    "refreshToken": "{{refreshToken}}"
+}
+
+### 5. Revoke Token
+POST {{baseUrl}}/api/auth/revoke
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "refreshToken": "{{refreshToken}}"
+}
+
+### 6. Logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+#############################################
+# MAIL ENDPOINTS
+#############################################
+
+### 7. Get Specific Mail (with optional mark as read)
+GET {{baseUrl}}/api/mail/{{mailId}}?markAsRead=true
+Authorization: Bearer {{accessToken}}
+
+### 8. Get Mail Boxes
+GET {{baseUrl}}/api/mail/boxes?showAll=false
+Authorization: Bearer {{accessToken}}
+
+### 9. Get Mails (with filtering and pagination)
+POST {{baseUrl}}/api/mail
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "page": 1,
+    "pageSize": 20,
+    "to": "test@example.com"
+}
+
+### 10. Get All Mails (no filters)
+POST {{baseUrl}}/api/mail
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "page": 1,
+    "pageSize": 50
+}
+
+### 11. Delete Mail Box
+DELETE {{baseUrl}}/api/mail/boxes
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "to": "test@example.com"
+}
+
+### 12. Mark All Emails as Read (all mailboxes)
+POST {{baseUrl}}/api/mail/mark-all-read
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "mailboxPath": null
+}
+
+### 13. Mark All Emails as Read (specific mailbox)
+POST {{baseUrl}}/api/mail/mark-all-read
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "mailboxPath": "example.com"
+}
+
+#############################################
+# MAIL GROUP ENDPOINTS
+#############################################
+
+### 14. Get Mail Groups
+GET {{baseUrl}}/api/mail/groups
+Authorization: Bearer {{accessToken}}
+
+### 15. Create Mail Group
+POST {{baseUrl}}/api/mail/mail-groups
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "subdomain": "testgroup",
+    "description": "Test mail group",
+    "isPublic": true
+}
+
+### 16. Update Mail Group
+PUT {{baseUrl}}/api/mail/groups/{{mailGroupId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "description": "Updated description",
+    "isPublic": false
+}
+
+### 17. Delete Mail Group
+DELETE {{baseUrl}}/api/mail/mail-groups/{{mailGroupId}}
+Authorization: Bearer {{accessToken}}
+
+### 18. Grant User Access to Mail Group
+POST {{baseUrl}}/api/mail/groups/{{mailGroupId}}/access
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "userId": "{{userId}}"
+}
+
+### 19. Revoke User Access from Mail Group
+DELETE {{baseUrl}}/api/mail/groups/{{mailGroupId}}/access/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+### 20. Get Mail Group Users
+GET {{baseUrl}}/api/mail/groups/{{mailGroupId}}/users
+Authorization: Bearer {{accessToken}}
+
+### 21. Get All Users
+GET {{baseUrl}}/api/mail/users
+Authorization: Bearer {{accessToken}}
+
+#############################################
+# RETENTION SETTINGS
+#############################################
+
+### 22. Get Retention Settings
+GET {{baseUrl}}/api/mail/mailbox/{{mailGroupId}}/retention
+Authorization: Bearer {{accessToken}}
+
+### 23. Update Retention Settings
+PUT {{baseUrl}}/api/mail/mailbox/{{mailGroupId}}/retention
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "retentionDays": 30
+}
+
+### 24. Disable Retention (set to null)
+PUT {{baseUrl}}/api/mail/mailbox/{{mailGroupId}}/retention
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "retentionDays": null
+}
+
+#############################################
+# WEBHOOK ENDPOINTS (Requires API Key)
+#############################################
+
+### 25. Test Webhook (Mail Data)
+POST {{baseUrl}}/api/webhook/mail
+X-API-Key: sendgrid-webhook-key-change-this-in-production
+Content-Type: {{contentType}}
+
+{
+    "from": "sender@example.com",
+    "to": "recipient@test.com",
+    "subject": "Test Email",
+    "text": "This is a test email body",
+    "html": "<p>This is a test email body</p>",
+    "timestamp": "2024-01-01T12:00:00Z"
+}
+
+#############################################
+# HEALTH CHECK
+#############################################
+
+### 26. Health Check
+GET {{baseUrl}}/api/health
+
+#############################################
+# USAGE EXAMPLES
+#############################################
+
+### Complete Authentication Flow Example
+# Step 1: Login to get tokens
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+    "userName": "admin",
+    "password": "admin"
+}
+
+# Step 2: Use the accessToken from login response in subsequent requests
+# Step 3: When token expires, use refresh token to get new tokens
+
+### Complete Mail Management Example
+# Step 1: Get all mailboxes
+GET {{baseUrl}}/api/mail/boxes
+Authorization: Bearer {{accessToken}}
+
+# Step 2: Get mails for a specific mailbox
+POST {{baseUrl}}/api/mail
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "page": 1,
+    "pageSize": 20,
+    "to": "specific@mailbox.com"
+}
+
+# Step 3: Read a specific mail
+GET {{baseUrl}}/api/mail/1?markAsRead=true
+Authorization: Bearer {{accessToken}}
+
+### Mail Group Management Example
+# Step 1: Create a new mail group
+POST {{baseUrl}}/api/mail/mail-groups
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "subdomain": "myteam",
+    "description": "Mail group for my team",
+    "isPublic": false
+}
+
+# Step 2: Grant access to a user
+POST {{baseUrl}}/api/mail/groups/1/access
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "userId": "user-guid-here"
+}
+
+# Step 3: Set retention policy
+PUT {{baseUrl}}/api/mail/mailbox/1/retention
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+    "retentionDays": 90
+}

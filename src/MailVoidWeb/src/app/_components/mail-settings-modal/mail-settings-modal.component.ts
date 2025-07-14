@@ -1,5 +1,4 @@
-
-import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, TemplateRef, viewChild } from '@angular/core';
 import { ModalService } from '../modal/modal.service';
 import { MailGroupComponent } from './mail-group/mail-group.component';
 
@@ -33,6 +32,6 @@ export class MailSettingsModalComponent {
   modalHeader = viewChild<TemplateRef<any>>('modalHeader');
 
   show() {
-    this.modalService.open('Mail Settings', this.modalBody(), undefined, this.modalHeader());
+    this.modalService.openModal('Mail Settings', this.modalBody(), undefined, this.modalHeader());
   }
 }

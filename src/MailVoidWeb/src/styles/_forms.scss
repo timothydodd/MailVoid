@@ -329,3 +329,28 @@ textarea.form-control {
   transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
   appearance: none;
 }
+
+/* Error Display Box */
+.error-box {
+  width: 100%;
+  margin-bottom: 1rem;
+  min-height: 4.5rem;
+  background: var(--bGLighter);
+  border: 2px solid var(--red);
+  border-radius: 5px;
+  font-size: 1rem;
+  color: var(--red);
+  cursor: pointer;
+  padding: 0.75rem;
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+
+  > div {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+  }
+}
+
+.error-box:hover {
+  background-color: var(--bGLight);
+  border-color: var(--red);
+}

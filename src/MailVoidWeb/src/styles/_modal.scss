@@ -4,7 +4,16 @@ body.modal-open {
   // Optionally add padding-right to compensate for scrollbar if needed
   // This prevents layout shift when modal opens
 }
-
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(21, 21, 21, 0.7);
+  z-index: 998;
+  pointer-events: none;
+}
 .modal-wrapper {
   position: fixed;
   top: 0;
@@ -41,16 +50,7 @@ body.modal-open {
   }
 }
 
-.backdrop {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
-  z-index: -1;
-  pointer-events: none;
-}
+
 
 .modal-container {
   position: relative;

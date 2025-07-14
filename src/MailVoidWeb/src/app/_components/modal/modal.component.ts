@@ -8,8 +8,8 @@ import { LucideAngularModule } from 'lucide-angular';
   imports: [CommonModule, LucideAngularModule],
   template: `
     @if (isOpen()) {
+      <div class="backdrop" [@fadeInOut]></div>
       <div class="modal-wrapper" (click)="onBackdropClick($event)">
-        <div class="backdrop" [@fadeInOut]></div>
         <div class="modal-container">
           <div class="modal" [@fadeInOut] (click)="$event.stopPropagation()">
             <div class="modal-header">
@@ -18,7 +18,7 @@ import { LucideAngularModule } from 'lucide-angular';
               } @else {
                 <h4 class="modal-title">{{ title() }}</h4>
               }
-              
+
               <button class="close" aria-label="Close" (click)="close()">
                 <lucide-angular name="x"></lucide-angular>
               </button>

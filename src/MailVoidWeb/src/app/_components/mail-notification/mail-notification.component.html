@@ -1,0 +1,25 @@
+<div class="notification-container">
+  <div 
+    *ngFor="let notification of notifications; let i = index" 
+    @slideIn
+    [@pulse]="pulseState"
+    class="notification-item"
+    [class.show]="notification.show"
+    (click)="removeNotification(i)"
+  >
+    <div class="notification-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="20" height="16" x="2" y="4" rx="2"/>
+        <path d="m22 7-10 5L2 7"/>
+      </svg>
+    </div>
+    <div class="notification-content">
+      <div class="notification-header">
+        <strong>New Email</strong>
+        <span class="notification-time">Just now</span>
+      </div>
+      <div class="notification-subject">{{ notification.subject || '(No Subject)' }}</div>
+      <div class="notification-from">From: {{ notification.from }}</div>
+    </div>
+  </div>
+</div>
