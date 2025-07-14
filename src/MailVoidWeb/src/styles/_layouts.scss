@@ -374,6 +374,7 @@
   padding: 1.5rem;
   gap: 1.5rem;
   position: relative;
+  flex-grow: 1;
 }
 
 .mail-sidebar {
@@ -423,6 +424,7 @@
   margin: 0 auto;
   padding: 1.5rem;
   gap: 1.5rem;
+  flex-grow: 1;
 }
 
 .mail-header {
