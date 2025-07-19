@@ -1,9 +1,17 @@
-import { ApplicationRef, ComponentRef, createComponent, EnvironmentInjector, inject, Injectable, TemplateRef, Type } from '@angular/core';
-import { ModalComponent } from './modal.component';
+import {
+  ApplicationRef,
+  ComponentRef,
+  createComponent,
+  EnvironmentInjector,
+  inject,
+  Injectable,
+  Type,
+} from '@angular/core';
 import { Subject } from 'rxjs';
+import { ModalComponent } from './modal.component';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ModalContainerService {
   private applicationRef = inject(ApplicationRef);
@@ -11,45 +19,40 @@ export class ModalContainerService {
   private modalInstances = new Map<string, ModalInstance>();
   private modalCounter = 0;
 
-  open(config: ModalConfig): ModalRef {
+  openComponent<T>(component: Type<T>, config?: { data?: any }): ModalRef {
     const modalId = `modal-${++this.modalCounter}`;
-    
-    // Create component
-    const componentRef = createComponent(ModalComponent, {
-      environmentInjector: this.injector
+
+    // Create modal wrapper with all nodes (they now have slot attributes)
+    const modalRef = createComponent(ModalComponent, {
+      environmentInjector: this.injector,
     });
 
     // Create modal instance
     const modalInstance: ModalInstance = {
       id: modalId,
-      componentRef,
-      config,
-      closeSubject: new Subject<any>()
+      componentRef: modalRef,
+      config: { data: config?.data },
+      closeSubject: new Subject<any>(),
     };
 
     this.modalInstances.set(modalId, modalInstance);
 
     // Initialize modal with config
-    componentRef.instance.modalId = modalId;
-    componentRef.instance.title.set(config.title);
-    componentRef.instance.bodyTemplate.set(config.body || null);
-    componentRef.instance.footerTemplate.set(config.footer || null);
-    componentRef.instance.headerTemplate.set(config.header || null);
-    
+    modalRef.instance.modalId = modalId;
+
     // Override close method
-    componentRef.instance.close = () => {
+    modalRef.instance.close = () => {
       this.close(modalId);
     };
+    // Insert the content into the modal's ViewContainerRef
+    modalRef.instance.childType.set(component);
+    // Attach both components to application
+    this.applicationRef.attachView(modalRef.hostView);
 
-    // Attach to application
-    this.applicationRef.attachView(componentRef.hostView);
-    
-    // Append to body
-    const domElem = (componentRef.hostView as any).rootNodes[0] as HTMLElement;
-    document.body.appendChild(domElem);
-
+    // Append modal to body
+    const modalDomElem = (modalRef.hostView as any).rootNodes[0] as HTMLElement;
+    document.body.appendChild(modalDomElem);
     // Open modal
-    componentRef.instance.open();
 
     // Update z-index based on stack position
     this.updateZIndexes();
@@ -60,7 +63,53 @@ export class ModalContainerService {
     return {
       id: modalId,
       close: (result?: any) => this.close(modalId, result),
-      onClose: modalInstance.closeSubject.asObservable()
+      onClose: modalInstance.closeSubject.asObservable(),
+    };
+  }
+
+  open(config: ModalConfig): ModalRef {
+    const modalId = `modal-${++this.modalCounter}`;
+
+    // Create component
+    const componentRef = createComponent(ModalComponent, {
+      environmentInjector: this.injector,
+    });
+
+    // Create modal instance
+    const modalInstance: ModalInstance = {
+      id: modalId,
+      componentRef,
+      config,
+      closeSubject: new Subject<any>(),
+    };
+
+    this.modalInstances.set(modalId, modalInstance);
+
+    // Initialize modal with config
+    componentRef.instance.modalId = modalId;
+
+    // Override close method
+    componentRef.instance.close = () => {
+      this.close(modalId);
+    };
+
+    // Attach to application
+    this.applicationRef.attachView(componentRef.hostView);
+
+    // Append to body
+    const domElem = (componentRef.hostView as any).rootNodes[0] as HTMLElement;
+    document.body.appendChild(domElem);
+
+    // Update z-index based on stack position
+    this.updateZIndexes();
+
+    // Handle body scroll
+    this.updateBodyScroll();
+
+    return {
+      id: modalId,
+      close: (result?: any) => this.close(modalId, result),
+      onClose: modalInstance.closeSubject.asObservable(),
     };
   }
 
@@ -72,26 +121,29 @@ export class ModalContainerService {
     modalInstance.closeSubject.next(result);
     modalInstance.closeSubject.complete();
 
-    // Close and destroy component
-    modalInstance.componentRef.instance.isOpen.set(false);
-    
     // Wait for animation to complete before destroying
-    setTimeout(() => {
-      this.applicationRef.detachView(modalInstance.componentRef.hostView);
-      modalInstance.componentRef.destroy();
-      this.modalInstances.delete(modalId);
-      
-      // Update body scroll
-      this.updateBodyScroll();
-      
-      // Update z-indexes
-      this.updateZIndexes();
-    }, 300); // Match animation duration
+
+    this.applicationRef.detachView(modalInstance.componentRef.hostView);
+    modalInstance.componentRef.destroy();
+
+    // Destroy content component if it exists
+    if (modalInstance.contentRef) {
+      this.applicationRef.detachView(modalInstance.contentRef.hostView);
+      modalInstance.contentRef.destroy();
+    }
+
+    this.modalInstances.delete(modalId);
+
+    // Update body scroll
+    this.updateBodyScroll();
+
+    // Update z-indexes
+    this.updateZIndexes();
   }
 
   closeAll(): void {
     const modalIds = Array.from(this.modalInstances.keys());
-    modalIds.forEach(id => this.close(id));
+    modalIds.forEach((id) => this.close(id));
   }
 
   private updateZIndexes(): void {
@@ -99,11 +151,11 @@ export class ModalContainerService {
     this.modalInstances.forEach((instance) => {
       const domElem = (instance.componentRef.hostView as any).rootNodes[0] as HTMLElement;
       const wrapper = domElem.querySelector('.modal-wrapper') as HTMLElement;
-      
+
       if (wrapper) {
         wrapper.style.zIndex = zIndex.toString();
       }
-      
+
       zIndex += 10;
     });
   }
@@ -122,10 +174,6 @@ export class ModalContainerService {
 }
 
 export interface ModalConfig {
-  title: string;
-  body?: TemplateRef<any>;
-  footer?: TemplateRef<any>;
-  header?: TemplateRef<any>;
   data?: any;
 }
 
@@ -138,6 +186,7 @@ export interface ModalRef {
 interface ModalInstance {
   id: string;
   componentRef: ComponentRef<ModalComponent>;
-  config: ModalConfig;
+  config: ModalConfig | { title: string; data?: any };
   closeSubject: Subject<any>;
+  contentRef?: ComponentRef<any>;
 }

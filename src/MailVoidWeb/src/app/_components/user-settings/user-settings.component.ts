@@ -1,87 +1,72 @@
-
-import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../_services/auth-service';
-import { ModalService } from '../modal/modal.service';
+import { ModalContainerService } from '../modal/modal-container.service';
+import { ModalLayoutComponent } from '../modal/modal-layout/modal-layout.component';
 import { UserManagementComponent } from '../user-management/user-management.component';
 import { ChangePasswordComponent } from './change-password/change-password.component';
 
 @Component({
   selector: 'app-user-settings',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, ChangePasswordComponent, UserManagementComponent],
-  template: `
-    <ng-template #modalHeader>
-      <div class="settings-header">
-        <h3 class="settings-title">User Settings</h3>
-        <p class="settings-subtitle">Manage your account and system settings</p>
-      </div>
-    </ng-template>
+  imports: [FormsModule, LucideAngularModule, ChangePasswordComponent, UserManagementComponent, ModalLayoutComponent],
+  template: ` <app-modal-layout>
+    <div slot="header" class="settings-header">
+      <h3 class="settings-title">User Settings</h3>
+      <p class="settings-subtitle">Manage your account and system settings</p>
+    </div>
 
-    <ng-template #modalBody>
-      <div class="user-settings-container">
-        <!-- Sub Header with Navigation Tabs -->
-        <div class="settings-subheader">
-          <div class="settings-nav">
-            <button 
-              class="nav-tab" 
-              [class.active]="activeTab() === 'account'"
-              (click)="setActiveTab('account')">
-              Account
+    <div slot="body" class="user-settings-container">
+      <!-- Sub Header with Navigation Tabs -->
+      <div class="settings-subheader">
+        <div class="settings-nav">
+          <button class="nav-tab" [class.active]="activeTab() === 'account'" (click)="setActiveTab('account')">
+            Account
+          </button>
+          @if (isAdmin()) {
+            <button class="nav-tab" [class.active]="activeTab() === 'users'" (click)="setActiveTab('users')">
+              Manage Users
             </button>
-            @if (isAdmin()) {
-              <button 
-                class="nav-tab" 
-                [class.active]="activeTab() === 'users'"
-                (click)="setActiveTab('users')">
-                Manage Users
-              </button>
+          }
+        </div>
+      </div>
+
+      <!-- Content Sections -->
+      <div class="settings-content">
+        @if (activeTab() === 'account') {
+          <div class="account-section">
+            <h4>Change Password</h4>
+            @if (changePassword()) {
+              <app-change-password (saveEvent)="changePassword.set(false)"></app-change-password>
+            } @else {
+              <button class="btn btn-primary" (click)="changePassword.set(true)">Change Password</button>
             }
           </div>
-        </div>
-        
-        <!-- Content Sections -->
-        <div class="settings-content">
-          @if (activeTab() === 'account') {
-            <div class="account-section">
-              <h4>Change Password</h4>
-              @if (changePassword()) {
-                <app-change-password (saveEvent)="changePassword.set(false)"></app-change-password>
-              } @else {
-                <button class="btn btn-primary" (click)="changePassword.set(true)">Change Password</button>
-              }
-            </div>
-          }
-          @if (activeTab() === 'users' && isAdmin()) {
-            <app-user-management></app-user-management>
-          }
-        </div>
-      </div>
-    </ng-template>
-    
-    <ng-template #modalFooter>
-      <div>
-        @if (errorMessage()) {
-          <div class="text-danger">{{ errorMessage() }}</div>
+        }
+        @if (activeTab() === 'users' && isAdmin()) {
+          <app-user-management></app-user-management>
         }
       </div>
-    </ng-template>`,
+    </div>
+
+    <div slot="footer">
+      @if (errorMessage()) {
+        <div class="text-danger">{{ errorMessage() }}</div>
+      }
+    </div>
+  </app-modal-layout>`,
   styleUrl: './user-settings.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UserSettingsComponent {
-  modalService = inject(ModalService);
   authService = inject(AuthService);
-  modalFooter = viewChild<TemplateRef<any>>('modalFooter');
-  modalBody = viewChild<TemplateRef<any>>('modalBody');
-  modalHeader = viewChild<TemplateRef<any>>('modalHeader');
   errorMessage = signal('');
   changePassword = signal(false);
   activeTab = signal<'account' | 'users'>('account');
 
-  show() {
-    this.modalService.open('User Settings', this.modalBody(), this.modalFooter(), this.modalHeader());
+  static show(modalContainerService: ModalContainerService) {
+    return modalContainerService.openComponent(UserSettingsComponent);
   }
 
   setActiveTab(tab: 'account' | 'users') {

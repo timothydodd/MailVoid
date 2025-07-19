@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, combineLatest, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
+import { ModalContainerService } from '../../_components/modal/modal-container.service';
 import {
   FilterOptions,
   MailBox,
@@ -42,7 +43,7 @@ type SortDirection = 'asc' | 'desc';
             >
               <lucide-icon name="inbox" size="20"></lucide-icon>
             </button>
-            <button class="btn btn-icon" (click)="mailSettings.show()" title="Mail Settings">
+            <button class="btn btn-icon" (click)="mailSettingsClick()" title="Mail Settings">
               <lucide-icon name="cog" size="20"></lucide-icon>
             </button>
           </div>
@@ -140,12 +141,12 @@ type SortDirection = 'asc' | 'desc';
         }
       </div>
     </div>
-    <app-mail-settings-modal #mailSettings></app-mail-settings-modal>
   `,
   styleUrl: './mail.component.scss',
 })
 export class MailComponent {
   router = inject(Router);
+  modalContainerService = inject(ModalContainerService);
   mailService = inject(MailService);
   lastSeenService = inject(LastSeenService);
   mobileMenuService = inject(MobileMenuService);
@@ -334,7 +335,9 @@ export class MailComponent {
     this.updateLastSeen(box);
     this.closeMobileMenu();
   }
-
+  mailSettingsClick() {
+    MailSettingsModalComponent.show(this.modalContainerService);
+  }
   private updateLastSeen(box: string | null) {
     if (!box) return; // Don't track "Show All"
 

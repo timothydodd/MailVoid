@@ -1,37 +1,31 @@
-import { ChangeDetectionStrategy, Component, inject, TemplateRef, viewChild } from '@angular/core';
-import { ModalService } from '../modal/modal.service';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ModalContainerService } from '../modal/modal-container.service';
+import { ModalLayoutComponent } from '../modal/modal-layout/modal-layout.component';
 import { MailGroupComponent } from './mail-group/mail-group.component';
 
 @Component({
   selector: 'app-mail-settings-modal',
-  imports: [MailGroupComponent],
+  imports: [MailGroupComponent, ModalLayoutComponent],
   template: `
-    <ng-template #modalHeader>
-      <div class="settings-header">
+    <app-modal-layout>
+      <div slot="header" class="settings-header">
         <h3 class="settings-title">Mail Settings</h3>
         <p class="settings-subtitle">Manage your mail groups</p>
       </div>
-    </ng-template>
 
-    <ng-template #modalBody>
-      <div class="mail-settings-container">
+      <div slot="body" class="mail-settings-container">
         <!-- Content -->
         <div class="settings-content">
           <app-mail-group></app-mail-group>
         </div>
       </div>
-    </ng-template>
+    </app-modal-layout>
   `,
   styleUrl: './mail-settings-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MailSettingsModalComponent {
-  modalService = inject(ModalService);
-  modalFooter = viewChild<TemplateRef<any>>('modalFooter');
-  modalBody = viewChild<TemplateRef<any>>('modalBody');
-  modalHeader = viewChild<TemplateRef<any>>('modalHeader');
-
-  show() {
-    this.modalService.openModal('Mail Settings', this.modalBody(), undefined, this.modalHeader());
+  static show(modalContainerService: ModalContainerService) {
+    return modalContainerService.openComponent(MailSettingsModalComponent);
   }
 }

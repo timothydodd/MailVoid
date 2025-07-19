@@ -1,7 +1,6 @@
 import { Component, inject, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ModalService } from './modal.service';
-import { ModalRef } from './modal-container.service';
+import { ModalContainerService, ModalRef } from './modal-container.service';
 
 @Component({
   selector: 'app-modal-example',
@@ -49,18 +48,18 @@ export class ModalExampleComponent {
   @ViewChild('secondModalFooter', { static: true }) secondModalFooter!: TemplateRef<any>;
   @ViewChild('nestedModalBody', { static: true }) nestedModalBody!: TemplateRef<any>;
   
-  modalService = inject(ModalService);
+  modalContainerService = inject(ModalContainerService);
   
   private firstModalRef?: ModalRef;
   private secondModalRef?: ModalRef;
   modalResult: any = null;
   
   openFirstModal() {
-    this.firstModalRef = this.modalService.openModal(
-      'First Modal',
-      this.firstModalBody,
-      this.firstModalFooter
-    );
+    this.firstModalRef = this.modalContainerService.open({
+      title: 'First Modal',
+      body: this.firstModalBody,
+      footer: this.firstModalFooter
+    });
     
     this.firstModalRef.onClose.subscribe(result => {
       console.log('First modal closed with result:', result);
@@ -68,11 +67,11 @@ export class ModalExampleComponent {
   }
   
   openSecondModal() {
-    this.secondModalRef = this.modalService.openModal(
-      'Second Modal',
-      this.secondModalBody,
-      this.secondModalFooter
-    );
+    this.secondModalRef = this.modalContainerService.open({
+      title: 'Second Modal',
+      body: this.secondModalBody,
+      footer: this.secondModalFooter
+    });
     
     this.secondModalRef.onClose.subscribe(result => {
       console.log('Second modal closed with result:', result);
@@ -80,12 +79,19 @@ export class ModalExampleComponent {
   }
   
   openNestedModals() {
-    const modal1 = this.modalService.openModal('Modal 1', this.firstModalBody, this.firstModalFooter);
+    const modal1 = this.modalContainerService.open({
+      title: 'Modal 1',
+      body: this.firstModalBody,
+      footer: this.firstModalFooter
+    });
     
     modal1.onClose.subscribe(result => {
       this.modalResult = result || 'No result from Modal 1';
       
-      const modal2 = this.modalService.openModal('Modal 2', this.nestedModalBody);
+      const modal2 = this.modalContainerService.open({
+        title: 'Modal 2',
+        body: this.nestedModalBody
+      });
       
       modal2.onClose.subscribe(result2 => {
         console.log('All modals closed');
@@ -106,6 +112,6 @@ export class ModalExampleComponent {
   }
   
   closeAllModals() {
-    this.modalService.closeAll();
+    this.modalContainerService.closeAll();
   }
 }

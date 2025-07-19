@@ -1,43 +1,22 @@
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, signal, TemplateRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, Type } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
+import { ModalContainerService } from './modal-container.service';
 
 @Component({
   selector: 'app-modal',
   imports: [CommonModule, LucideAngularModule],
   template: `
-    @if (isOpen()) {
-      <div class="backdrop" [@fadeInOut]></div>
-      <div class="modal-wrapper" (click)="onBackdropClick($event)">
-        <div class="modal-container">
-          <div class="modal" [@fadeInOut] (click)="$event.stopPropagation()">
-            <div class="modal-header">
-              @if (headerTemplate()) {
-                <ng-container *ngTemplateOutlet="headerTemplate()!"></ng-container>
-              } @else {
-                <h4 class="modal-title">{{ title() }}</h4>
-              }
-
-              <button class="close" aria-label="Close" (click)="close()">
-                <lucide-angular name="x"></lucide-angular>
-              </button>
-            </div>
-
-            <div class="modal-body">
-              @if (bodyTemplate()) {
-                <ng-container *ngTemplateOutlet="bodyTemplate()!"> </ng-container>
-              }
-            </div>
-            @if (footerTemplate()) {
-              <div class="modal-footer">
-                <ng-container *ngTemplateOutlet="footerTemplate()!"> </ng-container>
-              </div>
-            }
-          </div>
+    <div class="backdrop" [@fadeInOut]></div>
+    <div class="modal-wrapper" (click)="onBackdropClick($event)">
+      <div class="modal-container">
+        <div class="modal" [@fadeInOut] (click)="$event.stopPropagation()">
+          <ng-container [ngComponentOutlet]="childType()"></ng-container>
         </div>
       </div>
-    }
+    </div>
+    <!-- Add this placeholder -->
   `,
   styleUrl: './modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -54,20 +33,14 @@ import { LucideAngularModule } from 'lucide-angular';
   ],
 })
 export class ModalComponent {
+  modalContainerService = inject(ModalContainerService);
   modalId?: string;
-  footerTemplate = signal<TemplateRef<any> | null | undefined>(null);
-  bodyTemplate = signal<TemplateRef<any> | null | undefined>(null);
-  headerTemplate = signal<TemplateRef<any> | null | undefined>(null);
-  isOpen = signal(false);
-  title = signal<string | null>(null);
+
   closeOnBackdropClick = true;
-
+  childType = signal<Type<any> | null>(null);
+  constructor() {}
   close() {
-    // This will be overridden by the container service
-  }
-
-  open() {
-    this.isOpen.set(true);
+    if (this.modalId) this.modalContainerService.close(this.modalId);
   }
 
   onBackdropClick(event: Event) {

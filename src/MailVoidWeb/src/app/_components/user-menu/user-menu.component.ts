@@ -1,11 +1,10 @@
-
-import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 
 import { LucideAngularModule } from 'lucide-angular';
 import { take } from 'rxjs';
 import { AuthService, User } from '../../_services/auth-service';
 import { ClickOutsideDirective } from '../../_services/click-outside.directive';
-import { ModalService } from '../modal/modal.service';
+import { ModalContainerService } from '../modal/modal-container.service';
 import { UserSettingsComponent } from '../user-settings/user-settings.component';
 
 @Component({
@@ -33,13 +32,11 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
           </div>
 
           <div class="divider"></div>
-          <button dropdown-item (click)="settings.show()">Settings</button>
+          <button dropdown-item (click)="settingsClick()">Settings</button>
           <div class="divider"></div>
           <button dropdown-item (click)="logOut()">LogOut</button>
         </div>
       }
-
-      <app-user-settings #settings></app-user-settings>
     }
   `,
   styleUrl: './user-menu.component.scss',
@@ -47,9 +44,7 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
 })
 export class UserMenuComponent {
   authService = inject(AuthService);
-  modalService = inject(ModalService);
-  modalFooter = viewChild<TemplateRef<any>>('modalFooter');
-  modalBody = viewChild<TemplateRef<any>>('modalBody');
+  modalContainerService = inject(ModalContainerService);
   user = signal<User | null>(null);
   isOpen = signal(false);
   constructor() {
@@ -63,5 +58,8 @@ export class UserMenuComponent {
 
   logOut() {
     this.authService.logout();
+  }
+  settingsClick() {
+    UserSettingsComponent.show(this.modalContainerService);
   }
 }

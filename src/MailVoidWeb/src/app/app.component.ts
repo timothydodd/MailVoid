@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ModalService } from './_components/modal/modal.service';
+import { ModalContainerService } from './_components/modal/modal-container.service';
 import { ValidationDefaultsComponent } from './_components/validation-defaults/validation-defaults.component';
 import { AuthService } from './_services/auth-service';
 import { MainNavBarComponent } from './Pages/main-nav-bar/main-nav-bar.component';
@@ -18,7 +18,7 @@ import { MailNotificationComponent } from './_components/mail-notification/mail-
 })
 export class AppComponent implements OnInit, OnDestroy {
   title = 'MailVoid';
-  modalService = inject(ModalService);
+  modalContainerService = inject(ModalContainerService);
   authService = inject(AuthService);
   themeService = inject(ThemeService);
   signalRService = inject(SignalRService);
