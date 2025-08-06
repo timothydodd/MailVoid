@@ -1,33 +1,43 @@
 // @ts-check
-const prettierPlugin = require('eslint-plugin-prettier');
-const typescriptParser = require('@typescript-eslint/parser');
-const tsPlugin = require('@typescript-eslint/eslint-plugin');
-const angularPlugin = require('@angular-eslint/eslint-plugin');
-const angularTemplateParser = require('@angular-eslint/template-parser');
-const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
+const typescript = require('@typescript-eslint/eslint-plugin');
+const tsParser = require('@typescript-eslint/parser');
+const angular = require('@angular-eslint/eslint-plugin');
+const angularTemplate = require('@angular-eslint/eslint-plugin-template');
+const templateParser = require('@angular-eslint/template-parser');
+const prettier = require('eslint-plugin-prettier');
+const prettierConfig = require('eslint-config-prettier');
+
 module.exports = [
   {
-    ignores: ['.cache/', '.git/', '.github/', 'node_modules/'],
+    ignores: ['dist/', 'node_modules/', '.angular/', '.cache/', '.git/', '.github/', 'coverage/', '**/*.d.ts'],
   },
+  // TypeScript files
   {
     files: ['**/*.ts'],
     languageOptions: {
-      parser: typescriptParser,
+      parser: tsParser,
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.app.json', './tsconfig.spec.json'],
+        project: ['./tsconfig.json', './projects/*/tsconfig.*.json'],
+        createDefaultProgram: true,
       },
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
-      '@angular-eslint': angularPlugin,
-      prettier: prettierPlugin,
+      '@typescript-eslint': typescript,
+      '@angular-eslint': angular,
+      prettier,
     },
     rules: {
-      ...tsPlugin.configs.recommended.rules,
-      ...angularPlugin.configs.recommended.rules,
-      ...prettierPlugin.configs?.rules,
+      // TypeScript recommended rules
+      ...typescript.configs.recommended.rules,
+      // Angular recommended rules
+      ...angular.configs.recommended.rules,
+      // Prettier rules
+      ...prettierConfig.rules,
+      'prettier/prettier': 'error',
+
+      // Angular-specific rules
       '@angular-eslint/directive-selector': [
-        'warn',
+        'error',
         {
           type: 'attribute',
           prefix: 'app',
@@ -35,36 +45,59 @@ module.exports = [
         },
       ],
       '@angular-eslint/component-selector': [
-        'warn',
+        'error',
         {
           type: 'element',
-          prefix: 'app',
           style: 'kebab-case',
         },
       ],
-      'import/order': 'off',
-      '@typescript-eslint/no-explicit-any': ['off'],
-      '@typescript-eslint/member-ordering': 0,
-      '@typescript-eslint/naming-convention': 0,
+      '@angular-eslint/prefer-standalone': 'warn',
+      '@angular-eslint/prefer-on-push-component-change-detection': 'warn',
+
+      // TypeScript rules customization
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-inferrable-types': 'off',
+      '@typescript-eslint/ban-types': 'off',
+
+      // Disabled rules for legacy code compatibility
       '@angular-eslint/no-host-metadata-property': 'off',
       '@angular-eslint/no-output-on-prefix': 'off',
-      '@typescript-eslint/ban-types': 'off',
-      '@typescript-eslint/no-inferrable-types': 'off',
+      '@typescript-eslint/member-ordering': 'off',
+      '@typescript-eslint/naming-convention': 'off',
     },
   },
+  // Angular templates
   {
     files: ['**/*.html'],
     languageOptions: {
-      parser: angularTemplateParser,
+      parser: templateParser,
     },
     plugins: {
-      '@angular-eslint': angularPlugin,
-      '@angular-eslint/template': angularPlugin,
-      prettier: prettierPlugin,
+      '@angular-eslint/template': angularTemplate,
+      prettier,
     },
     rules: {
+      // Angular template recommended rules
+      ...angularTemplate.configs.recommended.rules,
+      // Prettier for templates
       'prettier/prettier': ['error', { parser: 'angular' }],
+
+      // Custom template rules
+      '@angular-eslint/template/prefer-self-closing-tags': 'error',
+      '@angular-eslint/template/conditional-complexity': ['error', { maxComplexity: 3 }],
+      '@angular-eslint/template/cyclomatic-complexity': ['error', { maxComplexity: 5 }],
+      '@angular-eslint/template/use-track-by-function': 'error',
     },
   },
-  eslintPluginPrettierRecommended,
+  // Special overrides for app.component.ts files
+  {
+    files: ['**/app.component.ts'],
+    rules: {
+      '@angular-eslint/prefer-standalone': 'off',
+      '@angular-eslint/prefer-on-push-component-change-detection': 'off',
+    },
+  },
 ];

@@ -8,7 +8,7 @@ MailVoid is a developer email testing tool with two main components:
 - **Backend API**: C# .NET 9 web API that manages emails, authentication, and webhook integration
 - **Frontend**: Angular 19 web application for viewing and managing test emails
 
-The application receives webhook events from SendGrid and stores emails in a MySQL database for developers to view through the web interface.
+The application receives webhook events from your mail server and stores emails in a MySQL database for developers to view through the web interface.
 
 ## Architecture
 
@@ -19,7 +19,8 @@ The application receives webhook events from SendGrid and stores emails in a MyS
 - **Data**: MailVoidDbContext for Entity Framework Core database operations
 - **Common**: Shared utilities including pagination, caching (TimedCache), and database extensions
 - **Authentication**: JWT-based authentication with refresh token support
-- **Database**: MySQL with Entity Framework Core and Pomelo MySQL provider
+- **Database**: MySQL with Entity Framework Core 8 and Pomelo MySQL provider
+- **Real-time**: SignalR hub for real-time email notifications
 
 ### Frontend (src/MailVoidWeb/)
 - **Architecture**: Angular 19 standalone components with reactive forms and routing
@@ -27,6 +28,8 @@ The application receives webhook events from SendGrid and stores emails in a MyS
 - **Services**: HttpClient-based API services with auth guards and interceptors
 - **Components**: Organized into Pages/ and _components/ directories
 - **Styling**: SCSS with Bootstrap-based custom styling system
+- **Real-time**: SignalR client for receiving live email notifications
+- **State Management**: BehaviorSubject patterns for reactive state management
 
 ## Development Commands
 
@@ -36,6 +39,7 @@ The application receives webhook events from SendGrid and stores emails in a MyS
 dotnet run                    # Run API (also starts frontend via SPA proxy)
 dotnet build                  # Build the API
 dotnet test                   # Run tests (if any exist)
+dotnet ef database update     # Apply database migrations
 ```
 
 ### Frontend (Angular)
@@ -95,15 +99,45 @@ npm run format                # Format code with Prettier
 ## Database Schema
 - **User**: Authentication and user data
 - **Mail**: Email storage with grouping support
-- **MailGroup**: Rules-based email organization
+- **MailGroup**: Rules-based email organization with retention policies
 - **RefreshToken**: Secure token rotation for authentication
+- **UserMailRead**: Tracking read status for emails per user
 
 ## Default Credentials
 - Username: admin
 - Password: admin
 
 ## API Endpoints
-- `/api/auth/*`: Authentication endpoints
+- `/api/auth/*`: Authentication endpoints (login, logout, refresh)
 - `/api/mail/*`: Email management and retrieval
+- `/api/mailgroup/*`: Mail group management
+- `/api/user/*`: User management and settings
 - `/api/health`: Health check endpoint
-- External webhook endpoint for SendGrid integration
+- `/webhooks/mail`: Mail server webhook endpoint
+- `/mailHub`: SignalR hub for real-time notifications
+
+## Dependencies
+
+### Backend NuGet Packages
+- Microsoft.AspNetCore.Authentication.JwtBearer (9.0.8)
+- Microsoft.EntityFrameworkCore (8.0.17) - Using v8 for Pomelo compatibility
+- Pomelo.EntityFrameworkCore.MySql (8.0.3)
+- Microsoft.AspNetCore.SpaProxy (9.0.8)
+- AspNetCore.HealthChecks.MySql (9.0.0)
+- Microsoft.Extensions.Caching.Memory (9.0.8)
+- Microsoft.Extensions.Diagnostics.HealthChecks (9.0.8)
+
+### Frontend NPM Packages
+- Angular 19 (v20.1.5) - Core framework
+- @auth0/angular-jwt - JWT token management
+- @ng-select/ng-select - Enhanced select components
+- @microsoft/signalr - Real-time communication
+- lucide-angular - Icon library
+- ngx-toastr - Toast notifications
+- ngx-valdemort - Form validation
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

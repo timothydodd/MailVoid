@@ -1,70 +1,185 @@
-
-
 # MailVoid
-MailVoid is a simple yet powerful tool designed for developers who need to manage multiple test emails without the hassle of creating multiple email accounts.
+
+MailVoid is a developer-focused email testing tool that simplifies managing multiple test email addresses without creating separate email accounts. It integrates with your mail server via webhooks to capture and organize test emails in a clean web interface.
+
 ![image](https://github.com/user-attachments/assets/320b036f-b522-44d7-8be3-b23d3f610128)
 
 > [!WARNING]  
- This project is currently in prototype status. Please be aware that things might change often
+> This project is currently in prototype status. Expect frequent changes and updates.
 
-## Features
-- API: Built with C# .NET 9, the API contains endpoints for the web frontend and an endpoint that receives webhook events from SendGrid.
-- Frontend: A simple web view of the different mailboxes received from a particular domain, coded in Angular 19.
-- Authentication: Uses JWT Auth 
-- Database: Requires a MySQL database to store emails.
+## 🚀 Features
 
-## Requirements
-.NET 9
-MySQL
-Angular 19
-SendGrid account
-
-## Setup
-
-Backend
-- Clone the repository:
-``` bash
-git clone https://github.com/timothydodd/MailVoid.git
-```
-
-- Navigate to the API project directory:
-``` bash
-cd src/MailVoidApi
-```
-
-- Update the appsettings.json file with your MySQL and JwtSettings config the Secret must be a SymmetricSecurityKey.
-```
-dotnet run 
-```
-This will also run the front end.
-
-
-## Frontend
-- Navigate to the Web project directory:
-```
-cd MailVoid/src/MailVoidWeb
-```
-- Update the environment.ts file with your Own  configuration (if using).
-- Install Angular dependencies:
-  ```
-  npm install
-  ```
-- Run the Angular project:
-  ```
-  npm start
-  ```
+- **Backend API**: RESTful API built with C# .NET 9
+  - JWT-based authentication with refresh token rotation
+  - Webhook integration for email capture from your mail server
+  - Health check endpoints for monitoring
+  - Real-time notifications via SignalR
   
-## Usage
-1. Access the frontend at http://localhost:6200.
-2. Log in using default credentials user/pass is admin
-3. View and manage the emails received from your specified domain.
- 
-##Contributing
-This project is in prototype phase so contributions will be welcome, but I would wait until project is closer to 1.0.
+- **Web Frontend**: Modern Angular 19 SPA
+  - Clean, responsive interface for email management
+  - Email grouping and organization
+  - User settings and password management
+  - Real-time email notifications
+  
+- **Database**: MySQL with Entity Framework Core
+  - Efficient email storage and retrieval
+  - User management and authentication
+  - Email grouping with retention policies
 
-License
-This project is licensed under the MIT License.
+## 📋 Requirements
 
-Acknowledgments
-SendGrid
-Microsoft 
+- .NET 9 SDK
+- Node.js 18+ and npm
+- MySQL 8.0+
+- Mail server with webhook support
+
+## 🛠️ Installation
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/timothydodd/MailVoid.git
+cd MailVoid
+```
+
+### Backend Setup
+
+1. Navigate to the API directory:
+   ```bash
+   cd src/MailVoidApi
+   ```
+
+2. Configure your settings in `appsettings.json`:
+   ```json
+   {
+     "ConnectionStrings": {
+       "DefaultConnection": "Server=localhost;Database=mailvoid;User=root;Password=yourpassword;"
+     },
+     "JwtSettings": {
+       "Secret": "your-256-bit-secret-key-here",
+       "Issuer": "MailVoidApi",
+       "Audience": "MailVoidClient",
+       "ExpiryMinutes": 15
+     }
+   }
+   ```
+
+3. Run database migrations:
+   ```bash
+   dotnet ef database update
+   ```
+
+4. Start the API (this also serves the frontend in production):
+   ```bash
+   dotnet run
+   ```
+
+### Frontend Setup (Development)
+
+1. Navigate to the web directory:
+   ```bash
+   cd src/MailVoidWeb
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure the API endpoint in `src/environments/environment.ts` if needed
+
+4. Start the development server:
+   ```bash
+   npm start
+   ```
+
+## 🎯 Usage
+
+1. Access the application at `http://localhost:8200` (development) or `http://localhost:5133` (production)
+2. Log in with default credentials:
+   - Username: `admin`
+   - Password: `admin`
+3. Configure your mail server to send webhooks to your API endpoint
+4. Start receiving and managing test emails!
+
+## 📝 Available Scripts
+
+### Backend (.NET API)
+```bash
+dotnet run        # Run the API with frontend proxy
+dotnet build      # Build the project
+dotnet test       # Run tests
+```
+
+### Frontend (Angular)
+```bash
+npm start         # Start development server
+npm run build     # Build for production
+npm run lint      # Run ESLint
+npm run format    # Format code with Prettier
+npm test          # Run unit tests
+```
+
+## 🐳 Docker Support
+
+Build and run with Docker:
+
+```bash
+docker build -f src/MailVoidApi/Dockerfile -t mailvoid .
+docker run -p 5133:80 mailvoid
+```
+
+## 🧪 Development
+
+### Technologies Used
+
+**Backend:**
+- .NET 9
+- Entity Framework Core 8 with Pomelo MySQL provider
+- JWT Authentication
+- SignalR for real-time updates
+
+**Frontend:**
+- Angular 19 with standalone components
+- RxJS for reactive programming
+- Lucide icons
+- Bootstrap-based custom styling
+- ngx-toastr for notifications
+- @ng-select for enhanced dropdowns
+
+### Project Structure
+
+```
+MailVoid/
+├── src/
+│   ├── MailVoidApi/          # .NET Backend API
+│   │   ├── Controllers/      # API endpoints
+│   │   ├── Services/         # Business logic
+│   │   ├── Models/          # Entity models
+│   │   └── Data/            # EF Core context
+│   └── MailVoidWeb/         # Angular Frontend
+│       ├── src/app/
+│       │   ├── Pages/       # Page components
+│       │   ├── _components/ # Shared components
+│       │   └── _services/   # Angular services
+│       └── src/styles/      # Global styles
+└── .github/workflows/       # CI/CD pipelines
+```
+
+## 🤝 Contributing
+
+This project is in prototype phase. Contributions are welcome but please wait until we're closer to v1.0 for major changes. Feel free to:
+
+1. Report bugs and issues
+2. Suggest new features
+3. Submit pull requests for fixes
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- [Microsoft](https://microsoft.com/) for .NET and development tools
+- [Angular](https://angular.io/) for the frontend framework
+- [Pomelo](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql) for MySQL EF Core provider

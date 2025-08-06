@@ -209,7 +209,7 @@ Content-Type: {{contentType}}
 
 ### 25. Test Webhook (Mail Data)
 POST {{baseUrl}}/api/webhook/mail
-X-API-Key: sendgrid-webhook-key-change-this-in-production
+X-API-Key: webhook-api-key-change-this-in-production
 Content-Type: {{contentType}}
 
 {
