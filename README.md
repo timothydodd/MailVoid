@@ -29,7 +29,7 @@ MailVoid is a developer-focused email testing tool that simplifies managing mult
 ## 📋 Requirements
 
 - .NET 9 SDK
-- Node.js 18+ and npm
+- Node.js 20.19+ and npm
 - MySQL 8.0+
 - Mail server with webhook support
 
