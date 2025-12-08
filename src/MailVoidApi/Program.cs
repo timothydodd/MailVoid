@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.IO.Compression;
 using System.Text;
 using MailVoidApi.Authentication;
@@ -10,8 +10,6 @@ using MailVoidWeb;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.IdentityModel.Tokens;
 
 namespace MailVoidApi;
@@ -41,6 +39,7 @@ public class Program
         builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
         builder.Services.AddHostedService<BackgroundWorkerService>();
         builder.Services.AddHostedService<MailCleanupService>();
+        builder.Services.AddHostedService<WebhookCleanupService>();
         builder.Services.AddControllers();
         builder.Services.AddSignalR();
         builder.Services.AddMemoryCache();
@@ -53,11 +52,8 @@ public class Program
             throw new InvalidOperationException("Connection string not found");
         }
 
-        // Add Entity Framework DbContext
-        builder.Services.AddDbContext<MailVoidDbContext>(options =>
-            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
-                mysqlOptions => mysqlOptions.MigrationsAssembly("MailVoidApi")));
-
+        // Add OrmLite Database Service
+        builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
 
         builder.Services.AddScoped<DatabaseInitializer>();
         builder.Services.AddSingleton<PasswordService>();
@@ -101,7 +97,7 @@ public class Program
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                     if (!string.IsNullOrEmpty(context.Error))
                     {
-                        logger.LogWarning("JWT Challenge - Error: {Error}, Description: {ErrorDescription}, Path: {Path}", 
+                        logger.LogWarning("JWT Challenge - Error: {Error}, Description: {ErrorDescription}, Path: {Path}",
                             context.Error, context.ErrorDescription, context.Request.Path);
                     }
                     return Task.CompletedTask;
@@ -109,7 +105,7 @@ public class Program
                 OnTokenValidated = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                    logger.LogDebug("JWT Token validated successfully for user {User} on path {Path}", 
+                    logger.LogDebug("JWT Token validated successfully for user {User} on path {Path}",
                         context.Principal?.Identity?.Name, context.Request.Path);
                     return Task.CompletedTask;
                 },
@@ -144,6 +140,7 @@ public class Program
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<UserManagementService>();
         builder.Services.AddScoped<IMailDataExtractionService, MailDataExtractionService>();
+        builder.Services.AddScoped<IWebhookBucketService, WebhookBucketService>();
         builder.Services.AddSingleton<TimedCache>();
         builder.Services.AddLogging(logging =>
         {
@@ -196,10 +193,10 @@ public class Program
 
         HealthCheck.AddHealthChecks(builder.Services, connectionString);
         var app = builder.Build();
-        
+
         // Add request logging middleware
         app.UseMiddleware<RequestLoggingMiddleware>();
-        
+
         if (app.Environment.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
@@ -209,53 +206,21 @@ public class Program
             app.UseMiddleware<ExceptionHandlingMiddleware>();
         }
 
-        // Initialize database
+        // Initialize database tables and seed data
         using (var scope = app.Services.CreateScope())
         {
-            var context = scope.ServiceProvider.GetRequiredService<MailVoidDbContext>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            var dbService = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
 
             try
             {
-                logger.LogInformation("Testing database connection...");
-                var canConnect = context.Database.CanConnect();
-                logger.LogInformation("Database connection test: {CanConnect}", canConnect);
-
-                logger.LogInformation("Checking applied migrations...");
-                var appliedMigrations = context.Database.GetAppliedMigrations().ToList();
-                logger.LogInformation("Applied migrations: {AppliedMigrations}",
-                    appliedMigrations.Any() ? string.Join(", ", appliedMigrations) : "None");
-
-                logger.LogInformation("Checking migrations assembly info...");
-                var migrationsAssembly = context.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>();
-                logger.LogInformation("Migrations assembly: {Assembly}", migrationsAssembly.Assembly.FullName);
-
-                logger.LogInformation("Checking all migrations...");
-                var allMigrations = context.Database.GetMigrations().ToList();
-                logger.LogInformation("All available migrations: {AllMigrations}",
-                    allMigrations.Any() ? string.Join(", ", allMigrations) : "None");
-
-                logger.LogInformation("Checking for pending migrations...");
-                var pendingMigrations = context.Database.GetPendingMigrations().ToList();
-
-                if (pendingMigrations.Any())
-                {
-                    logger.LogInformation("Found {Count} pending migrations: {Migrations}",
-                        pendingMigrations.Count, string.Join(", ", pendingMigrations));
-
-                    // Apply any pending migrations
-                    logger.LogInformation("Applying migrations...");
-                    context.Database.Migrate();
-                    logger.LogInformation("Migrations applied successfully.");
-                }
-                else
-                {
-                    logger.LogInformation("Database is up to date, no migrations to apply.");
-                }
+                logger.LogInformation("Initializing database...");
+                await dbService.InitializeAsync();
+                logger.LogInformation("Database initialized successfully.");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error during database migration");
+                logger.LogError(ex, "Error during database initialization");
                 throw;
             }
 

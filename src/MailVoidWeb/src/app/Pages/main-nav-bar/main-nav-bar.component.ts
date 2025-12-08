@@ -18,12 +18,25 @@ import { ThemeService } from '../../_services/theme.service';
       <div class="navbar-container">
         <img src="logo-s.png" width="32" alt="Logo" class="navbar-logo" />
 
+        @if (user() !== null) {
+          <div class="navbar-nav">
+            <a routerLink="/mail" routerLinkActive="active" class="nav-link">
+              <lucide-icon name="mail" size="18"></lucide-icon>
+              <span>Mail</span>
+            </a>
+            <a routerLink="/hooks" routerLinkActive="active" class="nav-link">
+              <lucide-icon name="webhook" size="18"></lucide-icon>
+              <span>Hooks</span>
+            </a>
+          </div>
+        }
+
         @if (templateRef()) {
           <div class="navbar-toolbar">
             <ng-container *ngTemplateOutlet="templateRef()"></ng-container>
           </div>
         }
-        
+
         <div class="navbar-actions">
           @if (user() !== null) {
             <button class="btn btn-icon mobile-menu-btn" (click)="onMobileMenuClick()" title="Mailboxes">

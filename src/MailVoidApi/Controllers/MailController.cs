@@ -1,4 +1,5 @@
-﻿using MailVoidApi.Common;
+using Dapper;
+using MailVoidApi.Common;
 using MailVoidApi.Data;
 using MailVoidApi.Services;
 using MailVoidWeb;
@@ -6,7 +7,7 @@ using MailVoidWeb.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
-using Microsoft.EntityFrameworkCore;
+using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Controllers;
 [Authorize]
@@ -15,21 +16,22 @@ namespace MailVoidApi.Controllers;
 public class MailController : ControllerBase
 {
     private readonly ILogger<MailController> _logger;
-    private readonly MailVoidDbContext _context;
+    private readonly IDatabaseService _db;
     private readonly IMailGroupService _mailGroupService;
     private readonly IUserService _userService;
 
-    public MailController(ILogger<MailController> logger, MailVoidDbContext context, IMailGroupService mailGroupService, IUserService userService)
+    public MailController(ILogger<MailController> logger, IDatabaseService db, IMailGroupService mailGroupService, IUserService userService)
     {
         _logger = logger;
-        _context = context;
+        _db = db;
         _mailGroupService = mailGroupService;
         _userService = userService;
     }
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMail(long id, [FromQuery] bool markAsRead = false)
     {
-        var email = await _context.Mails.FindAsync(id);
+        using var db = await _db.GetConnectionAsync();
+        var email = await db.SingleByIdAsync<Mail>(id);
         if (email == null)
         {
             return NotFound();
@@ -39,12 +41,11 @@ public class MailController : ControllerBase
         {
             var currentUserId = _userService.GetUserId();
 
-            // Use raw SQL to perform "INSERT IGNORE" or "INSERT ON DUPLICATE KEY" equivalent
-            // This is a single database operation that handles the check and insert atomically
-            await _context.Database.ExecuteSqlRawAsync(
-                @"INSERT IGNORE INTO UserMailRead (UserId, MailId, ReadAt) 
-                  VALUES ({0}, {1}, {2})",
-                currentUserId, id, DateTime.UtcNow);
+            // Use raw SQL to perform "INSERT IGNORE"
+            await db.ExecuteAsync(
+                @"INSERT IGNORE INTO UserMailRead (UserId, MailId, ReadAt)
+                  VALUES (@UserId, @MailId, @ReadAt)",
+                new { UserId = currentUserId, MailId = id, ReadAt = DateTime.UtcNow });
         }
 
         return Ok(email);
@@ -57,50 +58,53 @@ public class MailController : ControllerBase
         var role = _userService.GetRole();
         var isAdmin = role == "Admin";
 
-        // Get distinct mailboxes (by To address) with their mail group info
-        var mailboxes = await _context.Mails
-            .GroupJoin(_context.MailGroups,
-                       mail => mail.MailGroupPath,
-                       mailGroup => mailGroup.Path,
-                       (mail, mailGroups) => new
-                       {
-                           mail.To,
-                           mail.MailGroupPath,
-                           MailGroup = mailGroups.FirstOrDefault()
-                       })
-            .Where(x => (isAdmin && showAll) ||
-                        (x.MailGroup != null &&
-                         (x.MailGroup.IsPublic ||
-                          x.MailGroup.OwnerUserId == currentUserId ||
-                          x.MailGroup.MailGroupUsers != null && x.MailGroup.MailGroupUsers.Any(mgu => mgu.UserId == currentUserId))) ||
-                        (x.MailGroup == null && isAdmin))
-            .GroupBy(x => x.To)
-            .Select(g => g.First())
-            .ToListAsync();
+        using var db = await _db.GetConnectionAsync();
 
-        // For each mailbox, calculate unread count
+        // Get distinct mailboxes with their mail group info using a simpler approach
+        string sql;
+        if (isAdmin && showAll)
+        {
+            sql = @"SELECT DISTINCT m.`To`, m.MailGroupPath, mg.Subdomain, mg.IsPublic, mg.OwnerUserId
+                    FROM Mail m
+                    LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path";
+        }
+        else
+        {
+            sql = @"SELECT DISTINCT m.`To`, m.MailGroupPath, mg.Subdomain, mg.IsPublic, mg.OwnerUserId
+                    FROM Mail m
+                    LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path
+                    WHERE (mg.IsPublic = 1 OR mg.OwnerUserId = @UserId
+                           OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId))
+                           OR (mg.Id IS NULL AND @IsAdmin = 1)";
+        }
+
+        var mailboxes = await db.QueryAsync<dynamic>(sql, new { UserId = currentUserId, IsAdmin = isAdmin });
+
         var result = new List<MailBox>();
         foreach (var mailbox in mailboxes)
         {
-            // Count unread emails for this mailbox (emails not in UserMailRead for current user)
-            var unreadCount = await _context.Mails
-                .Where(m => m.To == mailbox.To)
-                .Where(m => !_context.UserMailReads.Any(umr => umr.MailId == m.Id && umr.UserId == currentUserId))
-                .CountAsync();
+            string toAddress = mailbox.To;
+            // Count unread emails for this mailbox
+            var unreadCount = await db.ExecuteScalarAsync<int>(
+                @"SELECT COUNT(*) FROM Mail m
+                  WHERE m.`To` = @To
+                  AND NOT EXISTS (SELECT 1 FROM UserMailRead umr WHERE umr.MailId = m.Id AND umr.UserId = @UserId)",
+                new { To = toAddress, UserId = currentUserId });
 
             result.Add(new MailBox()
             {
-                Name = mailbox.To,
+                Name = toAddress,
                 Path = mailbox.MailGroupPath,
-                MailBoxName = mailbox.MailGroup?.Subdomain,
-                IsPublic = mailbox.MailGroup?.IsPublic ?? false,
-                IsOwner = mailbox.MailGroup != null && (mailbox.MailGroup.OwnerUserId == currentUserId),
+                MailBoxName = mailbox.Subdomain,
+                IsPublic = Convert.ToBoolean(mailbox.IsPublic),
+                IsOwner = mailbox.OwnerUserId != null && (Guid)mailbox.OwnerUserId == currentUserId,
                 UnreadCount = unreadCount
             });
         }
 
         return result;
     }
+
     [HttpPost]
     public async Task<PagedResults<MailWithReadStatus>> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
     {
@@ -111,42 +115,44 @@ public class MailController : ControllerBase
         var results = new PagedResults<MailWithReadStatus>();
         options ??= new FilterOptions();
 
-        var query = _context.Mails
-                    .GroupJoin(_context.MailGroups,
-                       mail => mail.MailGroupPath,
-                       mailGroup => mailGroup.Path,
-                       (mail, mailGroups) => new
-                       {
-                           Mail = mail,
-                           MailGroup = mailGroups.FirstOrDefault()
-                       })
-            .AsQueryable();
+        using var db = await _db.GetConnectionAsync();
+
+        var whereClauses = new List<string>();
+        var parameters = new DynamicParameters();
+        parameters.Add("UserId", currentUserId);
 
         if (!string.IsNullOrEmpty(options.To))
         {
-            query = query.Where(m => m.Mail.To == options.To);
+            whereClauses.Add("m.`To` = @To");
+            parameters.Add("To", options.To);
         }
+
+        var whereClause = whereClauses.Count > 0 ? "WHERE " + string.Join(" AND ", whereClauses) : "";
 
         if (options.PageSize == 1)
         {
-            results.TotalCount = await query.CountAsync();
+            results.TotalCount = await db.ExecuteScalarAsync<int>(
+                $"SELECT COUNT(*) FROM Mail m {whereClause}", parameters);
         }
 
-        query = query.OrderByDescending(m => m.Mail.CreatedOn);
-        var mails = await query
-            .Skip((options.Page - 1) * options.PageSize)
-            .Take(options.PageSize)
-            .Select(m => m.Mail)
-            .ToListAsync();
+        var offset = (options.Page - 1) * options.PageSize;
+        var mails = await db.QueryAsync<Mail>(
+            $"SELECT * FROM Mail m {whereClause} ORDER BY CreatedOn DESC LIMIT @Limit OFFSET @Offset",
+            new { Limit = options.PageSize, Offset = offset, To = options.To, UserId = currentUserId });
+
+        var mailList = mails.ToList();
+        var mailIds = mailList.Select(m => m.Id).ToList();
 
         // Get read status for each mail
-        var mailIds = mails.Select(m => m.Id).ToList();
-        var readMails = await _context.UserMailReads
-            .Where(umr => umr.UserId == currentUserId && mailIds.Contains(umr.MailId))
-            .Select(umr => umr.MailId)
-            .ToListAsync();
+        var readMails = new List<long>();
+        if (mailIds.Any())
+        {
+            readMails = (await db.QueryAsync<long>(
+                @"SELECT MailId FROM UserMailRead WHERE UserId = @UserId AND MailId IN @MailIds",
+                new { UserId = currentUserId, MailIds = mailIds })).ToList();
+        }
 
-        results.Items = mails.Select(mail => new MailWithReadStatus
+        results.Items = mailList.Select(mail => new MailWithReadStatus
         {
             Id = mail.Id,
             To = mail.To,
@@ -161,42 +167,52 @@ public class MailController : ControllerBase
 
         return results;
     }
+
     [HttpDelete("boxes")]
     public async Task<IActionResult> DeleteBox([FromBody] FilterOptions options)
     {
         if (options == null || string.IsNullOrEmpty(options.To))
             return BadRequest();
 
-        var mailsToDelete = await _context.Mails
-            .Where(m => m.To == options.To)
-            .ToListAsync();
+        using var db = await _db.GetConnectionAsync();
+        var mailsToDelete = await db.SelectAsync<Mail>(m => m.To == options.To);
 
-        _context.Mails.RemoveRange(mailsToDelete);
-        await _context.SaveChangesAsync();
+        foreach (var mail in mailsToDelete)
+        {
+            await db.DeleteAsync(mail);
+        }
 
         return Ok();
     }
+
     [HttpGet("groups")]
     public async Task<IActionResult> GetMailGroups()
     {
         var userId = _userService.GetUserId();
-        var groups = await _context.MailGroups
-            .Where(mg => mg.Subdomain != null && !mg.IsUserPrivate && (mg.IsPublic || mg.OwnerUserId == userId ||
-                        mg.MailGroupUsers.Any(mgu => mgu.UserId == userId)))
-            .Select(mg => new
-            {
-                mg.Id,
-                Path = mg.Path ?? "",
-                Subdomain = mg.Subdomain ?? "",
-                Description = mg.Description ?? "",
-                mg.IsPublic,
-                mg.CreatedAt,
-                mg.LastActivity,
-                IsOwner = mg.OwnerUserId == userId,
-                mg.IsUserPrivate
-            })
-            .ToListAsync();
-        return Ok(groups);
+        using var db = await _db.GetConnectionAsync();
+
+        var groups = await db.QueryAsync<dynamic>(
+            @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate
+              FROM MailGroup mg
+              WHERE mg.Subdomain IS NOT NULL AND mg.IsUserPrivate = 0
+              AND (mg.IsPublic = 1 OR mg.OwnerUserId = @UserId
+                   OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId))",
+            new { UserId = userId });
+
+        var result = groups.Select(mg => new
+        {
+            Id = (long)mg.Id,
+            Path = mg.Path ?? "",
+            Subdomain = mg.Subdomain ?? "",
+            Description = mg.Description ?? "",
+            IsPublic = Convert.ToBoolean(mg.IsPublic),
+            CreatedAt = (DateTime)mg.CreatedAt,
+            LastActivity = mg.LastActivity as DateTime?,
+            IsOwner = mg.OwnerUserId != null && (Guid)mg.OwnerUserId == userId,
+            IsUserPrivate = Convert.ToBoolean(mg.IsUserPrivate)
+        }).ToList();
+
+        return Ok(result);
     }
 
     [HttpPost("groups/{mailGroupId}/access")]
@@ -204,8 +220,8 @@ public class MailController : ControllerBase
     {
         var currentUserId = _userService.GetUserId();
 
-        // Check if current user is owner or admin editing public group
-        var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
+        using var db = await _db.GetConnectionAsync();
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(mailGroupId);
         if (mailGroup == null)
             return NotFound();
 
@@ -215,7 +231,6 @@ public class MailController : ControllerBase
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
-        // Prevent sharing private user mailboxes
         if (mailGroup.IsUserPrivate)
             return BadRequest(new { message = "Private user mailboxes cannot be shared." });
 
@@ -228,8 +243,8 @@ public class MailController : ControllerBase
     {
         var currentUserId = _userService.GetUserId();
 
-        // Check if current user is owner or admin editing public group
-        var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
+        using var db = await _db.GetConnectionAsync();
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(mailGroupId);
         if (mailGroup == null)
             return NotFound();
 
@@ -239,7 +254,6 @@ public class MailController : ControllerBase
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
-        // Prevent modifying access to private user mailboxes
         if (mailGroup.IsUserPrivate)
             return BadRequest(new { message = "Private user mailboxes cannot have access modified." });
 
@@ -252,21 +266,19 @@ public class MailController : ControllerBase
     {
         var currentUserId = _userService.GetUserId();
 
-        var mailGroup = await _context.MailGroups.FindAsync(id);
+        using var db = await _db.GetConnectionAsync();
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(id);
         if (mailGroup == null)
             return NotFound();
 
-        // Allow owner or admin to edit public groups
         var isOwner = mailGroup.OwnerUserId == currentUserId;
         var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
 
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
-        // Prevent modifying private user mailboxes public status
         if (mailGroup.IsUserPrivate)
         {
-            // Only allow description updates for private mailboxes
             mailGroup.Description = request.Description;
         }
         else
@@ -275,7 +287,7 @@ public class MailController : ControllerBase
             mailGroup.IsPublic = request.IsPublic;
         }
 
-        await _context.SaveChangesAsync();
+        await db.UpdateAsync(mailGroup);
 
         return Ok(new
         {
@@ -295,7 +307,8 @@ public class MailController : ControllerBase
     {
         var currentUserId = _userService.GetUserId();
 
-        var mailGroup = await _context.MailGroups.FindAsync(mailGroupId);
+        using var db = await _db.GetConnectionAsync();
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(mailGroupId);
         if (mailGroup == null)
             return NotFound();
 
@@ -305,42 +318,47 @@ public class MailController : ControllerBase
         if (!isOwner && !isAdminEditingPublic)
             return Forbid();
 
-        var groupUsers = await _context.MailGroupUsers
-            .Include(mgu => mgu.User)
-            .Where(mgu => mgu.MailGroupId == mailGroupId)
-            .Select(mgu => new
-            {
-                mgu.Id,
-                mgu.MailGroupId,
-                mgu.UserId,
-                mgu.GrantedAt,
-                User = new
-                {
-                    mgu.User.Id,
-                    mgu.User.UserName,
-                    mgu.User.Role,
-                    mgu.User.TimeStamp
-                }
-            })
-            .ToListAsync();
+        var groupUsers = await db.QueryAsync<dynamic>(
+            @"SELECT mgu.Id, mgu.MailGroupId, mgu.UserId, mgu.GrantedAt,
+                     u.Id as User_Id, u.UserName as User_UserName, u.Role as User_Role, u.TimeStamp as User_TimeStamp
+              FROM MailGroupUser mgu
+              INNER JOIN User u ON mgu.UserId = u.Id
+              WHERE mgu.MailGroupId = @MailGroupId",
+            new { MailGroupId = mailGroupId });
 
-        return Ok(groupUsers);
+        var result = groupUsers.Select(mgu => new
+        {
+            Id = (long)mgu.Id,
+            MailGroupId = (long)mgu.MailGroupId,
+            UserId = (Guid)mgu.UserId,
+            GrantedAt = (DateTime)mgu.GrantedAt,
+            User = new
+            {
+                Id = (Guid)mgu.User_Id,
+                UserName = (string)mgu.User_UserName,
+                Role = (Role)mgu.User_Role,
+                TimeStamp = (DateTime)mgu.User_TimeStamp
+            }
+        }).ToList();
+
+        return Ok(result);
     }
 
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers()
     {
-        var users = await _context.Users
-            .Select(u => new
-            {
-                u.Id,
-                u.UserName,
-                u.Role,
-                u.TimeStamp
-            })
-            .ToListAsync();
+        using var db = await _db.GetConnectionAsync();
+        var users = await db.SelectAsync<User>();
 
-        return Ok(users);
+        var result = users.Select(u => new
+        {
+            u.Id,
+            u.UserName,
+            u.Role,
+            u.TimeStamp
+        }).ToList();
+
+        return Ok(result);
     }
 
     [HttpPost("mail-groups")]
@@ -348,9 +366,8 @@ public class MailController : ControllerBase
     {
         var userId = _userService.GetUserId();
 
-        // Check if subdomain already exists
-        var existingGroup = await _context.MailGroups
-            .FirstOrDefaultAsync(mg => mg.Subdomain == request.Subdomain);
+        using var db = await _db.GetConnectionAsync();
+        var existingGroup = await db.SingleAsync<MailGroup>(mg => mg.Subdomain == request.Subdomain);
 
         if (existingGroup != null)
         {
@@ -369,8 +386,7 @@ public class MailController : ControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
-        _context.MailGroups.Add(mailGroup);
-        await _context.SaveChangesAsync();
+        await db.InsertAsync(mailGroup);
 
         return Ok(new
         {
@@ -387,27 +403,25 @@ public class MailController : ControllerBase
     public async Task<IActionResult> DeleteMailGroup(long id)
     {
         var userId = _userService.GetUserId();
-        var mailGroup = await _context.MailGroups.FindAsync(id);
+        using var db = await _db.GetConnectionAsync();
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(id);
 
         if (mailGroup == null)
         {
             return NotFound();
         }
 
-        // Prevent deleting default mailboxes
         if (mailGroup.IsDefaultMailbox)
         {
             return BadRequest(new { message = "Cannot delete default mailbox." });
         }
 
-        // Only owner or admin can delete
         if (mailGroup.OwnerUserId != userId && !User.IsInRole("Admin"))
         {
             return Forbid();
         }
 
-        _context.MailGroups.Remove(mailGroup);
-        await _context.SaveChangesAsync();
+        await db.DeleteAsync(mailGroup);
 
         return Ok();
     }
@@ -416,17 +430,17 @@ public class MailController : ControllerBase
     public async Task<IActionResult> GetRetentionSettings(long id)
     {
         var userId = _userService.GetUserId();
-        var mailGroup = await _context.MailGroups.FindAsync(id);
-        
+        using var db = await _db.GetConnectionAsync();
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(id);
+
         if (mailGroup == null)
         {
             return NotFound();
         }
 
-        // Check if user has access to this mailbox
-        if (!mailGroup.IsPublic && 
-            mailGroup.OwnerUserId != userId && 
-            !await _context.MailGroupUsers.AnyAsync(mgu => mgu.MailGroupId == id && mgu.UserId == userId))
+        if (!mailGroup.IsPublic &&
+            mailGroup.OwnerUserId != userId &&
+            !await db.ExistsAsync<MailGroupUser>(mgu => mgu.MailGroupId == id && mgu.UserId == userId))
         {
             return Forbid();
         }
@@ -443,27 +457,26 @@ public class MailController : ControllerBase
     public async Task<IActionResult> UpdateRetentionSettings(long id, [FromBody] UpdateRetentionRequest request)
     {
         var userId = _userService.GetUserId();
-        var mailGroup = await _context.MailGroups.FindAsync(id);
-        
+        using var db = await _db.GetConnectionAsync();
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(id);
+
         if (mailGroup == null)
         {
             return NotFound();
         }
 
-        // Only the owner can update retention settings
         if (mailGroup.OwnerUserId != userId)
         {
             return Forbid();
         }
 
-        // Validate retention days (0-365)
         if (request.RetentionDays.HasValue && (request.RetentionDays < 0 || request.RetentionDays > 365))
         {
             return BadRequest(new { message = "Retention days must be between 0 and 365." });
         }
 
         mailGroup.RetentionDays = request.RetentionDays;
-        await _context.SaveChangesAsync();
+        await db.UpdateAsync(mailGroup);
 
         _logger.LogInformation($"Updated retention settings for mailbox {mailGroup.Path} to {request.RetentionDays} days");
 
@@ -479,66 +492,69 @@ public class MailController : ControllerBase
     public async Task<IActionResult> MarkAllAsRead([FromBody] MarkAllAsReadRequest request)
     {
         var userId = _userService.GetUserId();
-        
-        // Get emails for the specified mailbox that are accessible to the user
-        var emailsQuery = _context.Mails.AsQueryable();
-        
+
+        using var db = await _db.GetConnectionAsync();
+
+        List<long> emailIds;
         if (!string.IsNullOrEmpty(request.MailboxPath))
         {
-            emailsQuery = emailsQuery.Where(m => m.MailGroupPath == request.MailboxPath);
-            
             // Check if user has access to this mailbox
-            var mailGroup = await _context.MailGroups
-                .FirstOrDefaultAsync(mg => mg.Path == request.MailboxPath);
-                
+            var mailGroup = await db.SingleAsync<MailGroup>(mg => mg.Path == request.MailboxPath);
+
             if (mailGroup != null)
             {
                 var isAdmin = _userService.IsAdmin();
-                if (!mailGroup.IsPublic && 
-                    mailGroup.OwnerUserId != userId && 
-                    !await _context.MailGroupUsers.AnyAsync(mgu => mgu.MailGroupId == mailGroup.Id && mgu.UserId == userId) &&
+                if (!mailGroup.IsPublic &&
+                    mailGroup.OwnerUserId != userId &&
+                    !await db.ExistsAsync<MailGroupUser>(mgu => mgu.MailGroupId == mailGroup.Id && mgu.UserId == userId) &&
                     !isAdmin)
                 {
                     return Forbid();
                 }
             }
+
+            emailIds = (await db.QueryAsync<long>(
+                "SELECT Id FROM Mail WHERE MailGroupPath = @MailboxPath",
+                new { request.MailboxPath })).ToList();
         }
-        
-        var emailIds = await emailsQuery.Select(m => m.Id).ToListAsync();
-        
+        else
+        {
+            emailIds = (await db.QueryAsync<long>("SELECT Id FROM Mail")).ToList();
+        }
+
         if (!emailIds.Any())
         {
             return Ok(new { message = "No emails found to mark as read.", markedCount = 0 });
         }
-        
+
         // Get emails that are not already marked as read by this user
-        var alreadyReadIds = await _context.UserMailReads
-            .Where(r => r.UserId == userId && emailIds.Contains(r.MailId))
-            .Select(r => r.MailId)
-            .ToListAsync();
-            
+        var alreadyReadIds = (await db.QueryAsync<long>(
+            "SELECT MailId FROM UserMailRead WHERE UserId = @UserId AND MailId IN @EmailIds",
+            new { UserId = userId, EmailIds = emailIds })).ToList();
+
         var unreadEmailIds = emailIds.Except(alreadyReadIds).ToList();
-        
+
         if (!unreadEmailIds.Any())
         {
             return Ok(new { message = "All emails are already marked as read.", markedCount = 0 });
         }
-        
+
         // Create read records for unread emails
-        var readRecords = unreadEmailIds.Select(emailId => new UserMailRead
+        foreach (var emailId in unreadEmailIds)
         {
-            UserId = userId,
-            MailId = emailId,
-            ReadAt = DateTime.UtcNow
-        }).ToList();
-        
-        _context.UserMailReads.AddRange(readRecords);
-        await _context.SaveChangesAsync();
-        
+            var readRecord = new UserMailRead
+            {
+                UserId = userId,
+                MailId = emailId,
+                ReadAt = DateTime.UtcNow
+            };
+            await db.InsertAsync(readRecord);
+        }
+
         _logger.LogInformation(
             "User {UserId} marked {Count} emails as read in mailbox '{MailboxPath}'",
             userId, unreadEmailIds.Count, request.MailboxPath ?? "all");
-        
+
         return Ok(new { message = $"Marked {unreadEmailIds.Count} emails as read.", markedCount = unreadEmailIds.Count });
     }
 

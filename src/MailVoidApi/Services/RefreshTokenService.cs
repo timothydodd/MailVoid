@@ -1,18 +1,18 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using MailVoidApi.Data;
 using MailVoidApi.Models;
-using Microsoft.EntityFrameworkCore;
+using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Services;
 
 public class RefreshTokenService
 {
-    private readonly MailVoidDbContext _context;
+    private readonly IDatabaseService _db;
     private readonly IConfiguration _configuration;
 
-    public RefreshTokenService(MailVoidDbContext context, IConfiguration configuration)
+    public RefreshTokenService(IDatabaseService db, IConfiguration configuration)
     {
-        _context = context;
+        _db = db;
         _configuration = configuration;
     }
 
@@ -30,16 +30,16 @@ public class RefreshTokenService
             CreatedDate = DateTime.UtcNow
         };
 
-        _context.RefreshTokens.Add(refreshToken);
-        await _context.SaveChangesAsync();
+        using var db = await _db.GetConnectionAsync();
+        await db.InsertAsync(refreshToken);
 
         return refreshToken;
     }
 
     public async Task<RefreshToken?> GetRefreshTokenAsync(string token)
     {
-        return await _context.RefreshTokens
-            .FirstOrDefaultAsync(x => x.Token == token && !x.IsRevoked);
+        using var db = await _db.GetConnectionAsync();
+        return await db.SingleAsync<RefreshToken>(x => x.Token == token && !x.IsRevoked);
     }
 
     public async Task<bool> ValidateRefreshTokenAsync(string token)
@@ -50,25 +50,24 @@ public class RefreshTokenService
 
     public async Task RevokeRefreshTokenAsync(string token)
     {
-        var refreshToken = await _context.RefreshTokens
-            .FirstOrDefaultAsync(x => x.Token == token);
+        using var db = await _db.GetConnectionAsync();
+        var refreshToken = await db.SingleAsync<RefreshToken>(x => x.Token == token);
         if (refreshToken != null)
         {
             refreshToken.IsRevoked = true;
-            await _context.SaveChangesAsync();
+            await db.UpdateAsync(refreshToken);
         }
     }
 
     public async Task RevokeAllUserRefreshTokensAsync(Guid userId)
     {
-        var tokens = await _context.RefreshTokens
-            .Where(x => x.UserId == userId && !x.IsRevoked)
-            .ToListAsync();
+        using var db = await _db.GetConnectionAsync();
+        var tokens = await db.SelectAsync<RefreshToken>(x => x.UserId == userId && !x.IsRevoked);
         foreach (var token in tokens)
         {
             token.IsRevoked = true;
+            await db.UpdateAsync(token);
         }
-        await _context.SaveChangesAsync();
     }
 
     public async Task<RefreshToken> RotateRefreshTokenAsync(string oldToken, Guid userId)
@@ -82,11 +81,8 @@ public class RefreshTokenService
 
     public async Task CleanupExpiredTokensAsync()
     {
-        var expiredTokens = await _context.RefreshTokens
-            .Where(x => x.ExpiryDate < DateTime.UtcNow)
-            .ToListAsync();
-        _context.RefreshTokens.RemoveRange(expiredTokens);
-        await _context.SaveChangesAsync();
+        using var db = await _db.GetConnectionAsync();
+        await db.DeleteAsync<RefreshToken>(x => x.ExpiryDate < DateTime.UtcNow);
     }
 
     private string GenerateRefreshToken()

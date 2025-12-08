@@ -1,8 +1,9 @@
-﻿using MailVoidApi.Data;
+using MailVoidApi.Data;
 using MailVoidApi.Services;
+using MailVoidWeb.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Controllers;
 [Authorize]
@@ -10,15 +11,15 @@ namespace MailVoidApi.Controllers;
 [Route("api/auth")]
 public class AuthController : Controller
 {
-    private readonly MailVoidDbContext _context;
+    private readonly IDatabaseService _db;
     private readonly AuthService _authService;
     private readonly PasswordService _passwordService;
     private readonly RefreshTokenService _refreshTokenService;
     private readonly IConfiguration _configuration;
 
-    public AuthController(MailVoidDbContext context, AuthService authService, PasswordService passwordService, RefreshTokenService refreshTokenService, IConfiguration configuration)
+    public AuthController(IDatabaseService db, AuthService authService, PasswordService passwordService, RefreshTokenService refreshTokenService, IConfiguration configuration)
     {
-        _context = context;
+        _db = db;
         _authService = authService;
         _passwordService = passwordService;
         _refreshTokenService = refreshTokenService;
@@ -28,7 +29,8 @@ public class AuthController : Controller
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == request.UserName);
+        using var db = await _db.GetConnectionAsync();
+        var user = await db.SingleAsync<User>(u => u.UserName == request.UserName);
         if (user == null || !_authService.ValidateUser(user, request.Password))
         {
             return Unauthorized("Invalid email or password.");
@@ -54,7 +56,8 @@ public class AuthController : Controller
             return Unauthorized();
         }
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        using var db = await _db.GetConnectionAsync();
+        var user = await db.SingleByIdAsync<User>(userId.Value);
         if (user == null)
         {
             return NotFound();
@@ -72,7 +75,8 @@ public class AuthController : Controller
             return Unauthorized();
         }
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        using var db = await _db.GetConnectionAsync();
+        var user = await db.SingleByIdAsync<User>(userId.Value);
         if (user == null)
         {
             return NotFound();
@@ -82,7 +86,7 @@ public class AuthController : Controller
             return Unauthorized("Invalid password.");
         }
         user.PasswordHash = _passwordService.HashPassword(user, request.NewPassword);
-        await _context.SaveChangesAsync();
+        await db.UpdateAsync(user);
         return Ok();
     }
 
@@ -107,7 +111,8 @@ public class AuthController : Controller
             return Unauthorized("Invalid refresh token");
         }
 
-        var user = await _context.Users.FindAsync(userId.Value);
+        using var db = await _db.GetConnectionAsync();
+        var user = await db.SingleByIdAsync<User>(userId.Value);
         if (user == null)
         {
             return NotFound("User not found");

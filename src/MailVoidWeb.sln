@@ -17,6 +17,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MailVoidSmtpServer", "MailV
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MailVoidSmtpTest", "MailVoidSmtpTest\MailVoidSmtpTest.csproj", "{55A6C18A-9042-F846-03E1-8B7D38592404}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RoboDodd.OrmLite", "RoboDodd.OrmLite\src\RoboDodd.OrmLite\RoboDodd.OrmLite.csproj", "{E1D76D8A-E66B-4AF8-867E-ED2254DE9E25}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,10 @@ Global
 		{55A6C18A-9042-F846-03E1-8B7D38592404}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{55A6C18A-9042-F846-03E1-8B7D38592404}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{55A6C18A-9042-F846-03E1-8B7D38592404}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1D76D8A-E66B-4AF8-867E-ED2254DE9E25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1D76D8A-E66B-4AF8-867E-ED2254DE9E25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1D76D8A-E66B-4AF8-867E-ED2254DE9E25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1D76D8A-E66B-4AF8-867E-ED2254DE9E25}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,0 +1,91 @@
+@if (!!webhook()) {
+  <div class="hook-detail-container">
+    <!-- Header Section -->
+    <div class="hook-header">
+      <div class="hook-header-content">
+        <button class="btn btn-outline back-button" (click)="goBack()">
+          <lucide-icon name="arrow-left" size="16"></lucide-icon>
+        </button>
+        <div class="hook-meta">
+          <div class="meta-row">
+            <div class="meta-item">
+              <span class="meta-label">Method</span>
+              <span class="method-badge method-{{ webhook()?.httpMethod?.toLowerCase() }}">
+                {{ webhook()?.httpMethod }}
+              </span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Bucket</span>
+              <span class="meta-value">{{ webhook()?.bucketName }}</span>
+            </div>
+            <div class="meta-item date">
+              <span class="meta-label">Received</span>
+              <span class="meta-value">{{ webhook()?.createdOn | date: 'medium' }}</span>
+            </div>
+          </div>
+          <div class="meta-row">
+            <div class="meta-item path">
+              <span class="meta-label">Path</span>
+              <span class="meta-value mono">{{ webhook()?.path }}{{ webhook()?.queryString || '' }}</span>
+            </div>
+            @if (webhook()?.sourceIp) {
+              <div class="meta-item">
+                <span class="meta-label">Source IP</span>
+                <span class="meta-value">{{ webhook()?.sourceIp }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Headers Section -->
+    <div class="hook-section">
+      <div class="section-header">
+        <h3>Headers</h3>
+        <button class="btn btn-sm" (click)="copyToClipboard(webhook()?.headers || '')">
+          <lucide-icon name="copy" size="14"></lucide-icon>
+          Copy
+        </button>
+      </div>
+      <div class="section-content headers-content">
+        @if (parsedHeaders()) {
+          <table class="headers-table">
+            @for (entry of parsedHeaders() | keyvalue; track entry.key) {
+              <tr>
+                <td class="header-name">{{ entry.key }}</td>
+                <td class="header-value">{{ entry.value }}</td>
+              </tr>
+            }
+          </table>
+        } @else {
+          <pre class="raw-content">{{ webhook()?.headers }}</pre>
+        }
+      </div>
+    </div>
+
+    <!-- Body Section -->
+    <div class="hook-section">
+      <div class="section-header">
+        <h3>Body</h3>
+        <div class="section-actions">
+          @if (webhook()?.contentType) {
+            <span class="content-type-badge">{{ webhook()?.contentType }}</span>
+          }
+          <button class="btn btn-sm" (click)="copyToClipboard(webhook()?.body || '')">
+            <lucide-icon name="copy" size="14"></lucide-icon>
+            Copy
+          </button>
+        </div>
+      </div>
+      <div class="section-content body-content" [class.json-body]="isJsonBody()">
+        <pre class="body-text">{{ parsedBody() }}</pre>
+      </div>
+    </div>
+  </div>
+} @else {
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading webhook...</p>
+  </div>
+}

@@ -1,21 +1,21 @@
 using MailVoidApi.Data;
 using MailVoidWeb;
 using MailVoidWeb.Data.Models;
-using Microsoft.EntityFrameworkCore;
+using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Services
 {
     public class MailCleanupService : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IDatabaseService _dbService;
         private readonly ILogger<MailCleanupService> _logger;
         private readonly TimeSpan _cleanupInterval = TimeSpan.FromHours(1); // Run every hour
 
         public MailCleanupService(
-            IServiceProvider serviceProvider,
+            IDatabaseService dbService,
             ILogger<MailCleanupService> logger)
         {
-            _serviceProvider = serviceProvider;
+            _dbService = dbService;
             _logger = logger;
         }
 
@@ -42,15 +42,12 @@ namespace MailVoidApi.Services
 
         private async Task PerformCleanup(CancellationToken cancellationToken)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<MailVoidDbContext>();
+            using var db = await _dbService.GetConnectionAsync();
 
             _logger.LogInformation("Starting mail cleanup cycle");
 
             // Get all mailboxes with retention settings
-            var mailboxesWithRetention = await dbContext.MailGroups
-                .Where(mg => mg.RetentionDays.HasValue && mg.RetentionDays > 0)
-                .ToListAsync(cancellationToken);
+            var mailboxesWithRetention = await db.SelectAsync<MailGroup>(mg => mg.RetentionDays != null && mg.RetentionDays > 0);
 
             _logger.LogInformation("Found {Count} mailboxes with retention settings", mailboxesWithRetention.Count);
 
@@ -62,11 +59,9 @@ namespace MailVoidApi.Services
                 try
                 {
                     var cutoffDate = DateTime.UtcNow.AddDays(-mailbox.RetentionDays!.Value);
-                    
+
                     // Find emails to delete
-                    var emailsToDelete = await dbContext.Mails
-                        .Where(m => m.MailGroupPath == mailbox.Path && m.CreatedOn < cutoffDate)
-                        .ToListAsync(cancellationToken);
+                    var emailsToDelete = await db.SelectAsync<Mail>(m => m.MailGroupPath == mailbox.Path && m.CreatedOn < cutoffDate);
 
                     if (emailsToDelete.Any())
                     {
@@ -76,19 +71,16 @@ namespace MailVoidApi.Services
 
                         // Delete associated read records first
                         var mailIds = emailsToDelete.Select(m => m.Id).ToList();
-                        var readRecordsToDelete = await dbContext.UserMailReads
-                            .Where(r => mailIds.Contains(r.MailId))
-                            .ToListAsync(cancellationToken);
-
-                        if (readRecordsToDelete.Any())
+                        foreach (var mailId in mailIds)
                         {
-                            dbContext.UserMailReads.RemoveRange(readRecordsToDelete);
+                            await db.DeleteAsync<UserMailRead>(r => r.MailId == mailId);
                         }
 
                         // Delete the emails
-                        dbContext.Mails.RemoveRange(emailsToDelete);
-                        
-                        await dbContext.SaveChangesAsync(cancellationToken);
+                        foreach (var email in emailsToDelete)
+                        {
+                            await db.DeleteAsync(email);
+                        }
 
                         _logger.LogInformation(
                             "Successfully deleted {Count} emails from mailbox '{Path}'",
@@ -97,7 +89,7 @@ namespace MailVoidApi.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, 
+                    _logger.LogError(ex,
                         "Error cleaning up mailbox '{Path}' with retention {Days} days",
                         mailbox.Path, mailbox.RetentionDays);
                 }

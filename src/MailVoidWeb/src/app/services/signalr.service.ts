@@ -13,13 +13,24 @@ export interface MailNotification {
   mailGroupPath: string;
 }
 
+export interface WebhookNotification {
+  id: number;
+  bucketName: string;
+  httpMethod: string;
+  path: string;
+  contentType: string;
+  createdOn: Date;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class SignalRService {
   private hubConnection?: signalR.HubConnection;
   private newMailSubject = new Subject<MailNotification>();
+  private newWebhookSubject = new Subject<WebhookNotification>();
   public newMail$ = this.newMailSubject.asObservable();
+  public newWebhook$ = this.newWebhookSubject.asObservable();
 
   constructor(private authService: AuthService) {}
 
@@ -46,6 +57,11 @@ export class SignalRService {
     this.hubConnection.on('NewMail', (mail: MailNotification) => {
       console.log('New mail received:', mail);
       this.newMailSubject.next(mail);
+    });
+
+    this.hubConnection.on('NewWebhook', (webhook: WebhookNotification) => {
+      console.log('New webhook received:', webhook);
+      this.newWebhookSubject.next(webhook);
     });
 
     this.hubConnection.onreconnecting(error => {

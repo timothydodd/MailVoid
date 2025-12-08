@@ -16,6 +16,7 @@ import {
   ChevronUp,
   Clock,
   Cog,
+  Copy,
   Crown,
   Edit,
   EllipsisVertical,
@@ -38,6 +39,7 @@ import {
   UploadIcon,
   User,
   Users,
+  Webhook,
   X,
 } from 'lucide-angular';
 import { provideToastr } from 'ngx-toastr';
@@ -104,6 +106,8 @@ export const appConfig: ApplicationConfig = {
         Clock,
         Loader2,
         CheckCircle,
+        Copy,
+        Webhook,
       })
     ),
     provideToastr(),

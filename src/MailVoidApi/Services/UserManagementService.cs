@@ -1,41 +1,41 @@
 using MailVoidApi.Data;
 using MailVoidWeb.Data.Models;
-using Microsoft.EntityFrameworkCore;
+using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Services;
 
 public class UserManagementService
 {
-    private readonly MailVoidDbContext _context;
+    private readonly IDatabaseService _db;
     private readonly PasswordService _passwordService;
     private readonly IMailGroupService _mailGroupService;
 
-    public UserManagementService(MailVoidDbContext context, PasswordService passwordService, IMailGroupService mailGroupService)
+    public UserManagementService(IDatabaseService db, PasswordService passwordService, IMailGroupService mailGroupService)
     {
-        _context = context;
+        _db = db;
         _passwordService = passwordService;
         _mailGroupService = mailGroupService;
     }
 
     public async Task<List<User>> GetAllUsersAsync()
     {
-        return await _context.Users
-            .OrderBy(u => u.UserName)
-            .ToListAsync();
+        using var db = await _db.GetConnectionAsync();
+        return await db.SelectAsync<User>();
     }
 
     public async Task<User?> GetUserByIdAsync(Guid userId)
     {
-        return await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
+        using var db = await _db.GetConnectionAsync();
+        return await db.SingleByIdAsync<User>(userId);
     }
 
     public async Task<User?> CreateUserAsync(string userName, string password, Role role = Role.User)
     {
+        using var db = await _db.GetConnectionAsync();
+
         // Check if username already exists
-        var existingUser = await _context.Users
-            .FirstOrDefaultAsync(u => u.UserName == userName);
-        
+        var existingUser = await db.SingleAsync<User>(u => u.UserName == userName);
+
         if (existingUser != null)
         {
             return null; // Username already exists
@@ -53,8 +53,7 @@ public class UserManagementService
         // Hash the password
         user.PasswordHash = _passwordService.HashPassword(user, password);
 
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        await db.InsertAsync(user);
 
         // Create a default private MailGroup for the user
         await _mailGroupService.CreateUserPrivateMailGroup(user.Id, isDefault: true);
@@ -64,52 +63,54 @@ public class UserManagementService
 
     public async Task<bool> UpdateUserRoleAsync(Guid userId, Role role)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
-        
+        using var db = await _db.GetConnectionAsync();
+
+        var user = await db.SingleByIdAsync<User>(userId);
+
         if (user == null)
         {
             return false;
         }
 
         user.Role = role;
-        await _context.SaveChangesAsync();
+        await db.UpdateAsync(user);
         return true;
     }
 
     public async Task<bool> UpdateUserPasswordAsync(Guid userId, string newPassword)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
-        
+        using var db = await _db.GetConnectionAsync();
+
+        var user = await db.SingleByIdAsync<User>(userId);
+
         if (user == null)
         {
             return false;
         }
 
         user.PasswordHash = _passwordService.HashPassword(user, newPassword);
-        await _context.SaveChangesAsync();
+        await db.UpdateAsync(user);
         return true;
     }
 
     public async Task<bool> DeleteUserAsync(Guid userId)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
-        
+        using var db = await _db.GetConnectionAsync();
+
+        var user = await db.SingleByIdAsync<User>(userId);
+
         if (user == null)
         {
             return false;
         }
 
-        _context.Users.Remove(user);
-        await _context.SaveChangesAsync();
+        await db.DeleteAsync(user);
         return true;
     }
 
     public async Task<bool> UserExistsAsync(string userName)
     {
-        return await _context.Users
-            .AnyAsync(u => u.UserName == userName);
+        using var db = await _db.GetConnectionAsync();
+        return await db.ExistsAsync<User>(u => u.UserName == userName);
     }
 }

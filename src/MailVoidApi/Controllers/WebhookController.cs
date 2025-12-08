@@ -1,10 +1,12 @@
-﻿using MailVoidApi.Authentication;
+using MailVoidApi.Authentication;
 using MailVoidApi.Data;
 using MailVoidApi.Hubs;
 using MailVoidApi.Services;
+using MailVoidWeb.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
+using RoboDodd.OrmLite;
+
 namespace MailVoidWeb.Controllers;
 
 [ApiController]
@@ -12,15 +14,15 @@ namespace MailVoidWeb.Controllers;
 public class WebhookController : ControllerBase
 {
     private readonly ILogger<WebhookController> _logger;
-    private readonly MailVoidDbContext _context;
+    private readonly IDatabaseService _db;
     private readonly IMailGroupService _mailGroupService;
     private readonly IMailDataExtractionService _mailDataExtractionService;
     private readonly IHubContext<MailNotificationHub> _hubContext;
 
-    public WebhookController(ILogger<WebhookController> logger, MailVoidDbContext context, IMailGroupService mailGroupService, IMailDataExtractionService mailDataExtractionService, IHubContext<MailNotificationHub> hubContext)
+    public WebhookController(ILogger<WebhookController> logger, IDatabaseService db, IMailGroupService mailGroupService, IMailDataExtractionService mailDataExtractionService, IHubContext<MailNotificationHub> hubContext)
     {
         _logger = logger;
-        _context = context;
+        _db = db;
         _mailGroupService = mailGroupService;
         _mailDataExtractionService = mailDataExtractionService;
         _hubContext = hubContext;
@@ -39,19 +41,20 @@ public class WebhookController : ControllerBase
 
             await _mailGroupService.SetMailPath(mail);
 
+            using var db = await _db.GetConnectionAsync();
+
             // Update the mailgroup's LastActivity when new mail arrives
             if (!string.IsNullOrEmpty(mail.MailGroupPath))
             {
-                var mailGroup = await _context.MailGroups
-                    .FirstOrDefaultAsync(mg => mg.Path == mail.MailGroupPath);
+                var mailGroup = await db.SingleAsync<MailGroup>(mg => mg.Path == mail.MailGroupPath);
                 if (mailGroup != null)
                 {
                     mailGroup.LastActivity = DateTime.UtcNow;
+                    await db.UpdateAsync(mailGroup);
                 }
             }
 
-            _context.Mails.Add(mail);
-            await _context.SaveChangesAsync();
+            await db.InsertAsync(mail);
 
             _logger.LogInformation("Successfully processed MailData for {From} to {To}",
                 mail.From, mail.To);

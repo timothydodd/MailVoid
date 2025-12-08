@@ -1,6 +1,7 @@
-﻿using MailVoidApi.Data;
+using MailVoidApi.Data;
 using MailVoidWeb;
-using Microsoft.EntityFrameworkCore;
+using MailVoidWeb.Data.Models;
+using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Services;
 
@@ -18,22 +19,23 @@ public interface IMailGroupService
 public class MailGroupService : IMailGroupService
 {
     private readonly ILogger<MailGroupService> _logger;
-    private readonly MailVoidDbContext _context;
-    
-    public MailGroupService(ILogger<MailGroupService> logger, MailVoidDbContext context)
+    private readonly IDatabaseService _db;
+
+    public MailGroupService(ILogger<MailGroupService> logger, IDatabaseService db)
     {
         _logger = logger;
-        _context = context;
+        _db = db;
     }
 
     public async Task SetMailPath(Mail m)
     {
         // Extract subdomain to check if this is a user's private mailbox
         var subdomain = EmailSubdomainHelper.ExtractSubdomain(m.To);
-        
+
+        using var db = await _db.GetConnectionAsync();
+
         // Check if this email belongs to a user's private mailbox (subdomain matches username)
-        var privateMailGroup = await _context.MailGroups
-            .FirstOrDefaultAsync(mg => mg.IsUserPrivate && mg.Subdomain == subdomain);
+        var privateMailGroup = await db.SingleAsync<MailGroup>(mg => mg.IsUserPrivate && mg.Subdomain == subdomain);
 
         if (privateMailGroup != null)
         {
@@ -43,7 +45,7 @@ public class MailGroupService : IMailGroupService
 
         // For non-private emails, create/assign to mail group
         m.MailGroupPath = EmailSubdomainHelper.GenerateMailGroupPath(subdomain);
-        
+
         // Ensure the mail group exists for this subdomain
         await GetOrCreateMailGroup(subdomain);
     }
@@ -51,9 +53,10 @@ public class MailGroupService : IMailGroupService
     public async Task<MailGroup> GetOrCreateMailGroup(string subdomain, Guid? userId = null)
     {
         var path = EmailSubdomainHelper.GenerateMailGroupPath(subdomain);
-        
-        var existingGroup = await _context.MailGroups
-            .FirstOrDefaultAsync(mg => mg.Subdomain == subdomain);
+
+        using var db = await _db.GetConnectionAsync();
+
+        var existingGroup = await db.SingleAsync<MailGroup>(mg => mg.Subdomain == subdomain);
 
         if (existingGroup != null)
         {
@@ -61,8 +64,20 @@ public class MailGroupService : IMailGroupService
         }
 
         // Create new mail group with admin user as owner if provided
-        var adminUser = userId.HasValue ? await _context.Users.FirstAsync(u => u.Id == userId.Value) :
-                       await _context.Users.FirstAsync(u => u.UserName == "admin");
+        User? adminUser;
+        if (userId.HasValue)
+        {
+            adminUser = await db.SingleByIdAsync<User>(userId.Value);
+        }
+        else
+        {
+            adminUser = await db.SingleAsync<User>(u => u.UserName == "admin");
+        }
+
+        if (adminUser == null)
+        {
+            throw new InvalidOperationException("Admin user not found");
+        }
 
         var newGroup = new MailGroup
         {
@@ -73,18 +88,17 @@ public class MailGroupService : IMailGroupService
             Description = $"Auto-generated group for {subdomain} subdomain"
         };
 
-        _context.MailGroups.Add(newGroup);
-        await _context.SaveChangesAsync();
+        await db.InsertAsync(newGroup);
 
-        _logger.LogInformation($"Created new mail group for subdomain: {subdomain}");
+        _logger.LogInformation("Created new mail group for subdomain: {Subdomain}", subdomain);
         return newGroup;
     }
 
     public async Task<bool> HasUserAccess(long mailGroupId, Guid userId)
     {
-        var mailGroup = await _context.MailGroups
-            .Include(mg => mg.MailGroupUsers)
-            .FirstOrDefaultAsync(mg => mg.Id == mailGroupId);
+        using var db = await _db.GetConnectionAsync();
+
+        var mailGroup = await db.SingleByIdAsync<MailGroup>(mailGroupId);
 
         if (mailGroup == null)
             return false;
@@ -98,13 +112,14 @@ public class MailGroupService : IMailGroupService
             return true;
 
         // Check explicit user access
-        return mailGroup.MailGroupUsers.Any(mgu => mgu.UserId == userId);
+        return await db.ExistsAsync<MailGroupUser>(mgu => mgu.MailGroupId == mailGroupId && mgu.UserId == userId);
     }
 
     public async Task GrantUserAccess(long mailGroupId, Guid userId)
     {
-        var existingAccess = await _context.MailGroupUsers
-            .FirstOrDefaultAsync(mgu => mgu.MailGroupId == mailGroupId && mgu.UserId == userId);
+        using var db = await _db.GetConnectionAsync();
+
+        var existingAccess = await db.SingleAsync<MailGroupUser>(mgu => mgu.MailGroupId == mailGroupId && mgu.UserId == userId);
 
         if (existingAccess == null)
         {
@@ -114,30 +129,31 @@ public class MailGroupService : IMailGroupService
                 UserId = userId
             };
 
-            _context.MailGroupUsers.Add(mailGroupUser);
-            await _context.SaveChangesAsync();
-            
-            _logger.LogInformation($"Granted user {userId} access to mail group {mailGroupId}");
+            await db.InsertAsync(mailGroupUser);
+
+            _logger.LogInformation("Granted user {UserId} access to mail group {MailGroupId}", userId, mailGroupId);
         }
     }
 
     public async Task RevokeUserAccess(long mailGroupId, Guid userId)
     {
-        var existingAccess = await _context.MailGroupUsers
-            .FirstOrDefaultAsync(mgu => mgu.MailGroupId == mailGroupId && mgu.UserId == userId);
+        using var db = await _db.GetConnectionAsync();
+
+        var existingAccess = await db.SingleAsync<MailGroupUser>(mgu => mgu.MailGroupId == mailGroupId && mgu.UserId == userId);
 
         if (existingAccess != null)
         {
-            _context.MailGroupUsers.Remove(existingAccess);
-            await _context.SaveChangesAsync();
-            
-            _logger.LogInformation($"Revoked user {userId} access from mail group {mailGroupId}");
+            await db.DeleteAsync(existingAccess);
+
+            _logger.LogInformation("Revoked user {UserId} access from mail group {MailGroupId}", userId, mailGroupId);
         }
     }
 
     public async Task<MailGroup> CreateUserPrivateMailGroup(Guid userId, bool isDefault = false)
     {
-        var user = await _context.Users.FindAsync(userId);
+        using var db = await _db.GetConnectionAsync();
+
+        var user = await db.SingleByIdAsync<User>(userId);
         if (user == null)
         {
             throw new InvalidOperationException($"User {userId} not found");
@@ -158,8 +174,7 @@ public class MailGroupService : IMailGroupService
             CreatedAt = DateTime.UtcNow
         };
 
-        _context.MailGroups.Add(privateMailGroup);
-        await _context.SaveChangesAsync();
+        await db.InsertAsync(privateMailGroup);
 
         _logger.LogInformation("Created private mail group for user {UserId} with subdomain {Subdomain}", userId, subdomain);
         return privateMailGroup;
@@ -167,10 +182,7 @@ public class MailGroupService : IMailGroupService
 
     public async Task<List<MailGroup>> GetUserPrivateMailGroups(Guid userId)
     {
-        return await _context.MailGroups
-            .Where(mg => mg.OwnerUserId == userId && mg.IsUserPrivate)
-            .OrderBy(mg => mg.Subdomain)
-            .ToListAsync();
+        using var db = await _db.GetConnectionAsync();
+        return await db.SelectAsync<MailGroup>(mg => mg.OwnerUserId == userId && mg.IsUserPrivate);
     }
-
 }

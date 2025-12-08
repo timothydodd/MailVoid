@@ -1,8 +1,10 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using RoboDodd.OrmLite;
 
 namespace MailVoidWeb;
 
+[Table("Mail")]
 public class Mail
 {
     [Key]
@@ -10,6 +12,7 @@ public class Mail
     public long Id { get; set; }
 
     [Required]
+    [Index("IX_Mail_To")]
     public required string To { get; set; }
 
     [Required]
@@ -18,6 +21,7 @@ public class Mail
     public bool IsHtml { get; set; }
 
     [Required]
+    [Index("IX_Mail_From")]
     public required string From { get; set; }
 
     public string? FromName { get; set; }
@@ -27,10 +31,15 @@ public class Mail
     public required string Subject { get; set; }
 
     public string? Charsets { get; set; }
+
+    [Default(typeof(DateTime), "CURRENT_TIMESTAMP")]
     public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
+
+    [Index("IX_Mail_MailGroupPath")]
     public string? MailGroupPath { get; set; }
 }
 
+[Table("Contact")]
 public class Contact
 {
     [Key]
@@ -38,6 +47,7 @@ public class Contact
     public long Id { get; set; }
 
     [Required]
+    [Index("IX_Contact_From", IsUnique = true)]
     public required string From { get; set; }
 
     [Required]
