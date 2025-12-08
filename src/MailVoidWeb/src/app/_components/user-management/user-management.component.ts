@@ -183,7 +183,7 @@ export class UserManagementComponent {
     const request: CreateUserRequest = {
       userName: formValue.username,
       password: formValue.password,
-      role: formValue.role,
+      role: Number(formValue.role) as Role,
     };
 
     try {

@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json.Serialization;
 using MailVoidApi.Authentication;
 using MailVoidApi.Data;
 using MailVoidApi.Hubs;
@@ -40,7 +41,11 @@ public class Program
         builder.Services.AddHostedService<BackgroundWorkerService>();
         builder.Services.AddHostedService<MailCleanupService>();
         builder.Services.AddHostedService<WebhookCleanupService>();
-        builder.Services.AddControllers();
+        builder.Services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
         builder.Services.AddSignalR();
         builder.Services.AddMemoryCache();
         // Register HttpContextAccessor

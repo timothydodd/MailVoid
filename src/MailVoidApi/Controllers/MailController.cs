@@ -120,6 +120,7 @@ public class MailController : ControllerBase
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
         parameters.Add("UserId", currentUserId);
+        parameters.Add("IsAdmin", isAdmin);
 
         if (!string.IsNullOrEmpty(options.To))
         {
@@ -127,18 +128,29 @@ public class MailController : ControllerBase
             parameters.Add("To", options.To);
         }
 
+        // Filter by mail group access - user must have access to the mail group
+        // Admins can see all, others can only see emails in groups they have access to
+        if (!isAdmin)
+        {
+            whereClauses.Add(@"(
+                mg.IsPublic = 1
+                OR mg.OwnerUserId = @UserId
+                OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)
+            )");
+        }
+
         var whereClause = whereClauses.Count > 0 ? "WHERE " + string.Join(" AND ", whereClauses) : "";
 
         if (options.PageSize == 1)
         {
             results.TotalCount = await db.ExecuteScalarAsync<int>(
-                $"SELECT COUNT(*) FROM Mail m {whereClause}", parameters);
+                $"SELECT COUNT(*) FROM Mail m LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path {whereClause}", parameters);
         }
 
         var offset = (options.Page - 1) * options.PageSize;
         var mails = await db.QueryAsync<Mail>(
-            $"SELECT * FROM Mail m {whereClause} ORDER BY CreatedOn DESC LIMIT @Limit OFFSET @Offset",
-            new { Limit = options.PageSize, Offset = offset, To = options.To, UserId = currentUserId });
+            $"SELECT m.* FROM Mail m LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path {whereClause} ORDER BY m.CreatedOn DESC LIMIT @Limit OFFSET @Offset",
+            new { Limit = options.PageSize, Offset = offset, To = options.To, UserId = currentUserId, IsAdmin = isAdmin });
 
         var mailList = mails.ToList();
         var mailIds = mailList.Select(m => m.Id).ToList();
