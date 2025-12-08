@@ -5,22 +5,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 MailVoid is a developer email testing tool with two main components:
-- **Backend API**: C# .NET 9 web API that manages emails, authentication, and webhook integration
-- **Frontend**: Angular 19 web application for viewing and managing test emails
+- **Backend API**: C# .NET 10 web API that manages emails, authentication, and webhook integration
+- **Frontend**: Angular 19 web application for viewing and managing test emails and webhooks
 
-The application receives webhook events from your mail server and stores emails in a MySQL database for developers to view through the web interface.
+The application receives webhook events from your mail server and stores emails in a MySQL database for developers to view through the web interface. It also includes a webhook capture feature for testing HTTP webhooks.
 
 ## Architecture
 
 ### Backend (src/MailVoidApi/)
-- **Controllers**: REST API endpoints for authentication, mail management, and webhooks
-- **Services**: Core business logic including AuthService, MailGroupService, UserService, and background task processing
-- **Models**: Entity classes for User, Mail, MailGroup, and RefreshToken with Entity Framework annotations
-- **Data**: MailVoidDbContext for Entity Framework Core database operations
+- **Controllers**: REST API endpoints for authentication, mail management, webhook capture, and webhook management
+- **Services**: Core business logic including AuthService, MailGroupService, UserService, WebhookBucketService, and background task processing
+- **Models**: Entity classes for User, Mail, MailGroup, RefreshToken, Webhook, and WebhookBucket with RoboDodd.OrmLite annotations
+- **Data**: DatabaseService for RoboDodd.OrmLite database operations (Dapper-based)
 - **Common**: Shared utilities including pagination, caching (TimedCache), and database extensions
 - **Authentication**: JWT-based authentication with refresh token support
-- **Database**: MySQL with Entity Framework Core 8 and Pomelo MySQL provider
-- **Real-time**: SignalR hub for real-time email notifications
+- **Database**: MySQL with RoboDodd.OrmLite (Dapper-based micro ORM)
+- **Real-time**: SignalR hub for real-time email and webhook notifications
 
 ### Frontend (src/MailVoidWeb/)
 - **Architecture**: Angular 19 standalone components with reactive forms and routing
@@ -39,7 +39,7 @@ The application receives webhook events from your mail server and stores emails 
 dotnet run                    # Run API (also starts frontend via SPA proxy)
 dotnet build                  # Build the API
 dotnet test                   # Run tests (if any exist)
-dotnet ef database update     # Apply database migrations
+# Note: Database tables are created automatically on startup (no migrations needed)
 ```
 
 ### Frontend (Angular)
@@ -70,12 +70,15 @@ npm run format                # Format code with Prettier
 ## Key Patterns
 
 ### Backend Patterns
-- Controllers use Entity Framework Core with Pomelo MySQL provider for database operations
+- Controllers use RoboDodd.OrmLite (Dapper-based) for database operations
+- Use `db.From<T>()` for fluent query building with `.Where()`, `.OrderBy()`, `.Limit()`
+- Use `db.SelectAsync<T>()`, `db.SingleAsync<T>()`, `db.InsertAsync()`, `db.UpdateAsync()`, `db.DeleteAsync()`
+- Use `db.CountAsync<T>()` for counting records
 - JWT authentication with refresh token rotation
 - Background task queue for async operations
 - Pagination implemented via PagedResults<T> utility
 - Custom exception handling and logging
-- DbContext pattern with MailVoidDbContext for data access
+- DatabaseService pattern for connection management
 
 ### Frontend Patterns
 - Standalone Angular components (no NgModules)
@@ -102,6 +105,8 @@ npm run format                # Format code with Prettier
 - **MailGroup**: Rules-based email organization with retention policies
 - **RefreshToken**: Secure token rotation for authentication
 - **UserMailRead**: Tracking read status for emails per user
+- **Webhook**: Captured HTTP webhook requests
+- **WebhookBucket**: Organization for webhook captures with retention policies
 
 ## Default Credentials
 - Username: admin
@@ -113,19 +118,21 @@ npm run format                # Format code with Prettier
 - `/api/mailgroup/*`: Mail group management
 - `/api/user/*`: User management and settings
 - `/api/health`: Health check endpoint
+- `/api/hook/{bucket}`: Webhook capture endpoint (POST/PUT/PATCH - no auth required)
+- `/api/webhooks/*`: Webhook management API (requires auth)
 - `/webhooks/mail`: Mail server webhook endpoint
 - `/mailHub`: SignalR hub for real-time notifications
 
 ## Dependencies
 
 ### Backend NuGet Packages
-- Microsoft.AspNetCore.Authentication.JwtBearer (9.0.8)
-- Microsoft.EntityFrameworkCore (8.0.17) - Using v8 for Pomelo compatibility
-- Pomelo.EntityFrameworkCore.MySql (8.0.3)
-- Microsoft.AspNetCore.SpaProxy (9.0.8)
-- AspNetCore.HealthChecks.MySql (9.0.0)
-- Microsoft.Extensions.Caching.Memory (9.0.8)
-- Microsoft.Extensions.Diagnostics.HealthChecks (9.0.8)
+- Microsoft.AspNetCore.Authentication.JwtBearer
+- RoboDodd.OrmLite (git submodule - Dapper-based micro ORM)
+- MySqlConnector
+- Dapper
+- Microsoft.AspNetCore.SpaProxy
+- AspNetCore.HealthChecks.MySql
+- Microsoft.Extensions.Caching.Memory
 
 ### Frontend NPM Packages
 - Angular 19 (v20.1.5) - Core framework

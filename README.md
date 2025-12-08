@@ -9,29 +9,32 @@ MailVoid is a developer-focused email testing tool that simplifies managing mult
 
 ## 🚀 Features
 
-- **Backend API**: RESTful API built with C# .NET 9
+- **Backend API**: RESTful API built with C# .NET 10
   - JWT-based authentication with refresh token rotation
   - Webhook integration for email capture from your mail server
+  - Webhook capture feature for testing HTTP webhooks
   - Health check endpoints for monitoring
   - Real-time notifications via SignalR
-  
+
 - **Web Frontend**: Modern Angular 19 SPA
   - Clean, responsive interface for email management
   - Email grouping and organization
+  - Webhook capture and inspection UI
   - User settings and password management
-  - Real-time email notifications
-  
-- **Database**: MySQL with Entity Framework Core
+  - Real-time email and webhook notifications
+
+- **Database**: MySQL with RoboDodd.OrmLite (Dapper-based)
   - Efficient email storage and retrieval
   - User management and authentication
   - Email grouping with retention policies
+  - Webhook bucket organization
 
 ## 📋 Requirements
 
-- .NET 9 SDK
-- Node.js 20.19+ and npm
+- .NET 10 SDK
+- Node.js 22+ and npm
 - MySQL 8.0+
-- Mail server with webhook support
+- Mail server with webhook support (optional)
 
 ## 🛠️ Installation
 
@@ -64,12 +67,7 @@ cd MailVoid
    }
    ```
 
-3. Run database migrations:
-   ```bash
-   dotnet ef database update
-   ```
-
-4. Start the API (this also serves the frontend in production):
+3. Start the API (tables are created automatically on startup):
    ```bash
    dotnet run
    ```
@@ -134,8 +132,8 @@ docker run -p 5133:80 mailvoid
 ### Technologies Used
 
 **Backend:**
-- .NET 9
-- Entity Framework Core 8 with Pomelo MySQL provider
+- .NET 10
+- RoboDodd.OrmLite (Dapper-based micro ORM)
 - JWT Authentication
 - SignalR for real-time updates
 
@@ -155,8 +153,8 @@ MailVoid/
 │   ├── MailVoidApi/          # .NET Backend API
 │   │   ├── Controllers/      # API endpoints
 │   │   ├── Services/         # Business logic
-│   │   ├── Models/          # Entity models
-│   │   └── Data/            # EF Core context
+│   │   ├── Models/           # Entity models
+│   │   └── Data/             # Database service
 │   └── MailVoidWeb/         # Angular Frontend
 │       ├── src/app/
 │       │   ├── Pages/       # Page components
@@ -182,4 +180,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - [Microsoft](https://microsoft.com/) for .NET and development tools
 - [Angular](https://angular.io/) for the frontend framework
-- [Pomelo](https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql) for MySQL EF Core provider
+- [Dapper](https://github.com/DapperLib/Dapper) for the micro ORM foundation
