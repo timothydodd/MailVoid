@@ -40,10 +40,12 @@ jobs:
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -60,6 +62,10 @@ jobs:
       working-directory: src/MailVoidWeb
       run: npm run lint
       continue-on-error: true
+
+    - name: Build rd-ui library
+      working-directory: src/MailVoidWeb
+      run: npm run lib:build
 
     - name: Build
       working-directory: src/MailVoidWeb

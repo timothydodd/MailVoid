@@ -24,6 +24,11 @@ COPY . .
 RUN chmod +x ./MailVoidApi/replace_vars.sh
 RUN ./MailVoidApi/replace_vars.sh ./MailVoidWeb/src/environments
 
+# Build rd-ui library before main build
+WORKDIR "/src/MailVoidWeb"
+RUN npm ci
+RUN npm run lib:build
+
 WORKDIR "/src/MailVoidApi"
 RUN dotnet build "./MailVoidApi.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
