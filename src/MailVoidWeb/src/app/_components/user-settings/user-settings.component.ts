@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../_services/auth-service';
-import { ModalContainerService } from '../modal/modal-container.service';
-import { ModalLayoutComponent } from '../modal/modal-layout/modal-layout.component';
+import { ModalContainerService, ModalLayoutComponent } from '@rd-ui';
 import { UserManagementComponent } from '../user-management/user-management.component';
 import { ChangePasswordComponent } from './change-password/change-password.component';
 
@@ -11,7 +10,7 @@ import { ChangePasswordComponent } from './change-password/change-password.compo
   selector: 'app-user-settings',
   standalone: true,
   imports: [FormsModule, LucideAngularModule, ChangePasswordComponent, UserManagementComponent, ModalLayoutComponent],
-  template: ` <app-modal-layout>
+  template: ` <rd-modal-layout>
     <div slot="header" class="settings-header">
       <h3 class="settings-title">User Settings</h3>
       <p class="settings-subtitle">Manage your account and system settings</p>
@@ -55,7 +54,7 @@ import { ChangePasswordComponent } from './change-password/change-password.compo
         <div class="text-danger">{{ errorMessage() }}</div>
       }
     </div>
-  </app-modal-layout>`,
+  </rd-modal-layout>`,
   styleUrl: './user-settings.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

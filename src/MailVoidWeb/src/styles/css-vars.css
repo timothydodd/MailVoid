@@ -1,4 +1,18 @@
 
+/* rd-ui CSS variable mappings */
+:root {
+  --rd-background: var(--background);
+  --rd-foreground: var(--foreground);
+  --rd-primary: var(--primary);
+  --rd-surface: var(--bGDark);
+  --rd-surface-variant: var(--bGLight);
+  --rd-on-surface: var(--text-primary);
+  --rd-border-color: var(--border-color);
+  --rd-focus-ring: var(--primary);
+  --rd-dropdown-bg: var(--bGDark);
+  --rd-border-radius: 8px;
+}
+
 /* Dark Theme (default) */
 :root,
 :root[data-theme="dark"] {

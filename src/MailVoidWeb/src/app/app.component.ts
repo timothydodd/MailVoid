@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ModalContainerService } from './_components/modal/modal-container.service';
+import { ModalContainerService } from '@rd-ui';
 import { ValidationDefaultsComponent } from './_components/validation-defaults/validation-defaults.component';
 import { AuthService } from './_services/auth-service';
 import { MainNavBarComponent } from './Pages/main-nav-bar/main-nav-bar.component';

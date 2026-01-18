@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, combineLatest, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
-import { ModalContainerService } from '../../_components/modal/modal-container.service';
+import { ModalContainerService } from '@rd-ui';
 import {
   FilterOptions,
   MailBox,
@@ -25,7 +25,7 @@ type SortDirection = 'asc' | 'desc';
 @Component({
   selector: 'app-mail',
   standalone: true,
-  imports: [CommonModule, BoxListComponent, LucideAngularModule, MailSettingsModalComponent],
+  imports: [CommonModule, BoxListComponent, LucideAngularModule],
   template: `
     <div class="mail-container">
       <!-- Left Sidebar (Hidden on mobile, shown as overlay when menu is open) -->

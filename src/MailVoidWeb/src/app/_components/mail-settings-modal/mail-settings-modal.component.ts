@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { ModalContainerService } from '../modal/modal-container.service';
-import { ModalLayoutComponent } from '../modal/modal-layout/modal-layout.component';
+import { ModalContainerService, ModalLayoutComponent } from '@rd-ui';
 import { MailGroupComponent } from './mail-group/mail-group.component';
 
 @Component({
   selector: 'app-mail-settings-modal',
   imports: [MailGroupComponent, ModalLayoutComponent],
   template: `
-    <app-modal-layout>
+    <rd-modal-layout>
       <div slot="header" class="settings-header">
         <h3 class="settings-title">Mail Settings</h3>
         <p class="settings-subtitle">Manage your mail groups</p>
@@ -19,7 +18,7 @@ import { MailGroupComponent } from './mail-group/mail-group.component';
           <app-mail-group></app-mail-group>
         </div>
       </div>
-    </app-modal-layout>
+    </rd-modal-layout>
   `,
   styleUrl: './mail-settings-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

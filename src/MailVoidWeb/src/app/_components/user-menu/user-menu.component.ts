@@ -4,13 +4,13 @@ import { LucideAngularModule } from 'lucide-angular';
 import { take } from 'rxjs';
 import { AuthService, User } from '../../_services/auth-service';
 import { ClickOutsideDirective } from '../../_services/click-outside.directive';
-import { ModalContainerService } from '../modal/modal-container.service';
+import { ModalContainerService } from '@rd-ui';
 import { UserSettingsComponent } from '../user-settings/user-settings.component';
 
 @Component({
   selector: 'app-user-menu',
   standalone: true,
-  imports: [LucideAngularModule, UserSettingsComponent, ClickOutsideDirective],
+  imports: [LucideAngularModule, ClickOutsideDirective],
   template: `
     @if (user()) {
       <button type="button" class="btn btn-icon user-menu-btn" (click)="isOpen.set(!isOpen())" title="User menu">
