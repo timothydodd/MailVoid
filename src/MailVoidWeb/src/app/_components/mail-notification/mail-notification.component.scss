@@ -1,3 +1,26 @@
+// CSS Animations for enter/leave
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
 .notification-container {
   position: fixed;
   top: 80px;
@@ -19,13 +42,11 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  transition: all 0.3s ease;
-  opacity: 0;
-  transform: translateX(20px);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  animation: slideIn 300ms ease-out forwards;
 
-  &.show {
-    opacity: 1;
-    transform: translateX(0);
+  &.hiding {
+    animation: slideOut 300ms ease-in forwards;
   }
 
   &:hover {

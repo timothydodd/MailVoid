@@ -1,10 +1,8 @@
 <div class="notification-container">
-  <div 
-    *ngFor="let notification of notifications; let i = index" 
-    @slideIn
-    [@pulse]="pulseState"
+  <div
+    *ngFor="let notification of notifications; let i = index"
     class="notification-item"
-    [class.show]="notification.show"
+    [class.hiding]="notification.hiding"
     (click)="removeNotification(i)"
   >
     <div class="notification-icon">

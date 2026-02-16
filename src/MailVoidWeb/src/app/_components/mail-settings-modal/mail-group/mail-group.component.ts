@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { NgSelectModule } from '@ng-select/ng-select';
+import { DropdownComponent } from '@rd-ui';
 import { LucideAngularModule } from 'lucide-angular';
 import { ValdemortModule } from 'ngx-valdemort';
+import { ConfirmDialogService } from '@rd-ui';
 import {
   CreateMailGroupRequest,
   MailGroup,
@@ -13,7 +14,7 @@ import {
 import { AuthService } from '../../../_services/auth-service';
 @Component({
   selector: 'app-mail-group',
-  imports: [LucideAngularModule, ReactiveFormsModule, FormsModule, NgSelectModule, ValdemortModule],
+  imports: [LucideAngularModule, ReactiveFormsModule, FormsModule, DropdownComponent, ValdemortModule],
   template: `
     <div class="mail-group-layout">
       <div class="info-banner">
@@ -312,20 +313,15 @@ import { AuthService } from '../../../_services/auth-service';
             <div class="add-user-section">
               <h5>Add User Access</h5>
               <div class="add-user-form">
-                <ng-select
+                <rd-dropdown
                   [(ngModel)]="selectedUserId"
                   [items]="availableUsers()"
                   bindLabel="userName"
                   bindValue="id"
-                  placeholder="Select a user to grant access"
+                  [placeholder]="'Select a user to grant access'"
+                  [searchable]="true"
                   class="user-select"
-                >
-                  @for (user of availableUsers(); track user) {
-                    <ng-option [value]="user.id">
-                      {{ user.userName }}
-                    </ng-option>
-                  }
-                </ng-select>
+                ></rd-dropdown>
                 <button class="btn btn-primary" [disabled]="!selectedUserId || isLoading()" (click)="addUser()">
                   <lucide-icon name="plus" size="14"></lucide-icon>
                   Add User
@@ -377,6 +373,7 @@ import { AuthService } from '../../../_services/auth-service';
 export class MailGroupComponent {
   mailService = inject(MailService);
   authService = inject(AuthService);
+  private confirmDialog = inject(ConfirmDialogService);
 
   // Data signals
   mailGroups = signal<MailGroup[]>([]);
@@ -640,23 +637,21 @@ export class MailGroupComponent {
   }
 
   deleteGroup(group: MailGroup) {
-    if (
-      !confirm(`Are you sure you want to delete the mail group "${group.subdomain}"? This action cannot be undone.`)
-    ) {
-      return;
-    }
+    this.confirmDialog.confirmDelete(group.subdomain ?? undefined).subscribe((confirmed) => {
+      if (!confirmed) return;
 
-    this.isLoading.set(true);
+      this.isLoading.set(true);
 
-    this.mailService.deleteMailGroup(group.id).subscribe({
-      next: () => {
-        this.loadMailGroups();
-        this.isLoading.set(false);
-      },
-      error: (error) => {
-        console.error('Error deleting group:', error);
-        this.isLoading.set(false);
-      },
+      this.mailService.deleteMailGroup(group.id).subscribe({
+        next: () => {
+          this.loadMailGroups();
+          this.isLoading.set(false);
+        },
+        error: (error) => {
+          console.error('Error deleting group:', error);
+          this.isLoading.set(false);
+        },
+      });
     });
   }
 }

@@ -1,6 +1,7 @@
 
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ConfirmDialogService } from '@rd-ui';
 import { CreateUserRequest, Role, UpdateUserRoleRequest, User } from '../../_models/user.model';
 import { AuthService } from '../../_services/auth-service';
 import { UserManagementService } from '../../_services/user-management.service';
@@ -131,6 +132,7 @@ export class UserManagementComponent {
   private userManagementService = inject(UserManagementService);
   private authService = inject(AuthService);
   private fb = inject(FormBuilder);
+  private confirmDialog = inject(ConfirmDialogService);
 
   users = signal<User[]>([]);
   isLoading = signal(false);
@@ -250,22 +252,23 @@ export class UserManagementComponent {
     }
   }
 
-  async deleteUser(userId: string) {
-    const confirmed = confirm('Are you sure you want to delete this user? This action cannot be undone.');
-    if (!confirmed) return;
+  deleteUser(userId: string) {
+    this.confirmDialog.confirmDelete('this user').subscribe(async (confirmed) => {
+      if (!confirmed) return;
 
-    this.isDeletingUser.set(userId);
-    this.clearMessages();
+      this.isDeletingUser.set(userId);
+      this.clearMessages();
 
-    try {
-      await this.userManagementService.deleteUser(userId);
-      this.successMessage.set('User deleted successfully');
-      await this.loadUsers();
-    } catch (error: any) {
-      this.errorMessage.set(error.message || 'Failed to delete user');
-    } finally {
-      this.isDeletingUser.set(null);
-    }
+      try {
+        await this.userManagementService.deleteUser(userId);
+        this.successMessage.set('User deleted successfully');
+        await this.loadUsers();
+      } catch (error: any) {
+        this.errorMessage.set(error.message || 'Failed to delete user');
+      } finally {
+        this.isDeletingUser.set(null);
+      }
+    });
   }
 
   getRoleDisplayName(role: Role): string {

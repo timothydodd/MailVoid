@@ -59,7 +59,12 @@ type SortDirection = 'asc' | 'desc';
         @if (selectedBucket()) {
           <div class="content-header">
             <h2>{{ selectedBucket() }}</h2>
-            <code class="endpoint-url">POST /api/hook/{{ selectedBucket() }}</code>
+            <div class="endpoint-row">
+              <code class="endpoint-url">{{ endpointUrl() }}</code>
+              <button class="btn btn-icon btn-copy" (click)="copyEndpointUrl()" [title]="copyTooltip()">
+                <lucide-icon [name]="copyIcon()" size="14"></lucide-icon>
+              </button>
+            </div>
           </div>
         } @else {
           <div class="content-header">
@@ -161,6 +166,13 @@ export class HooksComponent {
   buckets = signal<WebhookBucket[] | null>(null);
   webhooks = signal<WebhookListItem[] | null>(null);
   selectedBucket = signal<string | null>(null);
+  copyIcon = signal<string>('copy');
+  copyTooltip = signal<string>('Copy URL');
+
+  endpointUrl = computed(() => {
+    const origin = window.location.origin;
+    return `${origin}/api/hook/${this.selectedBucket()}`;
+  });
 
   // Sorting
   sortColumn = signal<SortColumn>('createdOn');
@@ -297,5 +309,12 @@ export class HooksComponent {
     if (this.currentPage() > 1) {
       this.currentPage.update((page) => page - 1);
     }
+  }
+
+  copyEndpointUrl() {
+    navigator.clipboard.writeText(this.endpointUrl()).then(() => {
+      this.copyTooltip.set('Copied!');
+      setTimeout(() => this.copyTooltip.set('Copy URL'), 2000);
+    });
   }
 }

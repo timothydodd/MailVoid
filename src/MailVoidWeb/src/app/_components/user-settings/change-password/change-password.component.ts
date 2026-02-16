@@ -10,7 +10,7 @@ import {
   ValidatorFn,
   Validators,
 } from '@angular/forms';
-import { ToastrService } from 'ngx-toastr';
+import { ToastService } from '@rd-ui';
 import { ValdemortModule } from 'ngx-valdemort';
 import { AuthService } from '../../../_services/auth-service';
 import { ValidationDefaultsComponent } from '../../validation-defaults/validation-defaults.component';
@@ -50,7 +50,7 @@ import { ValidationDefaultsComponent } from '../../validation-defaults/validatio
 })
 export class ChangePasswordComponent {
   private authService = inject(AuthService);
-  private toastr = inject(ToastrService);
+  private toastr = inject(ToastService);
   errorMessage = signal('');
   form = signal<FormGroup<ChangePasswordForm>>(
     new FormGroup(

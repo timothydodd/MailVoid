@@ -4,7 +4,6 @@ import { registerLocaleData } from '@angular/common';
 import localeEn from '@angular/common/locales/en';
 
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
 import { JwtModule } from '@auth0/angular-jwt';
 import {
   ArrowLeft,
@@ -42,7 +41,6 @@ import {
   Webhook,
   X,
 } from 'lucide-angular';
-import { provideToastr } from 'ngx-toastr';
 import { environment } from '../environments/environment';
 import { JwtInterceptor } from './_services/jwt-interceptor';
 import { routes } from './app.routes';
@@ -56,9 +54,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideAnimations(),
     provideHttpClient(withInterceptorsFromDi()),
-    importProvidersFrom([BrowserAnimationsModule]),
     {
       provide: HTTP_INTERCEPTORS,
       useClass: JwtInterceptor,
@@ -110,7 +106,6 @@ export const appConfig: ApplicationConfig = {
         Webhook,
       })
     ),
-    provideToastr(),
     { provide: LOCALE_ID, useValue: 'en-US' },
   ],
 };

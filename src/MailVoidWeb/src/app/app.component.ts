@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ModalContainerService } from '@rd-ui';
+import { ModalContainerService, ToastComponent } from '@rd-ui';
 import { ValidationDefaultsComponent } from './_components/validation-defaults/validation-defaults.component';
 import { AuthService } from './_services/auth-service';
 import { MainNavBarComponent } from './Pages/main-nav-bar/main-nav-bar.component';
@@ -12,7 +12,7 @@ import { MailNotificationComponent } from './_components/mail-notification/mail-
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, MainNavBarComponent, ValidationDefaultsComponent, MailNotificationComponent],
+  imports: [CommonModule, RouterOutlet, MainNavBarComponent, ValidationDefaultsComponent, MailNotificationComponent, ToastComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
