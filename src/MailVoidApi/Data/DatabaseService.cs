@@ -1,8 +1,8 @@
-using MySqlConnector;
-using RoboDodd.OrmLite;
+﻿using MailVoidApi.Models;
 using MailVoidWeb;
 using MailVoidWeb.Data.Models;
-using MailVoidApi.Models;
+using MySqlConnector;
+using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Data;
 
@@ -38,17 +38,17 @@ public class DatabaseService : IDatabaseService
         using var db = await GetConnectionAsync();
 
         // Create tables in order of dependencies
-        await db.CreateTableIfNotExistsAsync<User>();
-        await db.CreateTableIfNotExistsAsync<Mail>();
-        await db.CreateTableIfNotExistsAsync<Contact>();
-        await db.CreateTableIfNotExistsAsync<MailGroup>();
-        await db.CreateTableIfNotExistsAsync<MailGroupUser>();
-        await db.CreateTableIfNotExistsAsync<RefreshToken>();
-        await db.CreateTableIfNotExistsAsync<UserMailRead>();
+        await db.CreateTableIfNotExistsAsync<User>(true);
+        await db.CreateTableIfNotExistsAsync<Mail>(true);
+        await db.CreateTableIfNotExistsAsync<Contact>(true);
+        await db.CreateTableIfNotExistsAsync<MailGroup>(true);
+        await db.CreateTableIfNotExistsAsync<MailGroupUser>(true);
+        await db.CreateTableIfNotExistsAsync<RefreshToken>(true);
+        await db.CreateTableIfNotExistsAsync<UserMailRead>(true);
 
         // Webhook tables
-        await db.CreateTableIfNotExistsAsync<WebhookBucket>();
-        await db.CreateTableIfNotExistsAsync<Webhook>();
+        await db.CreateTableIfNotExistsAsync<WebhookBucket>(true);
+        await db.CreateTableIfNotExistsAsync<Webhook>(true);
 
         _logger.LogInformation("Database tables initialized successfully");
     }
