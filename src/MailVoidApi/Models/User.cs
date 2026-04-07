@@ -24,4 +24,8 @@ public class User
 
     [Required]
     public Role Role { get; set; } = Role.User;
+
+    [StringLength(255)]
+    [Index("IX_User_Subdomain", IsUnique = true)]
+    public string? Subdomain { get; set; }
 }

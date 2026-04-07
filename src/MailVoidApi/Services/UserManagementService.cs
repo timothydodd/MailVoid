@@ -29,7 +29,7 @@ public class UserManagementService
         return await db.SingleByIdAsync<User>(userId);
     }
 
-    public async Task<User?> CreateUserAsync(string userName, string password, Role role = Role.User)
+    public async Task<User?> CreateUserAsync(string userName, string password, Role role = Role.User, string? subdomain = null)
     {
         using var db = await _db.GetConnectionAsync();
 
@@ -41,13 +41,25 @@ public class UserManagementService
             return null; // Username already exists
         }
 
+        // Check if subdomain is already taken
+        if (!string.IsNullOrWhiteSpace(subdomain))
+        {
+            subdomain = subdomain.Trim().ToLowerInvariant();
+            var existingSubdomain = await db.ExistsAsync<User>(u => u.Subdomain == subdomain);
+            if (existingSubdomain)
+            {
+                throw new InvalidOperationException("Subdomain is already assigned to another user.");
+            }
+        }
+
         var user = new User
         {
             Id = Guid.NewGuid(),
             UserName = userName,
             PasswordHash = "", // Will be set below
             TimeStamp = DateTime.UtcNow,
-            Role = role
+            Role = role,
+            Subdomain = subdomain
         };
 
         // Hash the password

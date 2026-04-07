@@ -3,6 +3,7 @@ export interface User {
   userName: string;
   role: Role;
   timeStamp: string;
+  subdomain: string | null;
 }
 
 export enum Role {
@@ -14,6 +15,7 @@ export interface CreateUserRequest {
   userName: string;
   password: string;
   role: Role;
+  subdomain?: string;
 }
 
 export interface UpdateUserRoleRequest {

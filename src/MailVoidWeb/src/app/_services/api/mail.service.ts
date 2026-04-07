@@ -187,6 +187,7 @@ export interface User {
   userName: string;
   role: number;
   timeStamp: string;
+  subdomain: string | null;
 }
 
 export interface MailGroupUser {

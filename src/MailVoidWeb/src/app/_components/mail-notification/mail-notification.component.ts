@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { SignalRService, MailNotification } from '../../services/signalr.service';
 
@@ -18,7 +19,7 @@ export class MailNotificationComponent implements OnInit, OnDestroy {
   notifications: NotificationItem[] = [];
   private destroy$ = new Subject<void>();
 
-  constructor(private signalRService: SignalRService) {}
+  constructor(private signalRService: SignalRService, private router: Router) {}
 
   ngOnInit(): void {
     this.signalRService.newMail$
@@ -37,7 +38,7 @@ export class MailNotificationComponent implements OnInit, OnDestroy {
     const notification: NotificationItem = { ...mail, hiding: false };
     this.notifications.unshift(notification);
 
-    // Remove notification after 5 seconds
+    // Remove notification after 30 seconds
     setTimeout(() => {
       notification.hiding = true;
       setTimeout(() => {
@@ -46,7 +47,7 @@ export class MailNotificationComponent implements OnInit, OnDestroy {
           this.notifications.splice(index, 1);
         }
       }, 300);
-    }, 5000);
+    }, 30000);
 
     // Keep only last 5 notifications
     if (this.notifications.length > 5) {
@@ -54,11 +55,16 @@ export class MailNotificationComponent implements OnInit, OnDestroy {
     }
   }
 
-  removeNotification(index: number): void {
-    if (this.notifications[index]) {
-      this.notifications[index].hiding = true;
+  openNotification(index: number): void {
+    const notification = this.notifications[index];
+    if (notification) {
+      this.router.navigate(['mail', notification.id]);
+      notification.hiding = true;
       setTimeout(() => {
-        this.notifications.splice(index, 1);
+        const i = this.notifications.indexOf(notification);
+        if (i > -1) {
+          this.notifications.splice(i, 1);
+        }
       }, 300);
     }
   }

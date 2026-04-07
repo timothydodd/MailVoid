@@ -163,6 +163,18 @@ export class AuthService {
     }
   }
 
+  getSubdomain(): string | null {
+    const token = this.getToken();
+    if (!token) return null;
+
+    try {
+      const payload = this.getTokenPayload(token);
+      return payload?.subdomain || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   private storeTokens(accessToken: string, refreshToken: string) {
     localStorage.setItem(this.tokenKey, accessToken);
     localStorage.setItem(this.refreshTokenKey, refreshToken);

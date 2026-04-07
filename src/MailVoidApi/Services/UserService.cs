@@ -58,10 +58,20 @@ public class UserService : IUserService
         }
     }
 
+    public string? GetSubdomain()
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext?.User?.Identity is not ClaimsIdentity identity)
+            return null;
+
+        var subdomainClaim = identity.FindFirst("subdomain");
+        return subdomainClaim?.Value;
+    }
 }
 public interface IUserService
 {
     Guid GetUserId();
     string GetRole();
     bool IsAdmin();
+    string? GetSubdomain();
 }

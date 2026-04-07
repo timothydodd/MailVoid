@@ -55,14 +55,13 @@ public class MailController : ControllerBase
     public async Task<IEnumerable<MailBox>> GetBoxes(bool showAll = false)
     {
         var currentUserId = _userService.GetUserId();
-        var role = _userService.GetRole();
-        var isAdmin = role == "Admin";
+        var isAdmin = _userService.IsAdmin();
+        var userSubdomain = _userService.GetSubdomain();
 
         using var db = await _db.GetConnectionAsync();
 
-        // Get distinct mailboxes with their mail group info using a simpler approach
         string sql;
-        if (isAdmin && showAll)
+        if (isAdmin)
         {
             sql = @"SELECT DISTINCT m.`To`, m.MailGroupPath, mg.Subdomain, mg.IsPublic, mg.OwnerUserId
                     FROM Mail m
@@ -73,12 +72,12 @@ public class MailController : ControllerBase
             sql = @"SELECT DISTINCT m.`To`, m.MailGroupPath, mg.Subdomain, mg.IsPublic, mg.OwnerUserId
                     FROM Mail m
                     LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path
-                    WHERE (mg.IsPublic = 1 OR mg.OwnerUserId = @UserId
-                           OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId))
-                           OR (mg.Id IS NULL AND @IsAdmin = 1)";
+                    WHERE mg.OwnerUserId = @UserId
+                           OR mg.Subdomain = @UserSubdomain
+                           OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)";
         }
 
-        var mailboxes = await db.QueryAsync<dynamic>(sql, new { UserId = currentUserId, IsAdmin = isAdmin });
+        var mailboxes = await db.QueryAsync<dynamic>(sql, new { UserId = currentUserId, UserSubdomain = userSubdomain });
 
         var result = new List<MailBox>();
         foreach (var mailbox in mailboxes)
@@ -109,8 +108,8 @@ public class MailController : ControllerBase
     public async Task<PagedResults<MailWithReadStatus>> GetMails([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] FilterOptions? options = null)
     {
         var currentUserId = _userService.GetUserId();
-        var role = _userService.GetRole();
-        var isAdmin = role == "Admin";
+        var isAdmin = _userService.IsAdmin();
+        var userSubdomain = _userService.GetSubdomain();
 
         var results = new PagedResults<MailWithReadStatus>();
         options ??= new FilterOptions();
@@ -120,7 +119,7 @@ public class MailController : ControllerBase
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
         parameters.Add("UserId", currentUserId);
-        parameters.Add("IsAdmin", isAdmin);
+        parameters.Add("UserSubdomain", userSubdomain);
 
         if (!string.IsNullOrEmpty(options.To))
         {
@@ -128,13 +127,11 @@ public class MailController : ControllerBase
             parameters.Add("To", options.To);
         }
 
-        // Filter by mail group access - user must have access to the mail group
-        // Admins can see all, others can only see emails in groups they have access to
         if (!isAdmin)
         {
             whereClauses.Add(@"(
-                mg.IsPublic = 1
-                OR mg.OwnerUserId = @UserId
+                mg.OwnerUserId = @UserId
+                OR mg.Subdomain = @UserSubdomain
                 OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)
             )");
         }
@@ -150,7 +147,7 @@ public class MailController : ControllerBase
         var offset = (options.Page - 1) * options.PageSize;
         var mails = await db.QueryAsync<Mail>(
             $"SELECT m.* FROM Mail m LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path {whereClause} ORDER BY m.CreatedOn DESC LIMIT @Limit OFFSET @Offset",
-            new { Limit = options.PageSize, Offset = offset, To = options.To, UserId = currentUserId, IsAdmin = isAdmin });
+            new { Limit = options.PageSize, Offset = offset, To = options.To, UserId = currentUserId, UserSubdomain = userSubdomain });
 
         var mailList = mails.ToList();
         var mailIds = mailList.Select(m => m.Id).ToList();
@@ -201,15 +198,28 @@ public class MailController : ControllerBase
     public async Task<IActionResult> GetMailGroups()
     {
         var userId = _userService.GetUserId();
+        var isAdmin = _userService.IsAdmin();
+        var userSubdomain = _userService.GetSubdomain();
         using var db = await _db.GetConnectionAsync();
 
-        var groups = await db.QueryAsync<dynamic>(
-            @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate
-              FROM MailGroup mg
-              WHERE mg.Subdomain IS NOT NULL AND mg.IsUserPrivate = 0
-              AND (mg.IsPublic = 1 OR mg.OwnerUserId = @UserId
-                   OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId))",
-            new { UserId = userId });
+        string sql;
+        if (isAdmin)
+        {
+            sql = @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate
+                    FROM MailGroup mg
+                    WHERE mg.Subdomain IS NOT NULL AND mg.IsUserPrivate = 0";
+        }
+        else
+        {
+            sql = @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate
+                    FROM MailGroup mg
+                    WHERE mg.Subdomain IS NOT NULL AND mg.IsUserPrivate = 0
+                    AND (mg.OwnerUserId = @UserId
+                         OR mg.Subdomain = @UserSubdomain
+                         OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId))";
+        }
+
+        var groups = await db.QueryAsync<dynamic>(sql, new { UserId = userId, UserSubdomain = userSubdomain });
 
         var result = groups.Select(mg => new
         {
@@ -367,7 +377,8 @@ public class MailController : ControllerBase
             u.Id,
             u.UserName,
             u.Role,
-            u.TimeStamp
+            u.TimeStamp,
+            u.Subdomain
         }).ToList();
 
         return Ok(result);

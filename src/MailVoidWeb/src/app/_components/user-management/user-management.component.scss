@@ -5,6 +5,20 @@
   font: normal 0.875rem "Roboto", sans-serif;
 }
 
+.subdomain-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  background-color: rgba(139, 233, 253, 0.15);
+  color: var(--cyan);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.text-muted {
+  color: var(--comment);
+}
+
 /* Component-specific responsive overrides */
 @media (max-width: 768px) {
   .actions { 

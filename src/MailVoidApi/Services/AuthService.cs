@@ -53,6 +53,11 @@ public class AuthService
             new Claim(ClaimTypes.Role, user.Role.ToString()),
         };
 
+        if (!string.IsNullOrEmpty(user.Subdomain))
+        {
+            claims.Add(new Claim("subdomain", user.Subdomain));
+        }
+
         // Create token using JwtSecurityToken directly for more control
         var token = new JwtSecurityToken(
             issuer: issuer,

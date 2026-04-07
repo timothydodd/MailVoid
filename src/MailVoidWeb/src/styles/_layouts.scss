@@ -321,11 +321,11 @@
 }
 
 .table-grid.header {
-  grid-template-columns: 2fr 1fr 1.5fr 2fr;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr 2fr;
 }
 
 .table-grid.row {
-  grid-template-columns: 2fr 1fr 1.5fr 2fr;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr 2fr;
   border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s ease;
   

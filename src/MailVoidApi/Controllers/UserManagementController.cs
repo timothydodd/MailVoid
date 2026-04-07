@@ -34,7 +34,8 @@ public class UserManagementController : ControllerBase
             Id = u.Id.ToString(),
             UserName = u.UserName,
             Role = u.Role,
-            TimeStamp = u.TimeStamp
+            TimeStamp = u.TimeStamp,
+            Subdomain = u.Subdomain
         }).ToList();
 
         return Ok(userDtos);
@@ -61,7 +62,8 @@ public class UserManagementController : ControllerBase
             Id = user.Id.ToString(),
             UserName = user.UserName,
             Role = user.Role,
-            TimeStamp = user.TimeStamp
+            TimeStamp = user.TimeStamp,
+            Subdomain = user.Subdomain
         };
 
         return Ok(userDto);
@@ -87,10 +89,19 @@ public class UserManagementController : ControllerBase
             return BadRequest("Username already exists.");
         }
 
-        var user = await _userManagementService.CreateUserAsync(
-            createUserDto.UserName,
-            createUserDto.Password,
-            createUserDto.Role);
+        User? user;
+        try
+        {
+            user = await _userManagementService.CreateUserAsync(
+                createUserDto.UserName,
+                createUserDto.Password,
+                createUserDto.Role,
+                createUserDto.Subdomain);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
 
         if (user == null)
         {
@@ -102,7 +113,8 @@ public class UserManagementController : ControllerBase
             Id = user.Id.ToString(),
             UserName = user.UserName,
             Role = user.Role,
-            TimeStamp = user.TimeStamp
+            TimeStamp = user.TimeStamp,
+            Subdomain = user.Subdomain
         };
 
         return CreatedAtAction(nameof(GetUser), new { id = user.Id }, userDto);
@@ -193,6 +205,7 @@ public class UserDto
     public required string UserName { get; set; }
     public Role Role { get; set; }
     public DateTime TimeStamp { get; set; }
+    public string? Subdomain { get; set; }
 }
 
 public class CreateUserDto
@@ -200,6 +213,7 @@ public class CreateUserDto
     public required string UserName { get; set; }
     public required string Password { get; set; }
     public Role Role { get; set; } = Role.User;
+    public string? Subdomain { get; set; }
 }
 
 public class UpdateRoleDto

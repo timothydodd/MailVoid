@@ -37,6 +37,16 @@ import { UserManagementService } from '../../_services/user-management.service';
               />
             </div>
             <div class="form-group">
+              <label for="subdomain">Subdomain</label>
+              <input
+                id="subdomain"
+                type="text"
+                formControlName="subdomain"
+                class="form-control"
+                placeholder="e.g., sales, support"
+              />
+            </div>
+            <div class="form-group">
               <label for="role">Role</label>
               <select id="role" formControlName="role" class="form-control">
                 <option value="0">User</option>
@@ -67,6 +77,7 @@ import { UserManagementService } from '../../_services/user-management.service';
           <div class="users-table">
             <div class="table-grid header">
               <div class="header-cell">Username</div>
+              <div class="header-cell">Subdomain</div>
               <div class="header-cell">Role</div>
               <div class="header-cell">Created</div>
               <div class="header-cell">Actions</div>
@@ -74,6 +85,13 @@ import { UserManagementService } from '../../_services/user-management.service';
             @for (user of users(); track user.id) {
               <div class="table-grid row">
                 <div class="cell username" data-label="Username">{{ user.userName }}</div>
+                <div class="cell subdomain" data-label="Subdomain">
+                  @if (user.subdomain) {
+                    <span class="subdomain-badge">{{ user.subdomain }}</span>
+                  } @else {
+                    <span class="text-muted">--</span>
+                  }
+                </div>
                 <div class="cell role" data-label="Role">
                   @if (editingRoleUserId() === user.id) {
                     <select class="role-select" [value]="user.role" (change)="onRoleChange($event, user.id)">
@@ -150,6 +168,7 @@ export class UserManagementComponent {
     this.createUserForm = this.fb.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
       password: ['', [Validators.required, Validators.minLength(6)]],
+      subdomain: ['', [Validators.pattern(/^[a-z0-9-]*$/)]],
       role: [0, Validators.required],
     });
 
@@ -186,12 +205,13 @@ export class UserManagementComponent {
       userName: formValue.username,
       password: formValue.password,
       role: Number(formValue.role) as Role,
+      subdomain: formValue.subdomain || undefined,
     };
 
     try {
       await this.userManagementService.createUser(request);
       this.successMessage.set('User created successfully');
-      this.createUserForm.reset({ role: 0 });
+      this.createUserForm.reset({ role: 0, subdomain: '' });
       await this.loadUsers();
     } catch (error: any) {
       this.errorMessage.set(error.message || 'Failed to create user');

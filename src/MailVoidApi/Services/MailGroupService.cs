@@ -84,7 +84,7 @@ public class MailGroupService : IMailGroupService
             Path = path,
             Subdomain = subdomain,
             OwnerUserId = adminUser.Id,
-            IsPublic = true,
+            IsPublic = false,
             Description = $"Auto-generated group for {subdomain} subdomain"
         };
 
