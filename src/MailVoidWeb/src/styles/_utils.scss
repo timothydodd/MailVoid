@@ -436,8 +436,107 @@
   &.success {
     color: green;
   }
-  
+
   &.error {
     color: red;
   }
+}
+
+/* Small Icon Buttons */
+.btn-icon-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--comment);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: var(--bGLighter);
+    color: var(--foreground);
+    border-color: var(--border-color);
+  }
+}
+
+.btn-icon-danger:hover {
+  color: var(--red);
+  background-color: rgba(255, 85, 85, 0.1);
+  border-color: rgba(255, 85, 85, 0.3);
+}
+
+/* Contextual Badges */
+.badge-owner {
+  @extend .badge;
+  background-color: rgba(139, 233, 253, 0.15);
+  color: var(--cyan);
+}
+
+.badge-admin {
+  @extend .badge;
+  background-color: rgba(189, 147, 249, 0.15);
+  color: var(--purple);
+}
+
+.badge-private {
+  @extend .badge;
+  background-color: rgba(255, 184, 108, 0.15);
+  color: var(--orange);
+}
+
+/* Slide-over Panel */
+.slide-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+.slide-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 90vw;
+  background-color: var(--bGDark);
+  border-left: 1px solid var(--border-color);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+
+  h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+}
+
+.slide-panel-subtitle {
+  font-size: 0.75rem;
+  color: var(--cyan);
+}
+
+.slide-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .slide-panel { width: 100%; }
 }

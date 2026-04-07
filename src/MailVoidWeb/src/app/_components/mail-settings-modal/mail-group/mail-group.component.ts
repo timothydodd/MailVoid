@@ -188,18 +188,18 @@ import { AuthService } from '../../../_services/auth-service';
 
       <!-- User Management Panel (overlay) -->
       @if (managingUsers() && selectedGroup()) {
-        <div class="users-panel-overlay" (click)="closeUserManagement()"></div>
-        <div class="users-panel">
-          <div class="users-panel-header">
+        <div class="slide-panel-overlay" (click)="closeUserManagement()"></div>
+        <div class="slide-panel">
+          <div class="slide-panel-header">
             <div>
               <h5>Share Access</h5>
-              <span class="users-panel-subtitle">{{ selectedGroup()?.subdomain }}</span>
+              <span class="slide-panel-subtitle">{{ selectedGroup()?.subdomain }}</span>
             </div>
             <button class="btn btn-icon" (click)="closeUserManagement()" title="Close">
               <lucide-icon name="x" size="16"></lucide-icon>
             </button>
           </div>
-          <div class="users-panel-body">
+          <div class="slide-panel-body">
             <div class="add-user-row">
               <rd-select
                 [(ngModel)]="selectedUserId"
