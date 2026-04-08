@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './_services/auth.guard';
+import { adminGuard, authGuard } from './_services/auth.guard';
 import { ErrorPageComponent } from './Pages/error-page/error-page.component';
 import { HookDetailComponent } from './Pages/hook-detail/hook-detail.component';
 import { HooksComponent } from './Pages/hooks/hooks.component';
@@ -30,12 +30,12 @@ export const routes: Routes = [
   {
     path: 'hooks',
     component: HooksComponent,
-    canActivate: [authGuard],
+    canActivate: [adminGuard],
   },
   {
     path: 'hooks/:bucket/:id',
     component: HookDetailComponent,
-    canActivate: [authGuard],
+    canActivate: [adminGuard],
   },
   { path: 'error/:errorCode', pathMatch: 'full', component: ErrorPageComponent },
 ];

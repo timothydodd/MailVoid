@@ -69,6 +69,10 @@ export class MailService {
     return this.http.get<MailGroup[]>(`${environment.apiUrl}/api/mail/groups`);
   }
 
+  getAllMailGroups() {
+    return this.http.get<AdminMailGroup[]>(`${environment.apiUrl}/api/mail/groups/all`);
+  }
+
   updateMailGroup(mailGroup: Partial<MailGroup> & { id: number }) {
     return this.http.put<MailGroup>(`${environment.apiUrl}/api/mail/groups/${mailGroup.id}`, mailGroup);
   }
@@ -196,6 +200,11 @@ export interface MailGroupUser {
   userId: string;
   grantedAt: string;
   user: User;
+}
+
+export interface AdminMailGroup extends MailGroup {
+  ownerUserName: string;
+  hasAccess: boolean;
 }
 
 export interface RetentionSettingsResponse {

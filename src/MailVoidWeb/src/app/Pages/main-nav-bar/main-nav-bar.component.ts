@@ -24,10 +24,12 @@ import { ThemeService } from '../../_services/theme.service';
               <lucide-icon name="mail" size="18"></lucide-icon>
               <span>Mail</span>
             </a>
-            <a routerLink="/hooks" routerLinkActive="active" class="nav-link">
-              <lucide-icon name="webhook" size="18"></lucide-icon>
-              <span>Hooks</span>
-            </a>
+            @if (authService.isAdmin()) {
+              <a routerLink="/hooks" routerLinkActive="active" class="nav-link">
+                <lucide-icon name="webhook" size="18"></lucide-icon>
+                <span>Hooks</span>
+              </a>
+            }
           </div>
         }
 
@@ -62,7 +64,7 @@ import { ThemeService } from '../../_services/theme.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainNavBarComponent {
-  private authService = inject(AuthService);
+  authService = inject(AuthService);
   private mobileMenuService = inject(MobileMenuService);
   themeService = inject(ThemeService);
 

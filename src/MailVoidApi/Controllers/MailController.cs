@@ -60,24 +60,15 @@ public class MailController : ControllerBase
 
         using var db = await _db.GetConnectionAsync();
 
-        string sql;
-        if (isAdmin)
-        {
-            sql = @"SELECT DISTINCT m.`To`, m.MailGroupPath, mg.Subdomain, mg.IsPublic, mg.OwnerUserId
-                    FROM Mail m
-                    LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path";
-        }
-        else
-        {
-            sql = @"SELECT DISTINCT m.`To`, m.MailGroupPath, mg.Subdomain, mg.IsPublic, mg.OwnerUserId
+        var sql = @"SELECT DISTINCT m.`To`, m.MailGroupPath, mg.Subdomain, mg.IsPublic, mg.OwnerUserId
                     FROM Mail m
                     LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path
                     WHERE mg.OwnerUserId = @UserId
                            OR mg.Subdomain = @UserSubdomain
-                           OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)";
-        }
+                           OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)
+                           OR (@IsAdmin = 1 AND mg.Subdomain = 'default')";
 
-        var mailboxes = await db.QueryAsync<dynamic>(sql, new { UserId = currentUserId, UserSubdomain = userSubdomain });
+        var mailboxes = await db.QueryAsync<dynamic>(sql, new { UserId = currentUserId, UserSubdomain = userSubdomain, IsAdmin = isAdmin ? 1 : 0 });
 
         var result = new List<MailBox>();
         foreach (var mailbox in mailboxes)
@@ -120,21 +111,20 @@ public class MailController : ControllerBase
         var parameters = new DynamicParameters();
         parameters.Add("UserId", currentUserId);
         parameters.Add("UserSubdomain", userSubdomain);
-
         if (!string.IsNullOrEmpty(options.To))
         {
             whereClauses.Add("m.`To` = @To");
             parameters.Add("To", options.To);
         }
 
-        if (!isAdmin)
-        {
-            whereClauses.Add(@"(
-                mg.OwnerUserId = @UserId
-                OR mg.Subdomain = @UserSubdomain
-                OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)
-            )");
-        }
+        parameters.Add("IsAdmin", isAdmin ? 1 : 0);
+
+        whereClauses.Add(@"(
+            mg.OwnerUserId = @UserId
+            OR mg.Subdomain = @UserSubdomain
+            OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)
+            OR (@IsAdmin = 1 AND mg.Subdomain = 'default')
+        )");
 
         var whereClause = whereClauses.Count > 0 ? "WHERE " + string.Join(" AND ", whereClauses) : "";
 
@@ -145,9 +135,11 @@ public class MailController : ControllerBase
         }
 
         var offset = (options.Page - 1) * options.PageSize;
+        parameters.Add("Limit", options.PageSize);
+        parameters.Add("Offset", offset);
         var mails = await db.QueryAsync<Mail>(
             $"SELECT m.* FROM Mail m LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path {whereClause} ORDER BY m.CreatedOn DESC LIMIT @Limit OFFSET @Offset",
-            new { Limit = options.PageSize, Offset = offset, To = options.To, UserId = currentUserId, UserSubdomain = userSubdomain });
+            parameters);
 
         var mailList = mails.ToList();
         var mailIds = mailList.Select(m => m.Id).ToList();
@@ -202,24 +194,20 @@ public class MailController : ControllerBase
         var userSubdomain = _userService.GetSubdomain();
         using var db = await _db.GetConnectionAsync();
 
-        string sql;
-        if (isAdmin)
-        {
-            sql = @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate
+        var sql = @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate
                     FROM MailGroup mg
-                    WHERE mg.Subdomain IS NOT NULL AND mg.IsUserPrivate = 0";
-        }
-        else
-        {
-            sql = @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate
-                    FROM MailGroup mg
-                    WHERE mg.Subdomain IS NOT NULL AND mg.IsUserPrivate = 0
-                    AND (mg.OwnerUserId = @UserId
-                         OR mg.Subdomain = @UserSubdomain
-                         OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId))";
-        }
+                    WHERE mg.Subdomain IS NOT NULL
+                    AND (
+                        (mg.IsUserPrivate = 1 AND mg.OwnerUserId = @UserId)
+                        OR (mg.IsUserPrivate = 0 AND (
+                            mg.OwnerUserId = @UserId
+                            OR mg.Subdomain = @UserSubdomain
+                            OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId)
+                            OR (@IsAdmin = 1 AND mg.Subdomain = 'default')
+                        ))
+                    )";
 
-        var groups = await db.QueryAsync<dynamic>(sql, new { UserId = userId, UserSubdomain = userSubdomain });
+        var groups = await db.QueryAsync<dynamic>(sql, new { UserId = userId, UserSubdomain = userSubdomain, IsAdmin = isAdmin ? 1 : 0 });
 
         var result = groups.Select(mg => new
         {
@@ -237,6 +225,42 @@ public class MailController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("groups/all")]
+    public async Task<IActionResult> GetAllMailGroups()
+    {
+        if (!_userService.IsAdmin())
+            return Forbid();
+
+        var userId = _userService.GetUserId();
+        using var db = await _db.GetConnectionAsync();
+
+        var sql = @"SELECT mg.Id, mg.Path, mg.Subdomain, mg.Description, mg.IsPublic, mg.CreatedAt, mg.LastActivity, mg.OwnerUserId, mg.IsUserPrivate,
+                           u.UserName as OwnerUserName,
+                           EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = @UserId) as HasAccess
+                    FROM MailGroup mg
+                    LEFT JOIN `User` u ON mg.OwnerUserId = u.Id
+                    WHERE mg.Subdomain IS NOT NULL AND mg.IsUserPrivate = 0";
+
+        var groups = await db.QueryAsync<dynamic>(sql, new { UserId = userId });
+
+        var result = groups.Select(mg => new
+        {
+            Id = (long)mg.Id,
+            Path = mg.Path ?? "",
+            Subdomain = mg.Subdomain ?? "",
+            Description = mg.Description ?? "",
+            IsPublic = Convert.ToBoolean(mg.IsPublic),
+            CreatedAt = (DateTime)mg.CreatedAt,
+            LastActivity = mg.LastActivity as DateTime?,
+            IsOwner = mg.OwnerUserId != null && (Guid)mg.OwnerUserId == userId,
+            IsUserPrivate = Convert.ToBoolean(mg.IsUserPrivate),
+            OwnerUserName = (string?)mg.OwnerUserName ?? "",
+            HasAccess = Convert.ToBoolean(mg.HasAccess) || (mg.OwnerUserId != null && (Guid)mg.OwnerUserId == userId)
+        }).ToList();
+
+        return Ok(result);
+    }
+
     [HttpPost("groups/{mailGroupId}/access")]
     public async Task<IActionResult> GrantAccess(long mailGroupId, [FromBody] GrantAccessRequest request)
     {
@@ -247,10 +271,8 @@ public class MailController : ControllerBase
         if (mailGroup == null)
             return NotFound();
 
-        var isOwner = mailGroup.OwnerUserId == currentUserId;
-        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-
-        if (!isOwner && !isAdminEditingPublic)
+        var isAdmin = _userService.IsAdmin();
+        if (!isAdmin && !await _mailGroupService.HasUserAccess(mailGroupId, currentUserId))
             return Forbid();
 
         if (mailGroup.IsUserPrivate)
@@ -270,10 +292,7 @@ public class MailController : ControllerBase
         if (mailGroup == null)
             return NotFound();
 
-        var isOwner = mailGroup.OwnerUserId == currentUserId;
-        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-
-        if (!isOwner && !isAdminEditingPublic)
+        if (!await _mailGroupService.HasUserAccess(mailGroupId, currentUserId))
             return Forbid();
 
         if (mailGroup.IsUserPrivate)
@@ -293,10 +312,7 @@ public class MailController : ControllerBase
         if (mailGroup == null)
             return NotFound();
 
-        var isOwner = mailGroup.OwnerUserId == currentUserId;
-        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-
-        if (!isOwner && !isAdminEditingPublic)
+        if (!await _mailGroupService.HasUserAccess(id, currentUserId))
             return Forbid();
 
         if (mailGroup.IsUserPrivate)
@@ -319,7 +335,7 @@ public class MailController : ControllerBase
             Description = mailGroup.Description ?? "",
             mailGroup.IsPublic,
             mailGroup.CreatedAt,
-            IsOwner = isOwner,
+            IsOwner = mailGroup.OwnerUserId == currentUserId,
             mailGroup.IsUserPrivate
         });
     }
@@ -334,10 +350,7 @@ public class MailController : ControllerBase
         if (mailGroup == null)
             return NotFound();
 
-        var isOwner = mailGroup.OwnerUserId == currentUserId;
-        var isAdminEditingPublic = User.IsInRole("Admin") && mailGroup.IsPublic;
-
-        if (!isOwner && !isAdminEditingPublic)
+        if (!await _mailGroupService.HasUserAccess(mailGroupId, currentUserId))
             return Forbid();
 
         var groupUsers = await db.QueryAsync<dynamic>(
@@ -488,7 +501,9 @@ public class MailController : ControllerBase
             return NotFound();
         }
 
-        if (mailGroup.OwnerUserId != userId)
+        if (!mailGroup.IsPublic &&
+            mailGroup.OwnerUserId != userId &&
+            !await db.ExistsAsync<MailGroupUser>(mgu => mgu.MailGroupId == id && mgu.UserId == userId))
         {
             return Forbid();
         }
@@ -526,11 +541,9 @@ public class MailController : ControllerBase
 
             if (mailGroup != null)
             {
-                var isAdmin = _userService.IsAdmin();
                 if (!mailGroup.IsPublic &&
                     mailGroup.OwnerUserId != userId &&
-                    !await db.ExistsAsync<MailGroupUser>(mgu => mgu.MailGroupId == mailGroup.Id && mgu.UserId == userId) &&
-                    !isAdmin)
+                    !await db.ExistsAsync<MailGroupUser>(mgu => mgu.MailGroupId == mailGroup.Id && mgu.UserId == userId))
                 {
                     return Forbid();
                 }

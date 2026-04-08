@@ -5,6 +5,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ValdemortModule } from 'ngx-valdemort';
 import { ConfirmDialogService } from '@rd-ui';
 import {
+  AdminMailGroup,
   CreateMailGroupRequest,
   MailGroup,
   MailGroupUser,
@@ -103,11 +104,7 @@ import { AuthService } from '../../../_services/auth-service';
                 <span class="description-text">{{ group.description || '--' }}</span>
               </div>
               <div class="col-retention">
-                @if (group.isOwner) {
-                  <span class="retention-text">{{ getRetentionLabel(group) }}</span>
-                } @else {
-                  <span class="retention-text muted">--</span>
-                }
+                <span class="retention-text">{{ getRetentionLabel(group) }}</span>
               </div>
               <div class="col-status">
                 @if (group.isOwner) {
@@ -121,10 +118,10 @@ import { AuthService } from '../../../_services/auth-service';
                 }
               </div>
               <div class="col-actions">
-                @if (canEditGroup(group) && !group.isUserPrivate) {
-                  <button class="btn btn-icon-sm" (click)="toggleExpand(group)" title="Edit">
-                    <lucide-icon name="edit" size="14"></lucide-icon>
-                  </button>
+                <button class="btn btn-icon-sm" (click)="toggleExpand(group)" title="Edit">
+                  <lucide-icon name="edit" size="14"></lucide-icon>
+                </button>
+                @if (!group.isUserPrivate) {
                   <button class="btn btn-icon-sm" (click)="manageUsers(group)" title="Share">
                     <lucide-icon name="share-2" size="14"></lucide-icon>
                   </button>
@@ -146,28 +143,26 @@ import { AuthService } from '../../../_services/auth-service';
                       <label class="form-label">Description</label>
                       <input type="text" class="form-control" formControlName="description" placeholder="Group description" />
                     </div>
-                    @if (group.isOwner) {
-                      <div class="form-group">
-                        <label class="form-label">Retention (days)</label>
-                        <div class="retention-input">
-                          <input
-                            type="number"
-                            class="form-control"
-                            formControlName="retentionDays"
-                            min="0"
-                            max="365"
-                            placeholder="0 = no deletion"
-                          />
-                          <span class="retention-hint">
-                            @if (editForm()?.get('retentionDays')?.value === 0 || editForm()?.get('retentionDays')?.value === null) {
-                              No auto-deletion
-                            } @else {
-                              Auto-delete after {{ editForm()?.get('retentionDays')?.value }} days
-                            }
-                          </span>
-                        </div>
+                    <div class="form-group">
+                      <label class="form-label">Retention (days)</label>
+                      <div class="retention-input">
+                        <input
+                          type="number"
+                          class="form-control"
+                          formControlName="retentionDays"
+                          min="0"
+                          max="365"
+                          placeholder="0 = no deletion"
+                        />
+                        <span class="retention-hint">
+                          @if (editForm()?.get('retentionDays')?.value === 0 || editForm()?.get('retentionDays')?.value === null) {
+                            No auto-deletion
+                          } @else {
+                            Auto-delete after {{ editForm()?.get('retentionDays')?.value }} days
+                          }
+                        </span>
                       </div>
-                    }
+                    </div>
                   </div>
                   <div class="expand-panel-actions">
                     <button class="btn btn-secondary btn-sm" (click)="cancelEdit()">Cancel</button>
@@ -184,6 +179,65 @@ import { AuthService } from '../../../_services/auth-service';
             }
           }
         </div>
+      }
+
+      <!-- Admin: Browse All Groups -->
+      @if (authService.isAdmin()) {
+        <div class="section-header" style="margin-top: 24px;">
+          <div class="header-left">
+            <h4 class="section-title">All Groups</h4>
+            <span class="groups-count">Admin</span>
+          </div>
+          @if (!browsingAllGroups()) {
+            <button class="btn btn-secondary btn-sm" (click)="loadAllGroups()">
+              <lucide-icon name="eye" size="14"></lucide-icon>
+              Browse
+            </button>
+          } @else {
+            <button class="btn btn-secondary btn-sm" (click)="browsingAllGroups.set(false)">
+              <lucide-icon name="eye-off" size="14"></lucide-icon>
+              Hide
+            </button>
+          }
+        </div>
+        @if (browsingAllGroups()) {
+          <div class="groups-table">
+            <div class="table-header">
+              <div class="col-subdomain">Subdomain</div>
+              <div class="col-description">Owner</div>
+              <div class="col-retention">Status</div>
+              <div class="col-actions">Actions</div>
+            </div>
+            @for (group of allGroups(); track group.id) {
+              <div class="table-row">
+                <div class="col-subdomain">
+                  <span class="subdomain-name">{{ group.subdomain || 'Unknown' }}</span>
+                </div>
+                <div class="col-description">
+                  <span class="description-text">{{ group.ownerUserName }}</span>
+                </div>
+                <div class="col-retention">
+                  @if (group.hasAccess) {
+                    <span class="badge badge-owner">Joined</span>
+                  }
+                </div>
+                <div class="col-actions">
+                  @if (!group.hasAccess) {
+                    <button class="btn btn-primary btn-sm" (click)="joinGroup(group)" [disabled]="isLoading()">
+                      <lucide-icon name="plus" size="14"></lucide-icon>
+                      Join
+                    </button>
+                  } @else if (!group.isOwner) {
+                    <button class="btn btn-secondary btn-sm" (click)="leaveGroup(group)" [disabled]="isLoading()">
+                      <lucide-icon name="log-out" size="14"></lucide-icon>
+                      Leave
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
       }
 
       <!-- User Management Panel (overlay) -->
@@ -263,6 +317,10 @@ export class MailGroupComponent {
   managingUsers = signal<boolean>(false);
   isLoading = signal<boolean>(false);
 
+  // Admin browse all groups
+  allGroups = signal<AdminMailGroup[]>([]);
+  browsingAllGroups = signal<boolean>(false);
+
   // Retention cache
   retentionCache = signal<Record<number, number | null>>({});
 
@@ -285,6 +343,49 @@ export class MailGroupComponent {
   loadUsers() {
     this.mailService.getUsers().subscribe((users) => {
       this.users.set(users);
+    });
+  }
+
+  loadAllGroups() {
+    this.browsingAllGroups.set(true);
+    this.mailService.getAllMailGroups().subscribe((groups) => {
+      this.allGroups.set(groups);
+    });
+  }
+
+  joinGroup(group: AdminMailGroup) {
+    const userId = this.authService.getCurrentUserId();
+    if (!userId) return;
+
+    this.isLoading.set(true);
+    this.mailService.grantUserAccess(group.id, userId).subscribe({
+      next: () => {
+        this.loadAllGroups();
+        this.loadMailGroups();
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Error joining group:', error);
+        this.isLoading.set(false);
+      },
+    });
+  }
+
+  leaveGroup(group: AdminMailGroup) {
+    const userId = this.authService.getCurrentUserId();
+    if (!userId) return;
+
+    this.isLoading.set(true);
+    this.mailService.revokeUserAccess(group.id, userId).subscribe({
+      next: () => {
+        this.loadAllGroups();
+        this.loadMailGroups();
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Error leaving group:', error);
+        this.isLoading.set(false);
+      },
     });
   }
 
@@ -320,12 +421,6 @@ export class MailGroupComponent {
     return '3d';
   }
 
-  canEditGroup(group: MailGroup): boolean {
-    if (group.isOwner) return true;
-    if (this.authService.isAdmin()) return true;
-    return false;
-  }
-
   // Expand/collapse edit
   toggleExpand(group: MailGroup) {
     if (this.expandedGroupId() === group.id) {
@@ -343,17 +438,15 @@ export class MailGroupComponent {
 
     this.editForm.set(form);
 
-    if (group.isOwner) {
-      this.mailService.getRetentionSettings(group.id).subscribe({
-        next: (settings) => {
-          form.get('retentionDays')?.setValue(settings.retentionDays);
-          this.retentionCache.update((cache) => ({ ...cache, [group.id]: settings.retentionDays }));
-        },
-        error: () => {
-          form.get('retentionDays')?.setValue(3);
-        },
-      });
-    }
+    this.mailService.getRetentionSettings(group.id).subscribe({
+      next: (settings) => {
+        form.get('retentionDays')?.setValue(settings.retentionDays);
+        this.retentionCache.update((cache) => ({ ...cache, [group.id]: settings.retentionDays }));
+      },
+      error: () => {
+        form.get('retentionDays')?.setValue(3);
+      },
+    });
   }
 
   cancelEdit() {
@@ -378,7 +471,7 @@ export class MailGroupComponent {
 
     this.mailService.updateMailGroup(updateData).subscribe({
       next: (updatedGroup) => {
-        if (group.isOwner && form.value.retentionDays !== null) {
+        if (form.value.retentionDays !== null) {
           this.mailService.updateRetentionSettings(group.id, form.value.retentionDays).subscribe({
             next: () => {
               this.retentionCache.update((cache) => ({ ...cache, [group.id]: form.value.retentionDays }));

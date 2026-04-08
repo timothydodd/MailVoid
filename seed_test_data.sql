@@ -1,81 +1,94 @@
 -- MailVoid Test Data Seed Script
--- This script creates sample data for testing the MailVoid application functionality
--- Run this after the initial migration has been applied
-
--- Note: Password hashes are for "password123" - use this to login to test accounts
+-- This script creates sample data for testing the MailVoid application
+-- Run this after the application has started and created tables
 -- The admin user (admin/admin) is already created by the application startup
 
--- Clear existing test data (keep admin user)
-DELETE FROM MailGroupUser WHERE UserId != (SELECT Id FROM User WHERE UserName = 'admin');
-DELETE FROM RefreshToken WHERE UserId != (SELECT Id FROM User WHERE UserName = 'admin');
+-- Note: Password hashes are for "password123" - use this to login to test accounts
+
+-- Purge all tables (keep only admin user)
+DELETE FROM UserMailRead;
+DELETE FROM MailGroupUser;
+DELETE FROM RefreshToken;
+DELETE FROM Webhook;
+DELETE FROM WebhookBucket;
 DELETE FROM Mail;
 DELETE FROM Contact;
-DELETE FROM MailGroup WHERE OwnerUserId != (SELECT Id FROM User WHERE UserName = 'admin');
-DELETE FROM User WHERE UserName != 'admin';
+DELETE FROM MailGroup;
+DELETE FROM `User` WHERE UserName != 'admin';
 
 -- ===========================
--- SAMPLE USERS
+-- USERS
 -- ===========================
 
--- Test User 1 - Regular user (john)
-INSERT INTO User (Id, UserName, PasswordHash, TimeStamp, Role) VALUES
-('11111111-1111-1111-1111-111111111111', 'john', 'AQAAAAIAAYagAAAAEKj8QkBQqKqJ+VQQ6IzP4H4aZZOQtN4Zj8gJKf+A5gHxXzFQJ8LHOP5N9eHgYjO9Hw==', NOW(), 0);
+-- All test users use the same password as admin (admin/admin)
 
--- Test User 2 - Regular user (jane)
-INSERT INTO User (Id, UserName, PasswordHash, TimeStamp, Role) VALUES
-('22222222-2222-2222-2222-222222222222', 'jane', 'AQAAAAIAAYagAAAAEKj8QkBQqKqJ+VQQ6IzP4H4aZZOQtN4Zj8gJKf+A5gHxXzFQJ8LHOP5N9eHgYjO9Hw==', NOW(), 0);
+-- john - Regular user with subdomain "john"
+INSERT INTO `User` (Id, UserName, PasswordHash, TimeStamp, Role, Subdomain)
+SELECT '11111111-1111-1111-1111-111111111111', 'john', PasswordHash, NOW(), 0, 'john'
+FROM `User` WHERE UserName = 'admin';
 
--- Test User 3 - Admin user (manager)
-INSERT INTO User (Id, UserName, PasswordHash, TimeStamp, Role) VALUES
-('33333333-3333-3333-3333-333333333333', 'manager', 'AQAAAAIAAYagAAAAEKj8QkBQqKqJ+VQQ6IzP4H4aZZOQtN4Zj8gJKf+A5gHxXzFQJ8LHOP5N9eHgYjO9Hw==', NOW(), 1);
+-- jane - Regular user with subdomain "jane"
+INSERT INTO `User` (Id, UserName, PasswordHash, TimeStamp, Role, Subdomain)
+SELECT '22222222-2222-2222-2222-222222222222', 'jane', PasswordHash, NOW(), 0, 'jane'
+FROM `User` WHERE UserName = 'admin';
 
--- Test User 4 - Regular user (alice)
-INSERT INTO User (Id, UserName, PasswordHash, TimeStamp, Role) VALUES
-('44444444-4444-4444-4444-444444444444', 'alice', 'AQAAAAIAAYagAAAAEKj8QkBQqKqJ+VQQ6IzP4H4aZZOQtN4Zj8gJKf+A5gHxXzFQJ8LHOP5N9eHgYjO9Hw==', NOW(), 0);
+-- manager - Admin user with subdomain "manager"
+INSERT INTO `User` (Id, UserName, PasswordHash, TimeStamp, Role, Subdomain)
+SELECT '33333333-3333-3333-3333-333333333333', 'manager', PasswordHash, NOW(), 1, 'manager'
+FROM `User` WHERE UserName = 'admin';
+
+-- alice - Regular user with subdomain "alice"
+INSERT INTO `User` (Id, UserName, PasswordHash, TimeStamp, Role, Subdomain)
+SELECT '44444444-4444-4444-4444-444444444444', 'alice', PasswordHash, NOW(), 0, 'alice'
+FROM `User` WHERE UserName = 'admin';
 
 -- ===========================
 -- MAIL GROUPS
 -- ===========================
 
--- Default private mailboxes for each user (these are auto-created but we'll add them manually for testing)
-INSERT INTO MailGroup (Id, Path, Subdomain, Description, OwnerUserId, IsPublic, IsUserPrivate, IsDefaultMailbox, CreatedAt) VALUES
-(100, 'user-john', 'john', 'Private mailbox for john', '11111111-1111-1111-1111-111111111111', 0, 1, 1, NOW()),
-(101, 'user-jane', 'jane', 'Private mailbox for jane', '22222222-2222-2222-2222-222222222222', 0, 1, 1, NOW()),
-(102, 'user-manager', 'manager', 'Private mailbox for manager', '33333333-3333-3333-3333-333333333333', 0, 1, 1, NOW()),
-(103, 'user-alice', 'alice', 'Private mailbox for alice', '44444444-4444-4444-4444-444444444444', 0, 1, 1, NOW());
+-- Default private mailboxes (auto-created per user, cannot be deleted)
+INSERT INTO MailGroup (Id, Path, Subdomain, Description, OwnerUserId, IsPublic, IsUserPrivate, IsDefaultMailbox, CreatedAt, RetentionDays) VALUES
+(100, 'user-john', 'john', 'Private mailbox for john', '11111111-1111-1111-1111-111111111111', 0, 1, 1, NOW(), 3),
+(101, 'user-jane', 'jane', 'Private mailbox for jane', '22222222-2222-2222-2222-222222222222', 0, 1, 1, NOW(), 7),
+(102, 'user-manager', 'manager', 'Private mailbox for manager', '33333333-3333-3333-3333-333333333333', 0, 1, 1, NOW(), 3),
+(103, 'user-alice', 'alice', 'Private mailbox for alice', '44444444-4444-4444-4444-444444444444', 0, 1, 1, NOW(), 3);
 
--- Public mail groups for different subdomains
-INSERT INTO MailGroup (Id, Path, Subdomain, Description, OwnerUserId, IsPublic, IsUserPrivate, IsDefaultMailbox, CreatedAt) VALUES
-(200, 'support', 'support', 'Customer support emails', '33333333-3333-3333-3333-333333333333', 1, 0, 0, NOW()),
-(201, 'sales', 'sales', 'Sales inquiries', '33333333-3333-3333-3333-333333333333', 1, 0, 0, NOW()),
-(202, 'marketing', 'marketing', 'Marketing campaigns', '22222222-2222-2222-2222-222222222222', 1, 0, 0, NOW()),
-(203, 'dev', 'dev', 'Development team emails', '11111111-1111-1111-1111-111111111111', 0, 0, 0, NOW()),
-(204, 'test', 'test', 'Testing environment emails', '11111111-1111-1111-1111-111111111111', 1, 0, 0, NOW());
+-- Base domain group (emails to user@mailvoid.com with no subdomain)
+-- Admins auto-see this via the 'default' subdomain rule
+INSERT INTO MailGroup (Id, Path, Subdomain, Description, OwnerUserId, IsPublic, IsUserPrivate, IsDefaultMailbox, CreatedAt, RetentionDays) VALUES
+(199, 'subdomain/default', 'default', 'Base domain emails', (SELECT Id FROM `User` WHERE UserName = 'admin'), 0, 0, 0, NOW(), 7);
 
--- Additional private mailboxes (claimed by users)
-INSERT INTO MailGroup (Id, Path, Subdomain, Description, OwnerUserId, IsPublic, IsUserPrivate, IsDefaultMailbox, CreatedAt) VALUES
-(300, 'user-jane', 'newsletter', 'Newsletter subscription mailbox', '22222222-2222-2222-2222-222222222222', 0, 1, 0, NOW()),
-(301, 'user-alice', 'personal', 'Personal project emails', '44444444-4444-4444-4444-444444444444', 0, 1, 0, NOW());
+-- Shared mail groups (owned by specific users, shared via MailGroupUser)
+INSERT INTO MailGroup (Id, Path, Subdomain, Description, OwnerUserId, IsPublic, IsUserPrivate, IsDefaultMailbox, CreatedAt, RetentionDays) VALUES
+(200, 'subdomain/support', 'support', 'Customer support emails', '33333333-3333-3333-3333-333333333333', 0, 0, 0, NOW(), 14),
+(201, 'subdomain/sales', 'sales', 'Sales inquiries', '33333333-3333-3333-3333-333333333333', 0, 0, 0, NOW(), 30),
+(202, 'subdomain/marketing', 'marketing', 'Marketing campaigns', '22222222-2222-2222-2222-222222222222', 0, 0, 0, NOW(), 7),
+(203, 'subdomain/dev', 'dev', 'Development notifications', '11111111-1111-1111-1111-111111111111', 0, 0, 0, NOW(), 3),
+(204, 'subdomain/staging', 'staging', 'Staging environment emails', '11111111-1111-1111-1111-111111111111', 0, 0, 0, NOW(), 1);
 
 -- ===========================
--- MAIL GROUP USERS (Access permissions)
+-- MAIL GROUP SHARING (MailGroupUser)
 -- ===========================
 
--- Give john access to dev group (he owns it, but let's add explicit access for testing)
-INSERT INTO MailGroupUser (Id, MailGroupId, UserId, GrantedAt) VALUES
-(1, 203, '11111111-1111-1111-1111-111111111111', NOW());
+-- jane has access to support (owned by manager)
+INSERT INTO MailGroupUser (MailGroupId, UserId, GrantedAt) VALUES
+(200, '22222222-2222-2222-2222-222222222222', NOW());
 
--- Give jane access to support group
-INSERT INTO MailGroupUser (Id, MailGroupId, UserId, GrantedAt) VALUES
-(2, 200, '22222222-2222-2222-2222-222222222222', NOW());
+-- john has access to support (shared by jane or manager)
+INSERT INTO MailGroupUser (MailGroupId, UserId, GrantedAt) VALUES
+(200, '11111111-1111-1111-1111-111111111111', NOW());
 
--- Give alice access to marketing group
-INSERT INTO MailGroupUser (Id, MailGroupId, UserId, GrantedAt) VALUES
-(3, 202, '44444444-4444-4444-4444-444444444444', NOW());
+-- alice has access to marketing (owned by jane)
+INSERT INTO MailGroupUser (MailGroupId, UserId, GrantedAt) VALUES
+(202, '44444444-4444-4444-4444-444444444444', NOW());
 
--- Give manager access to dev group
-INSERT INTO MailGroupUser (Id, MailGroupId, UserId, GrantedAt) VALUES
-(4, 203, '33333333-3333-3333-3333-333333333333', NOW());
+-- manager shared dev with themselves (admin opting in)
+INSERT INTO MailGroupUser (MailGroupId, UserId, GrantedAt) VALUES
+(203, '33333333-3333-3333-3333-333333333333', NOW());
+
+-- jane has access to staging (shared by john)
+INSERT INTO MailGroupUser (MailGroupId, UserId, GrantedAt) VALUES
+(204, '22222222-2222-2222-2222-222222222222', NOW());
 
 -- ===========================
 -- CONTACTS
@@ -84,138 +97,102 @@ INSERT INTO MailGroupUser (Id, MailGroupId, UserId, GrantedAt) VALUES
 INSERT INTO Contact (Id, `From`, Name) VALUES
 (1, 'noreply@company.com', 'Company Notifications'),
 (2, 'support@helpdesk.com', 'Help Desk'),
-(3, 'newsletter@marketing.com', 'Marketing Newsletter'),
-(4, 'admin@system.com', 'System Administrator'),
+(3, 'ci@buildserver.com', 'Build Server'),
+(4, 'deploy@automation.com', 'Deployment Bot'),
 (5, 'orders@ecommerce.com', 'Order Processing'),
 (6, 'security@alerts.com', 'Security Alerts'),
-(7, 'team@development.com', 'Development Team'),
-(8, 'billing@finance.com', 'Billing Department');
+(7, 'postmaster@mailvoid.com', 'Postmaster');
 
 -- ===========================
--- SAMPLE EMAILS
+-- EMAILS
 -- ===========================
 
--- Emails to John's default mailbox
+-- Base domain emails (visible to admins)
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(1, 'welcome@john.mailvoid.com', 'Welcome to MailVoid! This is your default mailbox.', 1, 'admin@mailvoid.com', 'MailVoid Admin', NULL, 'Welcome to MailVoid', 'utf-8', DATE_SUB(NOW(), INTERVAL 5 DAY), 'user-john'),
-(2, 'notification@john.mailvoid.com', 'Your account has been successfully created.', 0, 'noreply@company.com', 'Company Notifications', NULL, 'Account Created Successfully', 'utf-8', DATE_SUB(NOW(), INTERVAL 4 DAY), 'user-john'),
-(3, 'update@john.mailvoid.com', 'System maintenance scheduled for tonight.', 0, 'admin@system.com', 'System Administrator', NULL, 'Maintenance Schedule', 'utf-8', DATE_SUB(NOW(), INTERVAL 2 DAY), 'user-john');
+(1, 'postmaster@mailvoid.com', 'Mail delivery report for the past 24 hours.', 0, 'postmaster@mailvoid.com', 'Postmaster', NULL, 'Daily Mail Delivery Report', 'utf-8', DATE_SUB(NOW(), INTERVAL 2 HOUR), 'subdomain/default'),
+(2, 'abuse@mailvoid.com', 'Abuse report from external system.', 0, 'abuse@external.com', 'Abuse Reporter', NULL, 'Abuse Report #4821', 'utf-8', DATE_SUB(NOW(), INTERVAL 6 HOUR), 'subdomain/default'),
+(3, 'info@mailvoid.com', 'Hi, I would like to learn more about your service.', 0, 'curious@example.com', 'Curious User', NULL, 'Service Inquiry', 'utf-8', DATE_SUB(NOW(), INTERVAL 1 DAY), 'subdomain/default');
 
--- Emails to Jane's default mailbox
+-- John's private mailbox
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(4, 'info@jane.mailvoid.com', 'Hello Jane! Welcome to your personal mailbox.', 1, 'admin@mailvoid.com', 'MailVoid Admin', NULL, 'Personal Mailbox Setup', 'utf-8', DATE_SUB(NOW(), INTERVAL 3 DAY), 'user-jane'),
-(5, 'newsletter@jane.mailvoid.com', 'Monthly newsletter with updates and tips.', 1, 'newsletter@marketing.com', 'Marketing Newsletter', NULL, 'Monthly Newsletter - January', 'utf-8', DATE_SUB(NOW(), INTERVAL 1 DAY), 'user-jane');
+(10, 'welcome@john.mailvoid.com', '<h2>Welcome!</h2><p>Your mailbox is ready.</p>', 1, 'noreply@company.com', 'Company Notifications', NULL, 'Welcome to MailVoid', 'utf-8', DATE_SUB(NOW(), INTERVAL 5 DAY), 'user-john'),
+(11, 'alerts@john.mailvoid.com', 'Your CI pipeline has been configured.', 0, 'ci@buildserver.com', 'Build Server', NULL, 'Pipeline Setup Complete', 'utf-8', DATE_SUB(NOW(), INTERVAL 2 DAY), 'user-john');
 
--- Emails to Jane's claimed newsletter mailbox
+-- Jane's private mailbox
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(6, 'subscribe@newsletter.mailvoid.com', 'Thank you for subscribing to our newsletter!', 1, 'newsletter@marketing.com', 'Marketing Newsletter', NULL, 'Subscription Confirmed', 'utf-8', DATE_SUB(NOW(), INTERVAL 6 HOUR), 'user-jane'),
-(7, 'promo@newsletter.mailvoid.com', 'Special promotion just for you! 50% off everything.', 1, 'orders@ecommerce.com', 'Order Processing', NULL, 'Special Promotion Alert', 'utf-8', DATE_SUB(NOW(), INTERVAL 2 HOUR), 'user-jane');
+(20, 'updates@jane.mailvoid.com', 'Your weekly summary is ready.', 0, 'noreply@company.com', 'Company Notifications', NULL, 'Weekly Summary', 'utf-8', DATE_SUB(NOW(), INTERVAL 1 DAY), 'user-jane'),
+(21, 'notifications@jane.mailvoid.com', 'New comment on your pull request.', 0, 'noreply@github.com', 'GitHub', NULL, 'PR Comment: Fix login flow', 'utf-8', DATE_SUB(NOW(), INTERVAL 3 HOUR), 'user-jane');
 
--- Emails to support group (public)
+-- Alice's private mailbox
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(8, 'help@support.mailvoid.com', 'I need help with my account login.', 0, 'customer1@example.com', 'John Customer', NULL, 'Login Issue', 'utf-8', DATE_SUB(NOW(), INTERVAL 8 HOUR), 'support'),
-(9, 'ticket@support.mailvoid.com', 'Bug report: Application crashes on startup.', 0, 'user@testing.com', 'Beta Tester', NULL, 'Bug Report - Crash on Startup', 'utf-8', DATE_SUB(NOW(), INTERVAL 4 HOUR), 'support'),
-(10, 'urgent@support.mailvoid.com', 'URGENT: Cannot access my data!', 0, 'enterprise@client.com', 'Enterprise Client', NULL, 'URGENT: Data Access Issue', 'utf-8', DATE_SUB(NOW(), INTERVAL 30 MINUTE), 'support');
+(30, 'test@alice.mailvoid.com', 'Test email for integration testing.', 0, 'ci@buildserver.com', 'Build Server', NULL, 'Integration Test Email', 'utf-8', DATE_SUB(NOW(), INTERVAL 4 HOUR), 'user-alice');
 
--- Emails to sales group (public)
+-- Support group emails (manager owns, john & jane shared)
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(11, 'inquiry@sales.mailvoid.com', 'I am interested in your enterprise plan.', 0, 'ceo@startup.com', 'Startup CEO', NULL, 'Enterprise Plan Inquiry', 'utf-8', DATE_SUB(NOW(), INTERVAL 12 HOUR), 'sales'),
-(12, 'quote@sales.mailvoid.com', 'Please provide a quote for 1000 users.', 0, 'procurement@bigcorp.com', 'Big Corp Procurement', NULL, 'Quote Request - 1000 Users', 'utf-8', DATE_SUB(NOW(), INTERVAL 6 HOUR), 'sales'),
-(13, 'demo@sales.mailvoid.com', 'Can we schedule a product demo?', 0, 'manager@company.com', 'Product Manager', NULL, 'Demo Request', 'utf-8', DATE_SUB(NOW(), INTERVAL 1 HOUR), 'sales');
+(40, 'help@support.mailvoid.com', 'I cannot log in to my account.', 0, 'customer1@example.com', 'John Customer', NULL, 'Login Issue', 'utf-8', DATE_SUB(NOW(), INTERVAL 8 HOUR), 'subdomain/support'),
+(41, 'ticket@support.mailvoid.com', 'Application crashes when uploading large files.', 0, 'user@testing.com', 'Beta Tester', NULL, 'Bug Report - Upload Crash', 'utf-8', DATE_SUB(NOW(), INTERVAL 4 HOUR), 'subdomain/support'),
+(42, 'urgent@support.mailvoid.com', 'URGENT: Cannot access production data!', 0, 'enterprise@client.com', 'Enterprise Client', NULL, 'URGENT: Data Access Issue', 'utf-8', DATE_SUB(NOW(), INTERVAL 30 MINUTE), 'subdomain/support');
 
--- Emails to marketing group (public)
+-- Sales group emails (manager owns, no one else shared)
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(14, 'campaign@marketing.mailvoid.com', '<h1>New Product Launch!</h1><p>We are excited to announce our new product.</p>', 1, 'team@development.com', 'Development Team', NULL, 'New Product Launch Announcement', 'utf-8', DATE_SUB(NOW(), INTERVAL 10 HOUR), 'marketing'),
-(15, 'analytics@marketing.mailvoid.com', 'Monthly analytics report attached.', 0, 'analytics@tools.com', 'Analytics Service', NULL, 'Monthly Analytics Report', 'utf-8', DATE_SUB(NOW(), INTERVAL 2 DAY), 'marketing');
+(50, 'inquiry@sales.mailvoid.com', 'Interested in the enterprise plan for 500 seats.', 0, 'ceo@startup.com', 'Startup CEO', NULL, 'Enterprise Plan Inquiry', 'utf-8', DATE_SUB(NOW(), INTERVAL 12 HOUR), 'subdomain/sales'),
+(51, 'quote@sales.mailvoid.com', 'Please send a quote for annual licensing.', 0, 'procurement@bigcorp.com', 'Big Corp Procurement', NULL, 'Quote Request - Annual License', 'utf-8', DATE_SUB(NOW(), INTERVAL 6 HOUR), 'subdomain/sales');
 
--- Emails to dev group (private)
+-- Marketing group emails (jane owns, alice shared)
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(16, 'build@dev.mailvoid.com', 'Build #1234 failed. Check the logs for details.', 0, 'ci@build.com', 'Build Server', NULL, 'Build Failed - #1234', 'utf-8', DATE_SUB(NOW(), INTERVAL 3 HOUR), 'dev'),
-(17, 'deploy@dev.mailvoid.com', 'Production deployment successful.', 0, 'deploy@automation.com', 'Deployment Bot', NULL, 'Deployment Successful', 'utf-8', DATE_SUB(NOW(), INTERVAL 1 HOUR), 'dev'),
-(18, 'security@dev.mailvoid.com', 'Security vulnerability detected in dependency.', 0, 'security@alerts.com', 'Security Alerts', NULL, 'Security Alert - Dependency Vulnerability', 'utf-8', DATE_SUB(NOW(), INTERVAL 45 MINUTE), 'dev');
+(60, 'campaign@marketing.mailvoid.com', '<h1>New Product Launch!</h1><p>Announcing our latest feature.</p>', 1, 'noreply@company.com', 'Company Notifications', NULL, 'Product Launch Announcement', 'utf-8', DATE_SUB(NOW(), INTERVAL 10 HOUR), 'subdomain/marketing'),
+(61, 'analytics@marketing.mailvoid.com', 'Monthly campaign analytics are ready.', 0, 'analytics@tools.com', 'Analytics Service', NULL, 'Monthly Analytics Report', 'utf-8', DATE_SUB(NOW(), INTERVAL 2 DAY), 'subdomain/marketing');
 
--- Emails to test group (public)
+-- Dev group emails (john owns, manager shared with themselves)
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(19, 'automated@test.mailvoid.com', 'All tests passed successfully.', 0, 'testing@automation.com', 'Test Suite', NULL, 'Test Results - All Passed', 'utf-8', DATE_SUB(NOW(), INTERVAL 20 MINUTE), 'test'),
-(20, 'load@test.mailvoid.com', 'Load testing completed. Performance metrics attached.', 0, 'performance@tools.com', 'Performance Testing', NULL, 'Load Test Results', 'utf-8', DATE_SUB(NOW(), INTERVAL 10 MINUTE), 'test');
+(70, 'build@dev.mailvoid.com', 'Build #1234 failed. Check logs for details.', 0, 'ci@buildserver.com', 'Build Server', NULL, 'Build Failed - #1234', 'utf-8', DATE_SUB(NOW(), INTERVAL 3 HOUR), 'subdomain/dev'),
+(71, 'deploy@dev.mailvoid.com', 'Production deployment v2.5.1 successful.', 0, 'deploy@automation.com', 'Deployment Bot', NULL, 'Deploy Successful - v2.5.1', 'utf-8', DATE_SUB(NOW(), INTERVAL 1 HOUR), 'subdomain/dev'),
+(72, 'security@dev.mailvoid.com', 'Critical vulnerability found in lodash@4.17.20.', 0, 'security@alerts.com', 'Security Alerts', NULL, 'Security Alert - lodash CVE', 'utf-8', DATE_SUB(NOW(), INTERVAL 45 MINUTE), 'subdomain/dev');
 
--- Emails to Alice's claimed personal mailbox
+-- Staging group emails (john owns, jane shared)
 INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(21, 'project@personal.mailvoid.com', 'Your project proposal has been approved!', 1, 'manager@company.com', 'Project Manager', NULL, 'Project Proposal Approved', 'utf-8', DATE_SUB(NOW(), INTERVAL 5 HOUR), 'user-alice'),
-(22, 'freelance@personal.mailvoid.com', 'Payment for last months work has been processed.', 0, 'billing@finance.com', 'Billing Department', NULL, 'Payment Processed', 'utf-8', DATE_SUB(NOW(), INTERVAL 3 DAY), 'user-alice');
+(80, 'test@staging.mailvoid.com', 'All 142 integration tests passed.', 0, 'ci@buildserver.com', 'Build Server', NULL, 'Test Results - All Passed', 'utf-8', DATE_SUB(NOW(), INTERVAL 20 MINUTE), 'subdomain/staging'),
+(81, 'alerts@staging.mailvoid.com', 'Memory usage exceeded 90% threshold.', 0, 'monitoring@infra.com', 'Infrastructure Monitor', NULL, 'Staging Alert - High Memory', 'utf-8', DATE_SUB(NOW(), INTERVAL 10 MINUTE), 'subdomain/staging');
 
--- Some unclaimed emails (for testing claiming functionality)
-INSERT INTO Mail (Id, `To`, Text, IsHtml, `From`, FromName, ToOthers, Subject, Charsets, CreatedOn, MailGroupPath) VALUES
-(23, 'info@unclaimed.mailvoid.com', 'This email is in an unclaimed subdomain.', 0, 'sender@example.com', 'Unknown Sender', NULL, 'Unclaimed Email 1', 'utf-8', NOW(), 'unclaimed'),
-(24, 'contact@available.mailvoid.com', 'Another unclaimed email for testing.', 0, 'test@example.com', 'Test Sender', NULL, 'Available for Claiming', 'utf-8', NOW(), 'available'),
-(25, 'hello@open.mailvoid.com', 'This subdomain is open for claiming.', 0, 'demo@example.com', 'Demo User', NULL, 'Open Subdomain', 'utf-8', NOW(), 'open');
+-- Some read status entries
+INSERT INTO UserMailRead (UserId, MailId, ReadAt) VALUES
+('11111111-1111-1111-1111-111111111111', 10, NOW()),
+('11111111-1111-1111-1111-111111111111', 40, NOW()),
+('22222222-2222-2222-2222-222222222222', 20, NOW()),
+('33333333-3333-3333-3333-333333333333', 70, NOW());
 
 -- ===========================
 -- VERIFICATION QUERIES
 -- ===========================
--- Run these to verify the data was inserted correctly:
-
--- SELECT 'Users Created' as Info, COUNT(*) as Count FROM User;
--- SELECT 'Mail Groups Created' as Info, COUNT(*) as Count FROM MailGroup;
--- SELECT 'Emails Created' as Info, COUNT(*) as Count FROM Mail;
--- SELECT 'Contacts Created' as Info, COUNT(*) as Count FROM Contact;
-
--- Check default mailboxes:
--- SELECT u.UserName, mg.Path, mg.IsDefaultMailbox, mg.IsUserPrivate 
--- FROM MailGroup mg 
--- JOIN User u ON mg.OwnerUserId = u.Id 
--- WHERE mg.IsUserPrivate = 1;
-
--- Check email distribution:
--- SELECT MailGroupPath, COUNT(*) as EmailCount 
--- FROM Mail 
--- GROUP BY MailGroupPath 
--- ORDER BY EmailCount DESC;
+-- SELECT 'Users' as Info, COUNT(*) as Count FROM `User`;
+-- SELECT 'Mail Groups' as Info, COUNT(*) as Count FROM MailGroup;
+-- SELECT 'Emails' as Info, COUNT(*) as Count FROM Mail;
+-- SELECT 'Shared Access' as Info, COUNT(*) as Count FROM MailGroupUser;
 
 -- ===========================
 -- TEST SCENARIOS
 -- ===========================
 /*
-This seed data creates the following test scenarios:
+ACCOUNTS (all test users use password: "password123"):
+  - admin/admin (admin) - sees base domain emails, can access hooks
+  - john/password123 (user) - owns dev & staging groups
+  - jane/password123 (user) - owns marketing group
+  - manager/password123 (admin) - owns support & sales groups, can access hooks
+  - alice/password123 (user)
 
-1. USER ACCOUNTS (All use password: "password123"):
-   - admin/admin (existing admin user)
-   - john/password123 (regular user)
-   - jane/password123 (regular user)
-   - manager/password123 (admin user)
-   - alice/password123 (regular user)
+VISIBILITY:
+  - admin: own private mailbox + base domain (default) emails
+  - john: own mailbox + dev (owner) + staging (owner) + support (shared)
+  - jane: own mailbox + marketing (owner) + support (shared) + staging (shared)
+  - manager: own mailbox + support (owner) + sales (owner) + dev (shared) + base domain (admin)
+  - alice: own mailbox + marketing (shared)
 
-2. DEFAULT MAILBOXES (Cannot be unclaimed):
-   - john has: user-john (john subdomain)
-   - jane has: user-jane (jane subdomain)
-   - manager has: user-manager (manager subdomain)
-   - alice has: user-alice (alice subdomain)
-
-3. CLAIMED MAILBOXES (Can be unclaimed):
-   - jane claimed: newsletter subdomain
-   - alice claimed: personal subdomain
-
-4. PUBLIC MAIL GROUPS:
-   - support (owned by manager)
-   - sales (owned by manager)
-   - marketing (owned by jane)
-   - test (owned by john)
-
-5. PRIVATE MAIL GROUPS:
-   - dev (owned by john, manager has access)
-
-6. UNCLAIMED SUBDOMAINS (Available for claiming):
-   - unclaimed
-   - available
-   - open
-
-7. TESTING SCENARIOS:
-   - Login with different user roles
-   - View default mailboxes (should not show unclaim button)
-   - View claimed mailboxes (should show unclaim button)
-   - Try to claim unclaimed subdomains
-   - Try to unclaim default mailboxes (should fail)
-   - Test mail group access permissions
-   - Test mail filtering and grouping
-   - Test 404 redirect functionality
+KEY TEST SCENARIOS:
+  1. Admin does NOT auto-see all subdomains (only base domain + own/shared)
+  2. Admin (manager) shared dev with themselves to opt-in
+  3. Any user with access can set retention on a shared mailbox
+  4. Any user with access can share a mailbox with others
+  5. Hooks feature only visible to admin users (admin, manager)
+  6. Non-admin users cannot navigate to /hooks
+  7. Delete only available to mailbox owners
 */
