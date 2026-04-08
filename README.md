@@ -4,8 +4,6 @@ A developer email testing tool that captures and organizes test emails without c
 
 ![image](https://github.com/user-attachments/assets/320b036f-b522-44d7-8be3-b23d3f610128)
 
-> [!WARNING]
-> This project is currently in prototype status. Expect frequent changes and updates.
 
 ## Features
 
