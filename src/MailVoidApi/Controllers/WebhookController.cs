@@ -54,7 +54,7 @@ public class WebhookController : ControllerBase
                 }
             }
 
-            await db.InsertAsync(mail);
+            mail.Id = await db.InsertAsync(mail, selectIdentity: true);
 
             _logger.LogInformation("Successfully processed MailData for {From} to {To}",
                 mail.From, mail.To);

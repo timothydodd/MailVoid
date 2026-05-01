@@ -82,7 +82,7 @@ public class HooksController : ControllerBase
                 CreatedOn = DateTime.UtcNow
             };
 
-            await db.InsertAsync(webhook);
+            webhook.Id = await db.InsertAsync(webhook, selectIdentity: true);
 
             // Update bucket's last activity
             webhookBucket.LastActivity = DateTime.UtcNow;
