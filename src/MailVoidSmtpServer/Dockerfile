@@ -1,4 +1,4 @@
-and FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
 WORKDIR /app
 # 25 = SMTP, 587 = STARTTLS submission, 465 = implicit TLS, 2580 = test/non-privileged
 EXPOSE 25
