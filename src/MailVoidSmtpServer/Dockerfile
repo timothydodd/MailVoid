@@ -7,7 +7,10 @@ EXPOSE 465
 EXPOSE 2580
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends certbot \
+    && apt-get install -y --no-install-recommends \
+        certbot \
+        python3-certbot-dns-cloudflare \
+        openssl \
     && rm -rf /var/lib/apt/lists/*
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
