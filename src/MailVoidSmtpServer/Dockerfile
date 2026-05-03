@@ -1,10 +1,14 @@
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
+and FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
 WORKDIR /app
 # 25 = SMTP, 587 = STARTTLS submission, 465 = implicit TLS, 2580 = test/non-privileged
 EXPOSE 25
 EXPOSE 587
 EXPOSE 465
 EXPOSE 2580
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends certbot \
+    && rm -rf /var/lib/apt/lists/*
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
