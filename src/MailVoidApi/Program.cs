@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Serialization;
 using MailVoidApi.Authentication;
+using MailVoidApi.Common;
 using MailVoidApi.Data;
 using MailVoidApi.Hubs;
 using MailVoidApi.Middleware;
@@ -34,7 +35,7 @@ public class Program
         builder.Services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.TypeInfoResolver = new ApiJsonSerializerContext();
-
+            options.SerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
         });
 
         builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
@@ -45,8 +46,13 @@ public class Program
             .AddJsonOptions(options =>
             {
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
             });
-        builder.Services.AddSignalR();
+        builder.Services.AddSignalR()
+            .AddJsonProtocol(options =>
+            {
+                options.PayloadSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
+            });
         builder.Services.AddMemoryCache();
         // Register HttpContextAccessor
         builder.Services.AddHttpContextAccessor();
