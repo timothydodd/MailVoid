@@ -1,0 +1,145 @@
+# Example k3s manifest for MailVoidSmtpServer.
+#
+# Apply with:
+#   kubectl apply -f mailvoid-smtp.yaml
+#
+# Before applying:
+#   1. Replace DOCKERHUB_USER with your image registry path.
+#   2. Edit the ConfigMap (MailVoidApi__BaseUrl, allowed domains, etc.).
+#   3. Set a real API key in the Secret (echo -n 'key' | base64).
+#   4. If you use cert-manager / external secrets for TLS, mount the cert
+#      into /certs and set SmtpServer__CertificatePath accordingly.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mailvoid
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mailvoid-smtp-config
+  namespace: mailvoid
+data:
+  SmtpServer__Port: "25"
+  SmtpServer__StartTlsPort: "587"
+  SmtpServer__SslPort: "465"
+  SmtpServer__TestPort: "2580"
+  SmtpServer__Name: "MailVoid SMTP Server"
+  SmtpServer__MaxMessageSize: "10485760"
+  SmtpServer__EnableSsl: "false"
+  MailVoidApi__BaseUrl: "http://mailvoid-api.mailvoid.svc.cluster.local:8080"
+  MailVoidApi__WebhookEndpoint: "/api/webhook/mail"
+  MailboxFilter__AllowedDomains__0: "mailvoid.com"
+  EmailQueue__MaxRetryAttempts: "3"
+  EmailQueue__MaxConcurrentProcessing: "5"
+  Logging__LogLevel__Default: "Information"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mailvoid-smtp-secrets
+  namespace: mailvoid
+type: Opaque
+stringData:
+  # Shared key the SMTP server uses when calling the MailVoid API webhook.
+  MailVoidApi__ApiKey: "REPLACE_ME_WITH_REAL_KEY"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailvoid-smtp
+  namespace: mailvoid
+  labels:
+    app: mailvoid-smtp
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mailvoid-smtp
+  template:
+    metadata:
+      labels:
+        app: mailvoid-smtp
+    spec:
+      containers:
+        - name: smtp
+          image: DOCKERHUB_USER/mailvoid-smtp:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: smtp
+              containerPort: 25
+            - name: submission
+              containerPort: 587
+            - name: smtps
+              containerPort: 465
+            - name: smtp-test
+              containerPort: 2580
+          envFrom:
+            - configMapRef:
+                name: mailvoid-smtp-config
+            - secretRef:
+                name: mailvoid-smtp-secrets
+          # Non-root user from the Dockerfile cannot bind <1024 without this cap.
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            # Persistent volume for Let's Encrypt certs managed by certbot
+            # (matches LetsEncrypt:CertificateDirectory in appsettings.json).
+            # Set SmtpServer__EnableSsl=true and point SmtpServer__CertificatePath
+            # at the issued cert to enable STARTTLS / SMTPS.
+            - name: letsencrypt
+              mountPath: /etc/letsencrypt
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: letsencrypt
+          persistentVolumeClaim:
+            claimName: mailvoid-smtp-letsencrypt
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mailvoid-smtp-letsencrypt
+  namespace: mailvoid
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 128Mi
+---
+# Use a LoadBalancer so k3s' built-in ServiceLB (klipper-lb) exposes the SMTP
+# ports on the node IPs. For an internal-only service, switch type to ClusterIP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailvoid-smtp
+  namespace: mailvoid
+  labels:
+    app: mailvoid-smtp
+spec:
+  type: LoadBalancer
+  selector:
+    app: mailvoid-smtp
+  ports:
+    - name: smtp
+      port: 25
+      targetPort: smtp
+      protocol: TCP
+    - name: submission
+      port: 587
+      targetPort: submission
+      protocol: TCP
+    - name: smtps
+      port: 465
+      targetPort: smtps
+      protocol: TCP
