@@ -56,6 +56,8 @@ public class LetsEncryptService : ILetsEncryptService
             var certDir = Path.Combine(_options.CertificateDirectory, domain);
             Directory.CreateDirectory(certDir);
 
+            if (IsCloudflareChallenge() && !await EnsureCloudflareCredentialsAsync(cancellationToken))
+                return false;
 
             // Build certbot command for other challenge methods
             var certbotArgs = BuildCertbotCommand(domain, isRenewal: false);
@@ -95,6 +97,8 @@ public class LetsEncryptService : ILetsEncryptService
         {
             _logger.LogInformation("Renewing Let's Encrypt certificate for domain: {Domain}", domain);
 
+            if (IsCloudflareChallenge() && !await EnsureCloudflareCredentialsAsync(cancellationToken))
+                return false;
 
             // Build certbot renew command for other challenge methods
             var certbotArgs = BuildCertbotCommand(domain, isRenewal: true);
@@ -371,22 +375,29 @@ public class LetsEncryptService : ILetsEncryptService
 
 
 
-    private async Task<string?> CreateCloudflareCredentialsFileAsync()
+    private bool IsCloudflareChallenge() =>
+        string.Equals(_options.ChallengeMethod, "dns-cloudflare", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<bool> EnsureCloudflareCredentialsAsync(CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(_options.CloudflareApiToken))
+        {
+            _logger.LogError("dns-cloudflare challenge selected but CloudflareApiToken is not configured");
+            return false;
+        }
+
         try
         {
-            var tempDir = Path.Combine(_options.CertificateDirectory, "temp");
-            Directory.CreateDirectory(tempDir);
+            var credentialsPath = GetCloudflareCredentialsPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(credentialsPath)!);
 
-            var credentialsPath = Path.Combine(tempDir, $"cloudflare-{Guid.NewGuid()}.ini");
+            var credentialsContent =
+                "# Cloudflare API credentials for certbot-dns-cloudflare\n" +
+                $"dns_cloudflare_api_token = {_options.CloudflareApiToken}\n";
 
-            var credentialsContent = $@"# Cloudflare API credentials for certbot-dns-cloudflare
-dns_cloudflare_api_token = {_options.CloudflareApiToken}
-";
+            await File.WriteAllTextAsync(credentialsPath, credentialsContent, cancellationToken);
 
-            await File.WriteAllTextAsync(credentialsPath, credentialsContent);
-
-            // Set secure permissions (readable only by owner)
+            // certbot refuses to use the credentials file if group/world-readable.
             if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
             {
                 var chmod = new ProcessStartInfo("chmod", $"600 {credentialsPath}")
@@ -395,16 +406,17 @@ dns_cloudflare_api_token = {_options.CloudflareApiToken}
                     CreateNoWindow = true
                 };
                 using var process = Process.Start(chmod);
-                await process?.WaitForExitAsync()!;
+                if (process != null)
+                    await process.WaitForExitAsync(cancellationToken);
             }
 
-            _logger.LogDebug("Created Cloudflare credentials file: {Path}", credentialsPath);
-            return credentialsPath;
+            _logger.LogDebug("Wrote Cloudflare credentials file: {Path}", credentialsPath);
+            return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating Cloudflare credentials file");
-            return null;
+            _logger.LogError(ex, "Error writing Cloudflare credentials file");
+            return false;
         }
     }
 
