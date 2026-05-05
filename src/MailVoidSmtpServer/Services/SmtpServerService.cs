@@ -1,8 +1,10 @@
-﻿using System.Security.Authentication;
+﻿using System.Net;
+using System.Security.Authentication;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmtpServer;
+using SmtpServer.Net;
 
 namespace MailVoidSmtpServer.Services;
 public class SmtpServerService
@@ -11,18 +13,21 @@ public class SmtpServerService
     private readonly SmtpServerOptions _options;
     private readonly IServiceProvider _serviceProvider;
     private readonly ICertificateService _certificateService;
+    private readonly IIpBlacklistService _blacklist;
     private SmtpServer.SmtpServer? _server;
 
     public SmtpServerService(
         ILogger<SmtpServerService> logger,
         IOptions<SmtpServerOptions> options,
         IServiceProvider serviceProvider,
-        ICertificateService certificateService)
+        ICertificateService certificateService,
+        IIpBlacklistService blacklist)
     {
         _logger = logger;
         _options = options.Value;
         _serviceProvider = serviceProvider;
         _certificateService = certificateService;
+        _blacklist = blacklist;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -165,97 +170,110 @@ public class SmtpServerService
         _logger.LogInformation("SMTP server stopped");
     }
 
+    private static string GetRemoteEndPoint(ISessionContext context)
+    {
+        return context.Properties.TryGetValue(EndpointListener.RemoteEndPointKey, out var ep) && ep is EndPoint remote
+            ? remote.ToString() ?? "unknown"
+            : "unknown";
+    }
+
     private void OnSessionCreated(object? sender, SessionEventArgs e)
     {
-        var isSecure = e.Context.EndpointDefinition.IsSecure;
         var context = e.Context;
         var pipe = context.Pipe;
+        var remote = GetRemoteEndPoint(context);
+        var localPort = context.EndpointDefinition.Endpoint.Port;
+
+        var remoteIp = _blacklist.GetRemoteIp(context);
+        if (remoteIp != null && _blacklist.IsBlacklisted(remoteIp))
+        {
+            _logger.LogWarning(
+                "Dropping connection from blacklisted IP {Ip} on port {Port} (Session {SessionId})",
+                remoteIp, localPort, context.SessionId);
+            try
+            {
+                pipe.Input.Complete();
+                pipe.Output.Complete();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Error closing pipe for blacklisted IP {Ip}", remoteIp);
+            }
+            return;
+        }
 
         if (pipe.IsSecure)
         {
-            var endpointPort = context.EndpointDefinition.Endpoint.Port;
-
-            if (endpointPort == 465)
+            if (localPort == 465)
             {
                 _logger.LogInformation(
-                    "OnSessionCreated - Session {SessionId} started with implicit TLS (port 465), TLS protocol: {Protocol}",
-                    context.SessionId,
-                    pipe.SslProtocol);
+                    "OnSessionCreated - Session {SessionId} from {Remote} started with implicit TLS (port 465), TLS protocol: {Protocol}",
+                    context.SessionId, remote, pipe.SslProtocol);
             }
             else
             {
                 _logger.LogInformation(
-                    "OnSessionCreated - Session {SessionId} upgraded to TLS via STARTTLS (port {Port}), TLS protocol: {Protocol}",
-                    context.SessionId,
-                    endpointPort,
-                    pipe.SslProtocol);
+                    "OnSessionCreated - Session {SessionId} from {Remote} upgraded to TLS via STARTTLS (port {Port}), TLS protocol: {Protocol}",
+                    context.SessionId, remote, localPort, pipe.SslProtocol);
             }
         }
         else
         {
             _logger.LogWarning(
-                "OnSessionCreated - Session {SessionId} remained plaintext on port {Port} from {RemoteEndPoint}",
-                context.SessionId,
-                context.EndpointDefinition.Endpoint.Port,
-                context.EndpointDefinition.Endpoint.Address);
+                "OnSessionCreated - Session {SessionId} remained plaintext on port {Port} from {Remote}",
+                context.SessionId, localPort, remote);
         }
     }
 
     private void OnSessionCompleted(object? sender, SessionEventArgs e)
     {
-        var isSecure = e.Context.EndpointDefinition.IsSecure;
         var context = e.Context;
         var pipe = context.Pipe;
+        var remote = GetRemoteEndPoint(context);
+        var localPort = context.EndpointDefinition.Endpoint.Port;
 
         if (pipe.IsSecure)
         {
-            var endpointPort = context.EndpointDefinition.Endpoint.Port;
-
-            if (endpointPort == 465)
+            if (localPort == 465)
             {
                 _logger.LogInformation(
-                    "OnSessionCompleted - Session {SessionId} started with implicit TLS (port 465), TLS protocol: {Protocol}",
-                    context.SessionId,
-                    pipe.SslProtocol);
+                    "OnSessionCompleted - Session {SessionId} from {Remote} with implicit TLS (port 465), TLS protocol: {Protocol}",
+                    context.SessionId, remote, pipe.SslProtocol);
             }
             else
             {
                 _logger.LogInformation(
-                    "OnSessionCompleted - Session {SessionId} upgraded to TLS via STARTTLS (port {Port}), TLS protocol: {Protocol}",
-                    context.SessionId,
-                    endpointPort,
-                    pipe.SslProtocol);
+                    "OnSessionCompleted - Session {SessionId} from {Remote} with STARTTLS (port {Port}), TLS protocol: {Protocol}",
+                    context.SessionId, remote, localPort, pipe.SslProtocol);
             }
         }
         else
         {
             _logger.LogWarning(
-                "OnSessionCompleted - Session {SessionId} remained plaintext on port {Port} from {RemoteEndPoint}",
-                context.SessionId,
-                context.EndpointDefinition.Endpoint.Port,
-                context.EndpointDefinition.Endpoint.Address);
+                "OnSessionCompleted - Session {SessionId} remained plaintext on port {Port} from {Remote}",
+                context.SessionId, localPort, remote);
         }
     }
 
     private void OnSessionFaulted(object? sender, SessionFaultedEventArgs e)
     {
-        var isSecure = e.Context.EndpointDefinition.IsSecure;
-        var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
-
-        _logger.LogError(e.Exception, "SMTP session faulted - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
+        var securityInfo = e.Context.EndpointDefinition.IsSecure ? "SSL/TLS" : "Plain Text";
+        _logger.LogError(e.Exception,
+            "SMTP session faulted - SessionId: {SessionId}, Remote: {Remote}, LocalPort: {LocalPort}, Security: {Security}",
             e.Context.SessionId,
-            e.Context.EndpointDefinition.Endpoint,
+            GetRemoteEndPoint(e.Context),
+            e.Context.EndpointDefinition.Endpoint.Port,
             securityInfo);
     }
 
     private void OnSessionCancelled(object? sender, SessionEventArgs e)
     {
-        var isSecure = e.Context.EndpointDefinition.IsSecure;
-        var securityInfo = isSecure ? "SSL/TLS" : "Plain Text";
-
-        _logger.LogWarning("SMTP session cancelled - SessionId: {SessionId}, RemoteEndPoint: {RemoteEndPoint}, Security: {Security}",
+        var securityInfo = e.Context.EndpointDefinition.IsSecure ? "SSL/TLS" : "Plain Text";
+        _logger.LogWarning(
+            "SMTP session cancelled - SessionId: {SessionId}, Remote: {Remote}, LocalPort: {LocalPort}, Security: {Security}",
             e.Context.SessionId,
-            e.Context.EndpointDefinition.Endpoint,
+            GetRemoteEndPoint(e.Context),
+            e.Context.EndpointDefinition.Endpoint.Port,
             securityInfo);
     }
 

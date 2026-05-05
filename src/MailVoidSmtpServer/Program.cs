@@ -4,8 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using SmtpServer.Storage;
 using SmtpServer.Authentication;
+using SmtpServer.Storage;
 
 namespace MailVoidSmtpServer;
 
@@ -56,10 +56,12 @@ public class Program
                 services.AddSingleton<MailVoidMailboxFilter>();
                 services.AddSingleton<IMailboxFilter>(provider => provider.GetRequiredService<MailVoidMailboxFilter>());
                 services.AddSingleton<IMailboxFilterFactory>(provider => provider.GetRequiredService<MailVoidMailboxFilter>());
-                
+
+                services.AddSingleton<IIpBlacklistService, IpBlacklistService>();
+
                 services.AddSingleton<NoAuthenticator>();
                 services.AddSingleton<IUserAuthenticator>(provider => provider.GetRequiredService<NoAuthenticator>());
-                
+
                 // Queue services
                 services.AddSingleton<IInboundEmailQueueService, InboundEmailQueueService>();
                 services.AddSingleton<IOutboundEmailQueueService, OutboundEmailQueueService>();
