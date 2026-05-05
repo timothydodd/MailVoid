@@ -57,8 +57,6 @@ public class Program
                 services.AddSingleton<IMailboxFilter>(provider => provider.GetRequiredService<MailVoidMailboxFilter>());
                 services.AddSingleton<IMailboxFilterFactory>(provider => provider.GetRequiredService<MailVoidMailboxFilter>());
 
-                services.AddSingleton<IIpBlacklistService, IpBlacklistService>();
-
                 services.AddSingleton<NoAuthenticator>();
                 services.AddSingleton<IUserAuthenticator>(provider => provider.GetRequiredService<NoAuthenticator>());
 

@@ -13,21 +13,18 @@ public class SmtpServerService
     private readonly SmtpServerOptions _options;
     private readonly IServiceProvider _serviceProvider;
     private readonly ICertificateService _certificateService;
-    private readonly IIpBlacklistService _blacklist;
     private SmtpServer.SmtpServer? _server;
 
     public SmtpServerService(
         ILogger<SmtpServerService> logger,
         IOptions<SmtpServerOptions> options,
         IServiceProvider serviceProvider,
-        ICertificateService certificateService,
-        IIpBlacklistService blacklist)
+        ICertificateService certificateService)
     {
         _logger = logger;
         _options = options.Value;
         _serviceProvider = serviceProvider;
         _certificateService = certificateService;
-        _blacklist = blacklist;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -183,24 +180,6 @@ public class SmtpServerService
         var pipe = context.Pipe;
         var remote = GetRemoteEndPoint(context);
         var localPort = context.EndpointDefinition.Endpoint.Port;
-
-        var remoteIp = _blacklist.GetRemoteIp(context);
-        if (remoteIp != null && _blacklist.IsBlacklisted(remoteIp))
-        {
-            _logger.LogWarning(
-                "Dropping connection from blacklisted IP {Ip} on port {Port} (Session {SessionId})",
-                remoteIp, localPort, context.SessionId);
-            try
-            {
-                pipe.Input.Complete();
-                pipe.Output.Complete();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Error closing pipe for blacklisted IP {Ip}", remoteIp);
-            }
-            return;
-        }
 
         if (pipe.IsSecure)
         {

@@ -11,16 +11,11 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
 {
     private readonly ILogger<MailVoidMailboxFilter> _logger;
     private readonly MailboxFilterOptions _options;
-    private readonly IIpBlacklistService _blacklist;
 
-    public MailVoidMailboxFilter(
-        ILogger<MailVoidMailboxFilter> logger,
-        IOptions<MailboxFilterOptions> options,
-        IIpBlacklistService blacklist)
+    public MailVoidMailboxFilter(ILogger<MailVoidMailboxFilter> logger, IOptions<MailboxFilterOptions> options)
     {
         _logger = logger;
         _options = options.Value;
-        _blacklist = blacklist;
     }
 
     /// <summary>
@@ -33,14 +28,6 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Checking if can accept email from: {From}, Size: {Size}", from.AsAddress(), size);
-
-        // Reject anything from a blacklisted IP
-        var remoteIp = _blacklist.GetRemoteIp(context);
-        if (remoteIp != null && _blacklist.IsBlacklisted(remoteIp))
-        {
-            _logger.LogWarning("Rejected email from blacklisted IP: {Ip}", remoteIp);
-            return Task.FromResult(false);
-        }
 
         // Security checks for sender
         if (from == null || string.IsNullOrWhiteSpace(from.AsAddress()))
