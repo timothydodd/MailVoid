@@ -22,6 +22,24 @@ public class Program
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        Console.WriteLine("===== Configuration Dump =====");
+        foreach (var kvp in builder.Configuration.AsEnumerable().OrderBy(k => k.Key))
+        {
+            var value = kvp.Value;
+            if (!string.IsNullOrEmpty(value) &&
+                (kvp.Key.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
+                 kvp.Key.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
+                 kvp.Key.Contains("Key", StringComparison.OrdinalIgnoreCase) ||
+                 kvp.Key.Contains("ConnectionString", StringComparison.OrdinalIgnoreCase) ||
+                 kvp.Key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase)))
+            {
+                value = value.Length <= 8 ? "***" : value.Substring(0, 4) + "***" + value.Substring(value.Length - 4);
+            }
+            Console.WriteLine($"  {kvp.Key} = {value}");
+        }
+        Console.WriteLine("===== End Configuration Dump =====");
+
         builder.Services.AddRequestDecompression();
         builder.Services.AddResponseCompression(options =>
         {
