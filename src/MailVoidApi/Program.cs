@@ -172,8 +172,8 @@ public class Program
         });
 
 
-        var origins = builder.Configuration.GetValue<string>("CorsOrigins")?.Split(',');
-        if (origins is not null)
+        var origins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>();
+        if (origins is not null && origins.Length > 0)
         {
             builder.Services.AddCors(options =>
             {
