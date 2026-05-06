@@ -27,14 +27,24 @@ public class Program
         foreach (var kvp in builder.Configuration.AsEnumerable().OrderBy(k => k.Key))
         {
             var value = kvp.Value;
-            if (!string.IsNullOrEmpty(value) &&
-                (kvp.Key.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
-                 kvp.Key.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
-                 kvp.Key.Contains("Key", StringComparison.OrdinalIgnoreCase) ||
-                 kvp.Key.Contains("ConnectionString", StringComparison.OrdinalIgnoreCase) ||
-                 kvp.Key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrEmpty(value))
             {
-                value = value.Length <= 8 ? "***" : value.Substring(0, 4) + "***" + value.Substring(value.Length - 4);
+                bool isConnString = kvp.Key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase) ||
+                                    kvp.Key.Contains("ConnectionString", StringComparison.OrdinalIgnoreCase);
+                if (isConnString)
+                {
+                    value = System.Text.RegularExpressions.Regex.Replace(
+                        value,
+                        @"(Password|Pwd)\s*=\s*[^;]*",
+                        "$1=***",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                }
+                else if (kvp.Key.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
+                         kvp.Key.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
+                         kvp.Key.Contains("Key", StringComparison.OrdinalIgnoreCase))
+                {
+                    value = value.Length <= 8 ? "***" : value.Substring(0, 4) + "***" + value.Substring(value.Length - 4);
+                }
             }
             Console.WriteLine($"  {kvp.Key} = {value}");
         }
