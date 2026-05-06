@@ -84,10 +84,18 @@ public class Program
                 Console.WriteLine($"SMTP Port from config: {smtpConfig["Port"]}");
                 Console.WriteLine($"SMTP SSL Port from config: {smtpConfig["SslPort"]}");
 
-                var apiConfig = configuration.GetSection("MailVoidApi");
-                Console.WriteLine($"API BaseUrl from config: {apiConfig["BaseUrl"]}");
-                var apiKey = apiConfig["ApiKey"];
-                Console.WriteLine($"API Key from config: {(string.IsNullOrEmpty(apiKey) ? "(empty)" : $"(loaded: {apiKey.Substring(0, Math.Min(10, apiKey.Length))}...)")}");
+                var targetsSection = configuration.GetSection("MailVoidApi:Targets");
+                var targets = targetsSection.GetChildren().ToList();
+                Console.WriteLine($"MailVoidApi targets configured: {targets.Count}");
+                foreach (var t in targets)
+                {
+                    var name = t["Name"] ?? "(unnamed)";
+                    var baseUrl = t["BaseUrl"];
+                    var enabled = t["Enabled"] ?? "true";
+                    var key = t["ApiKey"];
+                    var keyDisplay = string.IsNullOrEmpty(key) ? "(empty)" : $"(loaded: {key.Substring(0, Math.Min(10, key.Length))}...)";
+                    Console.WriteLine($"  - [{name}] BaseUrl={baseUrl}, Enabled={enabled}, ApiKey={keyDisplay}");
+                }
                 Console.WriteLine($"=== END CONFIG DEBUG ===\n");
             })
             .ConfigureLogging((context, logging) =>
@@ -132,7 +140,14 @@ public class SmtpServerOptions
 
 public class MailVoidApiOptions
 {
-    public string BaseUrl { get; set; } = "http://localhost:5133";
+    public List<MailVoidApiTarget> Targets { get; set; } = new();
+}
+
+public class MailVoidApiTarget
+{
+    public string Name { get; set; } = "";
+    public string BaseUrl { get; set; } = "";
     public string WebhookEndpoint { get; set; } = "/api/webhook/mail";
     public string ApiKey { get; set; } = "";
+    public bool Enabled { get; set; } = true;
 }

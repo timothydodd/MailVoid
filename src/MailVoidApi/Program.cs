@@ -22,34 +22,7 @@ public class Program
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-
-        Console.WriteLine("===== Configuration Dump =====");
-        foreach (var kvp in builder.Configuration.AsEnumerable().OrderBy(k => k.Key))
-        {
-            var value = kvp.Value;
-            if (!string.IsNullOrEmpty(value))
-            {
-                bool isConnString = kvp.Key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase) ||
-                                    kvp.Key.Contains("ConnectionString", StringComparison.OrdinalIgnoreCase);
-                if (isConnString)
-                {
-                    value = System.Text.RegularExpressions.Regex.Replace(
-                        value,
-                        @"(Password|Pwd)\s*=\s*[^;]*",
-                        "$1=***",
-                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                }
-                else if (kvp.Key.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
-                         kvp.Key.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
-                         kvp.Key.Contains("Key", StringComparison.OrdinalIgnoreCase))
-                {
-                    value = value.Length <= 8 ? "***" : value.Substring(0, 4) + "***" + value.Substring(value.Length - 4);
-                }
-            }
-            Console.WriteLine($"  {kvp.Key} = {value}");
-        }
-        Console.WriteLine("===== End Configuration Dump =====");
-
+        ConfigurationDumper.DumpIfEnabled(builder.Configuration);
         builder.Services.AddRequestDecompression();
         builder.Services.AddResponseCompression(options =>
         {

@@ -5,8 +5,11 @@
 #
 # Before applying:
 #   1. Replace DOCKERHUB_USER with your image registry path.
-#   2. Edit the ConfigMap (MailVoidApi__BaseUrl, allowed domains, etc.).
-#   3. Set a real API key in the Secret (echo -n 'key' | base64).
+#   2. Edit the ConfigMap. The SMTP server can fan-out each email to multiple
+#      MailVoid API instances — add another block of
+#      MailVoidApi__Targets__N__* keys (and a matching ApiKey in the Secret)
+#      to register more targets. N is a 0-based index.
+#   3. Set real API keys in the Secret (one per target).
 #   4. If you use cert-manager / external secrets for TLS, mount the cert
 #      into /certs and set SmtpServer__CertificatePath accordingly.
 ---
@@ -28,8 +31,17 @@ data:
   SmtpServer__Name: "MailVoid SMTP Server"
   SmtpServer__MaxMessageSize: "10485760"
   SmtpServer__EnableSsl: "false"
-  MailVoidApi__BaseUrl: "http://mailvoid-api.mailvoid.svc.cluster.local:8080"
-  MailVoidApi__WebhookEndpoint: "/api/webhook/mail"
+  # MailVoidApi targets — fan-out: each enabled target receives every forwarded email.
+  # Add another block with index 1, 2, ... to register more targets.
+  MailVoidApi__Targets__0__Name: "primary"
+  MailVoidApi__Targets__0__BaseUrl: "http://mailvoid-api.mailvoid.svc.cluster.local:8080"
+  MailVoidApi__Targets__0__WebhookEndpoint: "/api/webhook/mail"
+  MailVoidApi__Targets__0__Enabled: "true"
+  # Example second target (uncomment + add matching ApiKey in the Secret):
+  # MailVoidApi__Targets__1__Name: "secondary"
+  # MailVoidApi__Targets__1__BaseUrl: "http://mailvoid-api-secondary.mailvoid.svc.cluster.local:8080"
+  # MailVoidApi__Targets__1__WebhookEndpoint: "/api/webhook/mail"
+  # MailVoidApi__Targets__1__Enabled: "true"
   MailboxFilter__AllowedDomains__0: "mailvoid.com"
   EmailQueue__MaxRetryAttempts: "3"
   EmailQueue__MaxConcurrentProcessing: "5"
@@ -42,8 +54,10 @@ metadata:
   namespace: mailvoid
 type: Opaque
 stringData:
-  # Shared key the SMTP server uses when calling the MailVoid API webhook.
-  MailVoidApi__ApiKey: "REPLACE_ME_WITH_REAL_KEY"
+  # Per-target API keys. The index must match the corresponding Targets__N__* entry
+  # in the ConfigMap above.
+  MailVoidApi__Targets__0__ApiKey: "REPLACE_ME_WITH_REAL_KEY"
+  # MailVoidApi__Targets__1__ApiKey: "REPLACE_ME_WITH_SECONDARY_KEY"
 ---
 apiVersion: apps/v1
 kind: Deployment

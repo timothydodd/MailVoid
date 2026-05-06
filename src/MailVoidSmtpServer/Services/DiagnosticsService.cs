@@ -39,65 +39,81 @@ public class DiagnosticsService : BackgroundService
     {
         _logger.LogInformation("🔧 Running SMTP Server Diagnostics...");
 
-        // Check MailVoid API connectivity
-        await CheckApiConnectivity(stoppingToken);
+        if (_apiOptions.Targets.Count == 0)
+        {
+            _logger.LogError("⚠️ No MailVoidApi targets configured. Set MailVoidApi:Targets in appsettings.json");
+            return;
+        }
 
-        // Check API key configuration
-        CheckApiKeyConfiguration();
+        foreach (var target in _apiOptions.Targets)
+        {
+            await CheckApiConnectivity(target, stoppingToken);
+            CheckApiKeyConfiguration(target);
+        }
     }
 
-    private async Task CheckApiConnectivity(CancellationToken stoppingToken)
+    private async Task CheckApiConnectivity(MailVoidApiTarget target, CancellationToken stoppingToken)
     {
+        if (!target.Enabled)
+        {
+            _logger.LogInformation("⏸️ [{Target}] Disabled, skipping connectivity check", target.Name);
+            return;
+        }
+
         try
         {
-            var healthUrl = $"{_apiOptions.BaseUrl.TrimEnd('/')}/api/health";
-            _logger.LogInformation("🏥 Testing MailVoid API connectivity: {Url}", healthUrl);
+            var healthUrl = $"{target.BaseUrl.TrimEnd('/')}/api/health";
+            _logger.LogInformation("🏥 [{Target}] Testing MailVoid API connectivity: {Url}", target.Name, healthUrl);
 
             var response = await _httpClient.GetAsync(healthUrl, stoppingToken);
 
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync(stoppingToken);
-                _logger.LogInformation("✅ MailVoid API is reachable - Status: {Status}, Response: {Response}",
-                    response.StatusCode, content);
+                _logger.LogInformation("✅ [{Target}] MailVoid API is reachable - Status: {Status}, Response: {Response}",
+                    target.Name, response.StatusCode, content);
             }
             else
             {
-                _logger.LogWarning("⚠️ MailVoid API health check failed - Status: {Status}", response.StatusCode);
+                _logger.LogWarning("⚠️ [{Target}] MailVoid API health check failed - Status: {Status}",
+                    target.Name, response.StatusCode);
             }
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError("❌ Cannot reach MailVoid API at {Url} - Network Error: {Error}. Make sure the MailVoid API is running.",
-                _apiOptions.BaseUrl, ex.Message);
+            _logger.LogError("❌ [{Target}] Cannot reach MailVoid API at {Url} - Network Error: {Error}",
+                target.Name, target.BaseUrl, ex.Message);
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
-            _logger.LogError("⏰ Timeout connecting to MailVoid API at {Url}. Check if the API is responding.",
-                _apiOptions.BaseUrl);
+            _logger.LogError("⏰ [{Target}] Timeout connecting to MailVoid API at {Url}",
+                target.Name, target.BaseUrl);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "💥 Unexpected error checking MailVoid API connectivity: {Error}", ex.Message);
+            _logger.LogError(ex, "💥 [{Target}] Unexpected error checking MailVoid API connectivity: {Error}",
+                target.Name, ex.Message);
         }
     }
 
-    private void CheckApiKeyConfiguration()
+    private void CheckApiKeyConfiguration(MailVoidApiTarget target)
     {
-        if (string.IsNullOrEmpty(_apiOptions.ApiKey))
+        if (string.IsNullOrEmpty(target.ApiKey))
         {
-            _logger.LogWarning("⚠️ No API key configured. Set MailVoidApi:ApiKey in appsettings.json");
+            _logger.LogWarning("⚠️ [{Target}] No API key configured. Set MailVoidApi:Targets[*]:ApiKey",
+                target.Name);
         }
-        else if (_apiOptions.ApiKey == "smtp-server-key-change-this-in-production")
+        else if (target.ApiKey == "smtp-server-key-change-this-in-production")
         {
-            _logger.LogWarning("⚠️ Using default API key. Change MailVoidApi:ApiKey in production!");
+            _logger.LogWarning("⚠️ [{Target}] Using default API key. Change in production!", target.Name);
         }
         else
         {
-            _logger.LogInformation("🔑 API key is configured (length: {Length} chars)", _apiOptions.ApiKey.Length);
+            _logger.LogInformation("🔑 [{Target}] API key is configured (length: {Length} chars)",
+                target.Name, target.ApiKey.Length);
         }
 
-        _logger.LogInformation("🌐 API Configuration: BaseUrl={BaseUrl}, Endpoint={Endpoint}",
-            _apiOptions.BaseUrl, _apiOptions.WebhookEndpoint);
+        _logger.LogInformation("🌐 [{Target}] Configuration: BaseUrl={BaseUrl}, Endpoint={Endpoint}, Enabled={Enabled}",
+            target.Name, target.BaseUrl, target.WebhookEndpoint, target.Enabled);
     }
 }
