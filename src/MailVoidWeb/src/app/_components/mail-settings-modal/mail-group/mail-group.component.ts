@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { SelectComponent } from '@rd-ui';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { ValdemortModule } from 'ngx-valdemort';
 import { ConfirmDialogService } from '@rd-ui';
 import {
@@ -15,7 +15,7 @@ import {
 import { AuthService } from '../../../_services/auth-service';
 @Component({
   selector: 'app-mail-group',
-  imports: [LucideAngularModule, ReactiveFormsModule, FormsModule, SelectComponent, ValdemortModule],
+  imports: [LucideDynamicIcon, ReactiveFormsModule, FormsModule, SelectComponent, ValdemortModule],
   template: `
     <div class="mail-group-layout">
       <!-- Header with create button -->
@@ -26,7 +26,7 @@ import { AuthService } from '../../../_services/auth-service';
         </div>
         @if (!creatingGroup()) {
           <button class="btn btn-primary btn-sm" (click)="showCreateForm()">
-            <lucide-icon name="plus" size="14"></lucide-icon>
+            <svg lucideIcon="plus" size="14"></svg>
             Create Group
           </button>
         }
@@ -38,7 +38,7 @@ import { AuthService } from '../../../_services/auth-service';
           <div class="inline-form-header">
             <h5>Create New Mail Group</h5>
             <button class="btn btn-icon" (click)="cancelCreate()" title="Close">
-              <lucide-icon name="x" size="16"></lucide-icon>
+              <svg lucideIcon="x" size="16"></svg>
             </button>
           </div>
           <div class="inline-form-body" [formGroup]="createForm()!">
@@ -83,7 +83,7 @@ import { AuthService } from '../../../_services/auth-service';
       <!-- Groups Table -->
       @if (mailGroups().length === 0) {
         <div class="empty-state">
-          <lucide-icon name="mail" size="36" class="empty-icon"></lucide-icon>
+          <svg lucideIcon="mail" size="36" class="empty-icon"></svg>
           <p class="empty-message">No mail groups yet. Groups are created automatically when emails arrive or you can create one manually.</p>
         </div>
       } @else {
@@ -119,15 +119,15 @@ import { AuthService } from '../../../_services/auth-service';
               </div>
               <div class="col-actions">
                 <button class="btn btn-icon-sm" (click)="toggleExpand(group)" title="Edit">
-                  <lucide-icon name="edit" size="14"></lucide-icon>
+                  <svg lucideIcon="edit" size="14"></svg>
                 </button>
                 @if (!group.isUserPrivate) {
                   <button class="btn btn-icon-sm" (click)="manageUsers(group)" title="Share">
-                    <lucide-icon name="share-2" size="14"></lucide-icon>
+                    <svg lucideIcon="share-2" size="14"></svg>
                   </button>
                   @if (group.isOwner) {
                     <button class="btn btn-icon-sm btn-icon-danger" (click)="deleteGroup(group)" title="Delete">
-                      <lucide-icon name="trash" size="14"></lucide-icon>
+                      <svg lucideIcon="trash" size="14"></svg>
                     </button>
                   }
                 }
@@ -155,7 +155,7 @@ import { AuthService } from '../../../_services/auth-service';
                           placeholder="0 = no deletion"
                         />
                         <span class="retention-hint">
-                          @if (editForm()?.get('retentionDays')?.value === 0 || editForm()?.get('retentionDays')?.value === null) {
+                          @if (editForm()?.get('retentionDays')?.value === 0 || $safeNavigationMigration(editForm()?.get('retentionDays')?.value) === null) {
                             No auto-deletion
                           } @else {
                             Auto-delete after {{ editForm()?.get('retentionDays')?.value }} days
@@ -190,12 +190,12 @@ import { AuthService } from '../../../_services/auth-service';
           </div>
           @if (!browsingAllGroups()) {
             <button class="btn btn-secondary btn-sm" (click)="loadAllGroups()">
-              <lucide-icon name="eye" size="14"></lucide-icon>
+              <svg lucideIcon="eye" size="14"></svg>
               Browse
             </button>
           } @else {
             <button class="btn btn-secondary btn-sm" (click)="browsingAllGroups.set(false)">
-              <lucide-icon name="eye-off" size="14"></lucide-icon>
+              <svg lucideIcon="eye-off" size="14"></svg>
               Hide
             </button>
           }
@@ -224,12 +224,12 @@ import { AuthService } from '../../../_services/auth-service';
                 <div class="col-actions">
                   @if (!group.hasAccess) {
                     <button class="btn btn-primary btn-sm" (click)="joinGroup(group)" [disabled]="isLoading()">
-                      <lucide-icon name="plus" size="14"></lucide-icon>
+                      <svg lucideIcon="plus" size="14"></svg>
                       Join
                     </button>
                   } @else if (!group.isOwner) {
                     <button class="btn btn-secondary btn-sm" (click)="leaveGroup(group)" [disabled]="isLoading()">
-                      <lucide-icon name="log-out" size="14"></lucide-icon>
+                      <svg lucideIcon="log-out" size="14"></svg>
                       Leave
                     </button>
                   }
@@ -250,7 +250,7 @@ import { AuthService } from '../../../_services/auth-service';
               <span class="slide-panel-subtitle">{{ selectedGroup()?.subdomain }}</span>
             </div>
             <button class="btn btn-icon" (click)="closeUserManagement()" title="Close">
-              <lucide-icon name="x" size="16"></lucide-icon>
+              <svg lucideIcon="x" size="16"></svg>
             </button>
           </div>
           <div class="slide-panel-body">
@@ -265,7 +265,7 @@ import { AuthService } from '../../../_services/auth-service';
                 class="user-select"
               ></rd-select>
               <button class="btn btn-primary btn-sm" [disabled]="!selectedUserId || isLoading()" (click)="addUser()">
-                <lucide-icon name="plus" size="14"></lucide-icon>
+                <svg lucideIcon="plus" size="14"></svg>
                 Add
               </button>
             </div>
@@ -286,7 +286,7 @@ import { AuthService } from '../../../_services/auth-service';
                       title="Remove access"
                       [disabled]="isLoading()"
                     >
-                      <lucide-icon name="x" size="14"></lucide-icon>
+                      <svg lucideIcon="x" size="14"></svg>
                     </button>
                   </div>
                 }

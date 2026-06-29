@@ -120,11 +120,19 @@ public class MailForwardingService
             To = emailData.To.FirstOrDefault() ?? "",
             Headers = emailData.Headers,
             Html = emailData.Html,
-            Text = emailData.Text
+            Text = emailData.Text,
+            RawEmail = emailData.RawEmail,
+            MessageId = emailData.MessageId,
+            Attachments = emailData.Attachments?.Select(a => new MailAttachmentDto
+            {
+                Filename = a.Filename,
+                ContentType = a.ContentType,
+                Content = a.Content
+            }).ToList()
         };
 
-        _logger.LogDebug("Converted email data - From: {From}, To: {To}, Has HTML: {HasHtml}, Has Text: {HasText}",
-            mailData.From, mailData.To, !string.IsNullOrEmpty(mailData.Html), !string.IsNullOrEmpty(mailData.Text));
+        _logger.LogDebug("Converted email data - From: {From}, To: {To}, Has HTML: {HasHtml}, Has Text: {HasText}, Attachments: {AttachmentCount}",
+            mailData.From, mailData.To, !string.IsNullOrEmpty(mailData.Html), !string.IsNullOrEmpty(mailData.Text), mailData.Attachments?.Count ?? 0);
 
         return mailData;
     }
@@ -138,5 +146,15 @@ public class MailForwardingService
         public Dictionary<string, string> Headers { get; init; } = new();
         public string? Html { get; init; }
         public string? Text { get; init; }
+        public List<MailAttachmentDto>? Attachments { get; init; }
+        public string? RawEmail { get; init; }
+        public string? MessageId { get; init; }
+    }
+
+    public class MailAttachmentDto
+    {
+        public string Filename { get; init; } = "";
+        public string ContentType { get; init; } = "";
+        public string Content { get; init; } = "";
     }
 }

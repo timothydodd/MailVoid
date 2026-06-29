@@ -4,7 +4,7 @@
     <div class="hook-header">
       <div class="hook-header-content">
         <button class="btn btn-outline back-button" (click)="goBack()">
-          <lucide-icon name="arrow-left" size="16"></lucide-icon>
+          <svg lucideIcon="arrow-left" size="16"></svg>
         </button>
         <div class="hook-meta">
           <div class="meta-row">
@@ -20,7 +20,7 @@
             </div>
             <div class="meta-item date">
               <span class="meta-label">Received</span>
-              <span class="meta-value">{{ webhook()?.createdOn | date: 'medium' }}</span>
+              <span class="meta-value">{{ $safeNavigationMigration(webhook()?.createdOn) | date: 'medium' }}</span>
             </div>
           </div>
           <div class="meta-row">
@@ -44,7 +44,7 @@
       <div class="section-header">
         <h3>Headers</h3>
         <button class="btn btn-sm" (click)="copyToClipboard(webhook()?.headers || '')">
-          <lucide-icon name="copy" size="14"></lucide-icon>
+          <svg lucideIcon="copy" size="14"></svg>
           Copy
         </button>
       </div>
@@ -73,7 +73,7 @@
             <span class="content-type-badge">{{ webhook()?.contentType }}</span>
           }
           <button class="btn btn-sm" (click)="copyToClipboard(webhook()?.body || '')">
-            <lucide-icon name="copy" size="14"></lucide-icon>
+            <svg lucideIcon="copy" size="14"></svg>
             Copy
           </button>
         </div>

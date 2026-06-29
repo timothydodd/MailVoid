@@ -47,7 +47,23 @@ public class MailDataExtractionService : IMailDataExtractionService
                 FromName = ExtractDisplayName(mailData.From),
                 ToOthers = ExtractAdditionalRecipientsFromHeaders(mailData.Headers, mailData.To),
                 Charsets = ExtractCharsetFromHeaders(mailData.Headers),
-                CreatedOn = parsedDate ?? DateTime.UtcNow
+                CreatedOn = parsedDate ?? DateTime.UtcNow,
+                MessageId = mailData.MessageId,
+                RawSource = mailData.RawEmail,
+                Headers = mailData.Headers.Count > 0
+                    ? JsonSerializer.Serialize(mailData.Headers)
+                    : null,
+                Attachments = mailData.Attachments != null && mailData.Attachments.Count > 0
+                    ? JsonSerializer.Serialize(mailData.Attachments.Select(a => new
+                    {
+                        filename = a.Filename,
+                        contentType = a.ContentType,
+                        sizeBytes = ComputeBase64DecodedLength(a.Content),
+                        content = a.Content
+                    }))
+                    : null,
+                SpfResult = ExtractSpfResult(mailData.Headers),
+                DkimResult = ExtractDkimResult(mailData.Headers)
             };
 
             return await Task.FromResult(mail);
@@ -300,6 +316,52 @@ public class MailDataExtractionService : IMailDataExtractionService
             // Fallback to UTF-8 if charset is not recognized
             return Encoding.UTF8;
         }
+    }
+
+    private static int ComputeBase64DecodedLength(string base64)
+    {
+        if (string.IsNullOrEmpty(base64)) return 0;
+        var clean = base64.Trim();
+        var padding = clean.EndsWith("==") ? 2 : clean.EndsWith("=") ? 1 : 0;
+        return (clean.Length / 4) * 3 - padding;
+    }
+
+    private static string? ReadHeader(Dictionary<string, string> headers, string name)
+    {
+        foreach (var kvp in headers)
+        {
+            if (string.Equals(kvp.Key, name, StringComparison.OrdinalIgnoreCase))
+                return kvp.Value;
+        }
+        return null;
+    }
+
+    private static string? ExtractSpfResult(Dictionary<string, string> headers)
+    {
+        var auth = ReadHeader(headers, "Authentication-Results");
+        if (!string.IsNullOrEmpty(auth))
+        {
+            var match = Regex.Match(auth, @"spf\s*=\s*([a-zA-Z]+)", RegexOptions.IgnoreCase);
+            if (match.Success) return match.Groups[1].Value.ToLowerInvariant();
+        }
+        var received = ReadHeader(headers, "Received-SPF");
+        if (!string.IsNullOrEmpty(received))
+        {
+            var match = Regex.Match(received, @"^\s*([a-zA-Z]+)", RegexOptions.IgnoreCase);
+            if (match.Success) return match.Groups[1].Value.ToLowerInvariant();
+        }
+        return null;
+    }
+
+    private static string? ExtractDkimResult(Dictionary<string, string> headers)
+    {
+        var auth = ReadHeader(headers, "Authentication-Results");
+        if (!string.IsNullOrEmpty(auth))
+        {
+            var match = Regex.Match(auth, @"dkim\s*=\s*([a-zA-Z]+)", RegexOptions.IgnoreCase);
+            if (match.Success) return match.Groups[1].Value.ToLowerInvariant();
+        }
+        return null;
     }
 
     private string DecodeQuotedPrintable(string encodedText, string charset)

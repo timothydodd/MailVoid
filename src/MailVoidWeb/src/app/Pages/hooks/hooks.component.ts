@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { catchError, of, switchMap } from 'rxjs';
 import { WebhookBucket, WebhookListItem, WebhookService } from '../../_services/api/webhook.service';
 import { SignalRService } from '../../services/signalr.service';
@@ -13,7 +13,7 @@ type SortDirection = 'asc' | 'desc';
 @Component({
   selector: 'app-hooks',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, LucideDynamicIcon],
   template: `
     <div class="hooks-container">
       <!-- Left Sidebar -->
@@ -27,7 +27,7 @@ type SortDirection = 'asc' | 'desc';
               (click)="selectBucket(null)"
               title="Show all webhooks"
             >
-              <lucide-icon name="inbox" size="20"></lucide-icon>
+              <svg lucideIcon="inbox" size="20"></svg>
             </button>
           </div>
           <div class="sidebar-body">
@@ -39,7 +39,7 @@ type SortDirection = 'asc' | 'desc';
                     [class.selected]="selectedBucket() === bucket.name"
                     (click)="selectBucket(bucket.name)"
                   >
-                    <lucide-icon name="folder" size="16"></lucide-icon>
+                    <svg lucideIcon="folder" size="16"></svg>
                     <span class="bucket-name">{{ bucket.name }}</span>
                     @if (bucket.lastActivity) {
                       <span class="bucket-activity">{{ bucket.lastActivity | date: 'short' }}</span>
@@ -62,7 +62,7 @@ type SortDirection = 'asc' | 'desc';
             <div class="endpoint-row">
               <code class="endpoint-url">{{ endpointUrl() }}</code>
               <button class="btn btn-icon btn-copy" (click)="copyEndpointUrl()" [title]="copyTooltip()">
-                <lucide-icon [name]="copyIcon()" size="14"></lucide-icon>
+                <svg [lucideIcon]="copyIcon()" size="14"></svg>
               </button>
             </div>
           </div>
@@ -79,37 +79,37 @@ type SortDirection = 'asc' | 'desc';
                 <th class="sortable" (click)="toggleSort('httpMethod')">
                   Method
                   @if (sortColumn() === 'httpMethod') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('path')">
                   Path
                   @if (sortColumn() === 'path') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('contentType')">
                   Content-Type
                   @if (sortColumn() === 'contentType') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('createdOn')">
                   Received
                   @if (sortColumn() === 'createdOn') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
               </tr>
@@ -142,13 +142,13 @@ type SortDirection = 'asc' | 'desc';
           <div class="pagination-controls">
             <div>
               <button class="btn" (click)="previousPage()" [disabled]="currentPage() === 1">
-                <lucide-icon name="chevron-left" size="14"></lucide-icon>
+                <svg lucideIcon="chevron-left" size="14"></svg>
                 Previous
               </button>
               <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
               <button class="btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
                 Next
-                <lucide-icon name="chevron-right" size="14"></lucide-icon>
+                <svg lucideIcon="chevron-right" size="14"></svg>
               </button>
             </div>
           </div>
@@ -156,6 +156,7 @@ type SortDirection = 'asc' | 'desc';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './hooks.component.scss',
 })
 export class HooksComponent {

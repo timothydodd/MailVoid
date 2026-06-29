@@ -1,9 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
-import { catchError, combineLatest, of, switchMap } from 'rxjs';
+import { LucideDynamicIcon } from '@lucide/angular';
+import { catchError, combineLatest, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
 import { ModalContainerService } from '@rd-ui';
 import {
@@ -15,6 +15,7 @@ import {
   MailWithReadStatus,
 } from '../../_services/api/mail.service';
 import { LastSeenService } from '../../_services/last-seen.service';
+import { MailSearchService } from '../../_services/mail-search.service';
 import { MobileMenuService } from '../../_services/mobile-menu.service';
 import { SignalRService } from '../../services/signalr.service';
 import { BoxListComponent } from './box-list/box-list.component';
@@ -25,7 +26,7 @@ type SortDirection = 'asc' | 'desc';
 @Component({
   selector: 'app-mail',
   standalone: true,
-  imports: [CommonModule, BoxListComponent, LucideAngularModule],
+  imports: [CommonModule, BoxListComponent, LucideDynamicIcon],
   template: `
     <div class="mail-container">
       <!-- Left Sidebar (Hidden on mobile, shown as overlay when menu is open) -->
@@ -33,7 +34,7 @@ type SortDirection = 'asc' | 'desc';
         <div class="sidebar-card">
           <div class="sidebar-header">
             <button class="btn btn-icon mobile-close-btn" (click)="closeMobileMenu()" title="Close">
-              <lucide-icon name="x" size="24"></lucide-icon>
+              <svg lucideIcon="x" size="24"></svg>
             </button>
             <button
               class="btn btn-icon show-all-btn"
@@ -41,10 +42,10 @@ type SortDirection = 'asc' | 'desc';
               (click)="clickBox(null)"
               title="Show all emails"
             >
-              <lucide-icon name="inbox" size="20"></lucide-icon>
+              <svg lucideIcon="inbox" size="20"></svg>
             </button>
             <button class="btn btn-icon" (click)="mailSettingsClick()" title="Mail Settings">
-              <lucide-icon name="cog" size="20"></lucide-icon>
+              <svg lucideIcon="cog" size="20"></svg>
             </button>
           </div>
           <div class="sidebar-body">
@@ -73,37 +74,37 @@ type SortDirection = 'asc' | 'desc';
                 <th class="sortable" (click)="toggleSort('from')">
                   From
                   @if (sortColumn() === 'from') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('to')">
                   To
                   @if (sortColumn() === 'to') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('subject')">
                   Subject
                   @if (sortColumn() === 'subject') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
                 <th class="sortable" (click)="toggleSort('createdOn')">
                   Created On
                   @if (sortColumn() === 'createdOn') {
-                    <lucide-icon
-                      [name]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    <svg
+                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
                       size="14"
-                    ></lucide-icon>
+                    ></svg>
                   }
                 </th>
               </tr>
@@ -128,13 +129,13 @@ type SortDirection = 'asc' | 'desc';
           <div class="pagination-controls">
             <div>
               <button class="btn" (click)="previousPage()" [disabled]="currentPage() === 1">
-                <lucide-icon name="chevron-left" size="14"></lucide-icon>
+                <svg lucideIcon="chevron-left" size="14"></svg>
                 Previous
               </button>
               <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
               <button class="btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
                 Next
-                <lucide-icon name="chevron-right" size="14"></lucide-icon>
+                <svg lucideIcon="chevron-right" size="14"></svg>
               </button>
             </div>
           </div>
@@ -142,6 +143,7 @@ type SortDirection = 'asc' | 'desc';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './mail.component.scss',
 })
 export class MailComponent {
@@ -151,6 +153,7 @@ export class MailComponent {
   lastSeenService = inject(LastSeenService);
   mobileMenuService = inject(MobileMenuService);
   signalRService = inject(SignalRService);
+  mailSearchService = inject(MailSearchService);
 
   mailboxes = signal<MailBoxGroups[] | null>(null);
   mailGroups = signal<MailGroup[] | null>(null);
@@ -214,17 +217,20 @@ export class MailComponent {
   });
 
   constructor() {
-    toObservable(this.selectedBox)
+    combineLatest([
+      toObservable(this.selectedBox),
+      toObservable(this.mailSearchService.searchText).pipe(debounceTime(250), distinctUntilChanged()),
+    ])
       .pipe(
-        switchMap((selectedBox) =>
+        switchMap(([selectedBox, search]) =>
           this.mailService
-            .getEmails(selectedBox ? ({ to: selectedBox } as FilterOptions) : undefined)
+            .getEmails(this.buildFilter(selectedBox, search))
             .pipe(catchError(() => of({ items: null, totalCount: 0 })))
         ),
         takeUntilDestroyed()
       )
-      .subscribe((selectedBox) => {
-        this.emails.set(selectedBox?.items);
+      .subscribe((result) => {
+        this.emails.set(result?.items);
         this.currentPage.set(1); // Reset to first page when emails change
       });
     this.refreshMail();
@@ -239,7 +245,7 @@ export class MailComponent {
       if (!currentBox || mail.to === currentBox || (mail.mailGroupPath && currentBox.includes(mail.mailGroupPath))) {
         // Refresh emails for the current view
         this.mailService
-          .getEmails(currentBox ? ({ to: currentBox } as FilterOptions) : undefined)
+          .getEmails(this.buildFilter(currentBox, this.mailSearchService.searchText()))
           .pipe(catchError(() => of({ items: null, totalCount: 0 })))
           .subscribe((result) => {
             this.emails.set(result?.items);
@@ -248,6 +254,12 @@ export class MailComponent {
       // Always refresh mailboxes to update counts
       this.refreshMail();
     });
+  }
+
+  private buildFilter(box: string | null, search: string): FilterOptions | undefined {
+    const trimmed = search.trim();
+    if (!box && !trimmed) return undefined;
+    return { to: box, search: trimmed || null } as FilterOptions;
   }
 
   refreshMail() {

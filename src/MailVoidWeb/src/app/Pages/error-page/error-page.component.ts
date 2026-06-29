@@ -1,9 +1,9 @@
 
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { take } from 'rxjs';
 import { HealthCheckService } from '../../_services/api/health-check.service';
 import { AuthService } from '../../_services/auth-service';
@@ -13,7 +13,8 @@ import { AuthService } from '../../_services/auth-service';
   templateUrl: './error-page.component.html',
   styleUrls: ['./error-page.component.scss'],
   standalone: true,
-  imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [LucideDynamicIcon],
 })
 export class ErrorPageComponent implements OnInit {
   public sanitizer = inject(DomSanitizer);

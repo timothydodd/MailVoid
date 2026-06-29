@@ -124,7 +124,7 @@
   }
   
   .mailbox-button {
-    flex: 1;
+    flex: 0 1 auto;
     display: flex;
     align-items: center;
     padding: 0.375rem 0.5rem;
@@ -137,8 +137,7 @@
     font-size: 0.8125rem;
     border-radius: 4px;
     min-width: 0;
-    width: 100%;
-    
+
     &:hover {
       color: var(--primary);
     }
@@ -178,22 +177,60 @@
         width: 100%;
       }
     }
-
-    .unread-count {
-      background-color: var(--primary);
-      color: var(--background);
-      border-radius: 12px;
-      padding: 0.125rem 0.375rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      min-width: 1.5rem;
-      text-align: center;
-      flex-shrink: 0;
-      margin-left: auto;
-    }
-    
   }
-  
+
+  .unread-count {
+    background-color: var(--primary);
+    color: var(--background);
+    border-radius: 12px;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 1.5rem;
+    text-align: center;
+    flex-shrink: 0;
+    align-self: center;
+    margin-right: 0.25rem;
+  }
+
+  .row-spacer {
+    flex: 1 1 auto;
+  }
+
+  .copy-button {
+    flex-shrink: 0;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--comment);
+    cursor: pointer;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease;
+
+    &:hover {
+      color: var(--primary);
+      background: var(--bGLight);
+    }
+
+    &:focus-visible {
+      opacity: 1;
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+    }
+  }
+
+  &:hover .copy-button,
+  &.selected .copy-button {
+    opacity: 1;
+  }
+
   app-box-menu {
     flex-shrink: 0;
     margin-right: 0.25rem;
@@ -203,7 +240,7 @@
       height: 20px;
       padding: 2px;
       
-      lucide-angular {
+      svg[lucideIcon] {
         // Size controlled by size attribute in template
       }
     }

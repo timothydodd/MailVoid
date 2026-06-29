@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { MailService } from '../../../../_services/api/mail.service';
 import { ClickOutsideDirective } from '../../../../_services/click-outside.directive';
 
 @Component({
   selector: 'app-box-menu',
-  imports: [LucideAngularModule, ClickOutsideDirective],
+  imports: [LucideDynamicIcon, ClickOutsideDirective],
   template: ` <button type="button" class="btn-icon" #triggerButton (click)="toggleMenu()">
-      <lucide-angular name="ellipsis-vertical"></lucide-angular>
+      <svg lucideIcon="ellipsis-vertical"></svg>
     </button>
     @if (isOpen()) {
       <div 
@@ -21,13 +21,13 @@ import { ClickOutsideDirective } from '../../../../_services/click-outside.direc
       >
         @if (unreadCount() > 0) {
           <button dropdown-item (click)="markAllAsReadClick()">
-            <lucide-angular name="check-circle" size="16"></lucide-angular>
+            <svg lucideIcon="check-circle" size="16"></svg>
             Mark all as read
           </button>
           <div class="menu-divider"></div>
         }
         <button dropdown-item (click)="deleteClick()">
-          <lucide-angular name="trash-2" size="16"></lucide-angular>
+          <svg lucideIcon="trash-2" size="16"></svg>
           Delete
         </button>
       </div>

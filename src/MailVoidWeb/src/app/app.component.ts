@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ModalContainerService, ToastComponent } from '@rd-ui';
 import { ValidationDefaultsComponent } from './_components/validation-defaults/validation-defaults.component';
@@ -14,6 +14,7 @@ import { MailNotificationComponent } from './_components/mail-notification/mail-
   standalone: true,
   imports: [CommonModule, RouterOutlet, MainNavBarComponent, ValidationDefaultsComponent, MailNotificationComponent, ToastComponent],
   templateUrl: './app.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit, OnDestroy {

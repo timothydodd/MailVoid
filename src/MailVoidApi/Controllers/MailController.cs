@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using MailVoidApi.Common;
 using MailVoidApi.Data;
 using MailVoidApi.Services;
@@ -116,6 +116,11 @@ public class MailController : ControllerBase
             whereClauses.Add("m.`To` = @To");
             parameters.Add("To", options.To);
         }
+        if (!string.IsNullOrEmpty(options.Search))
+        {
+            whereClauses.Add("(m.Subject LIKE @Search OR m.`From` LIKE @Search OR m.`To` LIKE @Search OR m.Text LIKE @Search)");
+            parameters.Add("Search", $"%{options.Search.Trim()}%");
+        }
 
         parameters.Add("IsAdmin", isAdmin ? 1 : 0);
 
@@ -128,7 +133,7 @@ public class MailController : ControllerBase
 
         var whereClause = whereClauses.Count > 0 ? "WHERE " + string.Join(" AND ", whereClauses) : "";
 
-        if (options.PageSize == 1)
+        if (options.Page == 1)
         {
             results.TotalCount = await db.ExecuteScalarAsync<int>(
                 $"SELECT COUNT(*) FROM Mail m LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path {whereClause}", parameters);
@@ -618,6 +623,7 @@ public class FilterOptions
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 50;
     public string? To { get; set; }
+    public string? Search { get; set; }
 }
 public class MailBox
 {

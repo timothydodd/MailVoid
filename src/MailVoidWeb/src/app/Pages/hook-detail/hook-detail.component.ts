@@ -1,16 +1,17 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { filter, switchMap } from 'rxjs';
 import { WebhookDetail, WebhookService } from '../../_services/api/webhook.service';
 
 @Component({
   selector: 'app-hook-detail',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, LucideDynamicIcon],
   templateUrl: './hook-detail.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './hook-detail.component.scss',
 })
 export class HookDetailComponent {

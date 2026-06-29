@@ -1,12 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, input, model, output } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
+import { ChangeDetectionStrategy, Component, computed, inject, input, model, output } from '@angular/core';
+import { LucideDynamicIcon } from '@lucide/angular';
+import { ToastService } from '@rd-ui';
 import { MailBoxGroups } from '../../../_services/api/mail.service';
 import { BoxMenuComponent } from './box-menu/box-menu.component';
 
 @Component({
   selector: 'app-box-list',
   standalone: true,
-  imports: [LucideAngularModule, BoxMenuComponent],
+  imports: [LucideDynamicIcon, BoxMenuComponent],
   template: `
     <div class="box-list-container">
       @if (sortedMailboxes(); as mb) {
@@ -16,12 +17,12 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
               <h3 class="group-title">{{ group.groupName }}</h3>
               <div class="group-indicators">
                 @if (group.isOwner) {
-                  <lucide-icon name="crown" size="12" class="group-owner-icon" title="You own this group"></lucide-icon>
+                  <svg lucideIcon="crown" size="12" class="group-owner-icon" title="You own this group"></svg>
                 }
                 @if (group.isPublic) {
-                  <lucide-icon name="users" size="12" class="group-public-icon" title="Public group"></lucide-icon>
+                  <svg lucideIcon="users" size="12" class="group-public-icon" title="Public group"></svg>
                 } @else {
-                  <lucide-icon name="lock" size="12" class="group-private-icon" title="Private group"></lucide-icon>
+                  <svg lucideIcon="lock" size="12" class="group-private-icon" title="Private group"></svg>
                 }
               </div>
             </div>
@@ -35,10 +36,14 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
                         <span class="mailbox-subdomain">{{ item.mailBoxName }}</span>
                       }
                     </span>
-                    @if (item.unreadCount > 0) {
-                      <span class="unread-count">{{ item.unreadCount }}</span>
-                    }
                   </button>
+                  <button class="copy-button" (click)="copyEmail(item.name)" title="Copy email address">
+                    <svg lucideIcon="copy" size="14"></svg>
+                  </button>
+                  <span class="row-spacer"></span>
+                  @if (item.unreadCount > 0) {
+                    <span class="unread-count">{{ item.unreadCount }}</span>
+                  }
                   <app-box-menu
                     [item]="item.name"
                     [groupName]="group.groupName"
@@ -69,6 +74,8 @@ export class BoxListComponent {
   markAllAsReadEvent = output<string>();
   boxClick = output<string | null>();
 
+  private toastr = inject(ToastService);
+
   sortedMailboxes = computed(() => {
     const mb = this.mailboxes();
     if (!mb) return null;
@@ -80,6 +87,12 @@ export class BoxListComponent {
   clickBox(box: string | null) {
     this.selectedBox.set(box);
     this.boxClick.emit(box);
+  }
+
+  copyEmail(email: string) {
+    navigator.clipboard.writeText(email).then(() => {
+      this.toastr.success('Email address copied');
+    });
   }
 
   deleteClick(item: string) {

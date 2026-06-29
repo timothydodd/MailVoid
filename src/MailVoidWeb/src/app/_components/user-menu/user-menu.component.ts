@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { take } from 'rxjs';
 import { AuthService, User } from '../../_services/auth-service';
 import { ClickOutsideDirective } from '../../_services/click-outside.directive';
@@ -10,11 +10,11 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
 @Component({
   selector: 'app-user-menu',
   standalone: true,
-  imports: [LucideAngularModule, ClickOutsideDirective],
+  imports: [LucideDynamicIcon, ClickOutsideDirective],
   template: `
     @if (user()) {
       <button type="button" class="btn btn-icon user-menu-btn" (click)="isOpen.set(!isOpen())" title="User menu">
-        <lucide-icon name="user" size="20"></lucide-icon>
+        <svg lucideIcon="user" size="20"></svg>
       </button>
       @if (isOpen()) {
         <div class="menu" appClickOutside (clickOutside)="isOpen.set(false)" [delayTime]="200">
@@ -22,7 +22,7 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
             <div class="avatar-spacer">
               <div class="avatar-wrap">
                 <div class="avatar" style="width: 80px">
-                  <lucide-icon name="user"></lucide-icon>
+                  <svg lucideIcon="user"></svg>
                 </div>
               </div>
             </div>

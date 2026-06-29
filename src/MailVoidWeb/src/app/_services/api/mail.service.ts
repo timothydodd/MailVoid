@@ -122,6 +122,7 @@ export class MailService {
 }
 export interface FilterOptions {
   to: string | null;
+  search?: string | null;
 }
 export interface Mail {
   id: number;
@@ -129,9 +130,24 @@ export interface Mail {
   text: string;
   isHtml: boolean;
   from: string;
+  fromName?: string | null;
+  toOthers?: string | null;
   subject: string;
   charsets: string | null;
   createdOn: string;
+  attachments?: string | null;
+  headers?: string | null;
+  rawSource?: string | null;
+  messageId?: string | null;
+  spfResult?: string | null;
+  dkimResult?: string | null;
+}
+
+export interface MailAttachment {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  content: string; // base64
 }
 
 export interface MailGroup {

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
@@ -13,6 +13,7 @@ interface NotificationItem extends MailNotification {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './mail-notification.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./mail-notification.component.scss'],
 })
 export class MailNotificationComponent implements OnInit, OnDestroy {

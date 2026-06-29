@@ -26,6 +26,16 @@ public class MailData
     public Dictionary<string, string> Headers { get; init; } = new();
     public string? Html { get; init; }
     public string? Text { get; init; }
+    public List<MailAttachmentDto>? Attachments { get; init; }
+    public string? RawEmail { get; init; }
+    public string? MessageId { get; init; }
+}
+
+public class MailAttachmentDto
+{
+    public string Filename { get; init; } = "";
+    public string ContentType { get; init; } = "";
+    public string Content { get; init; } = ""; // Base64
 }
 
 public class Envelope

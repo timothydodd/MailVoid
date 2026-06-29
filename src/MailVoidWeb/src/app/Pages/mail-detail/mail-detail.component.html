@@ -1,12 +1,10 @@
 @if (!!mail()) {
   <div class="mail-detail-container">
-    <!-- Back Button -->
-
     <!-- Header Section -->
     <div class="mail-header">
       <div class="mail-header-content">
         <button class="btn btn-outline back-button" (click)="goBack()">
-          <lucide-icon name="arrow-left" size="16"></lucide-icon>
+          <svg lucideIcon="arrow-left" size="16"></svg>
         </button>
         <div class="mail-meta">
           <div class="meta-row">
@@ -16,11 +14,16 @@
             </div>
             <div class="meta-item">
               <span class="meta-label">To</span>
-              <span class="meta-value">{{ mail()?.to }}</span>
+              <span class="meta-value with-copy">
+                <span class="copy-text">{{ mail()?.to }}</span>
+                <button class="copy-button" (click)="copyEmail(mail()?.to)" title="Copy email address">
+                  <svg lucideIcon="copy" size="16"></svg>
+                </button>
+              </span>
             </div>
             <div class="meta-item date">
               <span class="meta-label">Date</span>
-              <span class="meta-value">{{ mail()?.createdOn | date: 'medium' }}</span>
+              <span class="meta-value">{{ $safeNavigationMigration(mail()?.createdOn) | date: 'medium' }}</span>
             </div>
           </div>
           <div class="meta-row">
@@ -29,18 +32,98 @@
               <span class="meta-value">{{ mail()?.subject }}</span>
             </div>
           </div>
+
+          @if (mail()?.spfResult || mail()?.dkimResult) {
+            <div class="meta-row badges">
+              @if (mail()?.spfResult) {
+                <span class="badge" [class]="badgeClass($safeNavigationMigration(mail()?.spfResult))">SPF: {{ mail()?.spfResult }}</span>
+              }
+              @if (mail()?.dkimResult) {
+                <span class="badge" [class]="badgeClass($safeNavigationMigration(mail()?.dkimResult))">DKIM: {{ mail()?.dkimResult }}</span>
+              }
+            </div>
+          }
         </div>
       </div>
     </div>
 
-    <!-- Content Section -->
+    <!-- Tabs -->
+    <div class="mail-tabs">
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'preview'"
+        (click)="setTab('preview')"
+      >
+        Preview
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'headers'"
+        [disabled]="headers().length === 0"
+        (click)="setTab('headers')"
+      >
+        Headers
+        @if (headers().length > 0) {
+          <span class="tab-count">{{ headers().length }}</span>
+        }
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'raw'"
+        [disabled]="!hasRawSource()"
+        (click)="setTab('raw')"
+      >
+        Raw
+      </button>
+    </div>
+
+    <!-- Tab content -->
     <div class="mail-content">
-      @if (mail()?.isHtml) {
-        <iframe #emailContent class="html-content"></iframe>
-      } @else {
-        <div class="text-content">{{ mail()?.text }}</div>
+      @switch (activeTab()) {
+        @case ('preview') {
+          @if (mail()?.isHtml) {
+            <iframe #emailContent class="html-content" sandbox="allow-same-origin"></iframe>
+          } @else {
+            <div class="text-content">{{ mail()?.text }}</div>
+          }
+        }
+        @case ('headers') {
+          <div class="headers-table">
+            @for (h of headers(); track h.name) {
+              <div class="header-row">
+                <div class="header-name">{{ h.name }}</div>
+                <div class="header-value">{{ h.value }}</div>
+              </div>
+            }
+          </div>
+        }
+        @case ('raw') {
+          <pre class="raw-source">{{ mail()?.rawSource }}</pre>
+        }
       }
     </div>
+
+    <!-- Attachments -->
+    @if (attachments().length > 0) {
+      <div class="attachments-panel">
+        <div class="attachments-header">
+          <svg lucideIcon="paperclip" size="16"></svg>
+          <span>{{ attachments().length }} attachment{{ attachments().length === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="attachments-list">
+          @for (att of attachments(); track att.filename) {
+            <button class="attachment" (click)="downloadAttachment(att)" [title]="'Download ' + att.filename">
+              <svg lucideIcon="file" size="20"></svg>
+              <div class="attachment-info">
+                <div class="attachment-name">{{ att.filename }}</div>
+                <div class="attachment-meta">{{ att.contentType }} &middot; {{ formatBytes(att.sizeBytes) }}</div>
+              </div>
+              <svg lucideIcon="download" size="16"></svg>
+            </button>
+          }
+        </div>
+      </div>
+    }
   </div>
 } @else {
   <div class="loading-container">

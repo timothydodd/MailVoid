@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../_services/auth-service';
 import { ModalContainerService, ModalLayoutComponent } from '@rd-ui';
 import { UserManagementComponent } from '../user-management/user-management.component';
@@ -9,7 +8,7 @@ import { ChangePasswordComponent } from './change-password/change-password.compo
 @Component({
   selector: 'app-user-settings',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, ChangePasswordComponent, UserManagementComponent, ModalLayoutComponent],
+  imports: [FormsModule, ChangePasswordComponent, UserManagementComponent, ModalLayoutComponent],
   template: ` <rd-modal-layout>
     <div slot="header" class="settings-header">
       <h3 class="settings-title">User Settings</h3>

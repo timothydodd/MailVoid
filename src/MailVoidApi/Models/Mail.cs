@@ -37,6 +37,18 @@ public class Mail
 
     [Index("IX_Mail_MailGroupPath")]
     public string? MailGroupPath { get; set; }
+
+    public string? Attachments { get; set; }
+
+    public string? Headers { get; set; }
+
+    public string? RawSource { get; set; }
+
+    public string? MessageId { get; set; }
+
+    public string? SpfResult { get; set; }
+
+    public string? DkimResult { get; set; }
 }
 
 [Table("Contact")]
