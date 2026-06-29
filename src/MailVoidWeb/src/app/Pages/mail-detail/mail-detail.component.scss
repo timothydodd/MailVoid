@@ -67,32 +67,6 @@
     white-space: nowrap;
     min-width: 0;
   }
-
-  .copy-button {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--comment);
-    cursor: pointer;
-    border-radius: 4px;
-    transition: color 0.2s ease, background 0.2s ease;
-
-    &:hover {
-      color: var(--primary);
-      background: var(--bGLight);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--primary);
-      outline-offset: -2px;
-    }
-  }
 }
 
 .meta-item.date .meta-value {
@@ -138,41 +112,12 @@
 }
 
 
-/* Badges (SPF / DKIM / Spam) */
+/* Badges (SPF / DKIM) use the shared global .badge / .badge-success|danger|secondary */
 .meta-row.badges {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: 0.5rem;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  border: 1px solid transparent;
-
-  &.badge-pass {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-    border-color: rgba(16, 185, 129, 0.4);
-  }
-  &.badge-fail {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.4);
-  }
-  &.badge-neutral,
-  &.badge-none {
-    background: rgba(156, 163, 175, 0.15);
-    color: #9ca3af;
-    border-color: rgba(156, 163, 175, 0.4);
-  }
 }
 
 /* Tabs */
@@ -264,72 +209,6 @@
   word-break: break-all;
   margin: 0;
   max-height: 70vh;
-}
-
-/* Attachments */
-.attachments-panel {
-  border-top: 1px solid var(--border-color, #2a2a3a);
-  padding: 1rem 0 0;
-  margin-top: 1rem;
-
-  .attachments-header {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-weight: 500;
-    color: var(--foreground);
-    opacity: 0.7;
-    font-size: 0.85rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .attachments-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .attachment {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-color, #2a2a3a);
-    background: var(--bGLight, transparent);
-    color: var(--foreground);
-    cursor: pointer;
-    text-align: left;
-    min-width: 220px;
-    max-width: 360px;
-    transition: border-color 0.15s ease, transform 0.15s ease;
-
-    &:hover {
-      border-color: var(--primary);
-      transform: translateY(-1px);
-    }
-
-    .attachment-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .attachment-name {
-      font-size: 0.85rem;
-      font-weight: 500;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .attachment-meta {
-      font-size: 0.7rem;
-      opacity: 0.6;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
 }
 
 /* Tablet Styles */

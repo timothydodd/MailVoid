@@ -6,13 +6,14 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { ToastService } from '@rd-ui';
 import { catchError, filter, of, switchMap } from 'rxjs';
 import { Mail, MailAttachment, MailService } from '../../_services/api/mail.service';
+import { MailAttachmentsComponent } from './mail-attachments/mail-attachments.component';
 
 type Tab = 'preview' | 'headers' | 'raw';
 
 @Component({
   selector: 'app-mail-detail',
   standalone: true,
-  imports: [CommonModule, LucideDynamicIcon],
+  imports: [CommonModule, LucideDynamicIcon, MailAttachmentsComponent],
   templateUrl: './mail-detail.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './mail-detail.component.scss',
@@ -91,33 +92,11 @@ export class MailDetailComponent {
     this.router.navigate(['/mail']);
   }
 
-  formatBytes(n: number): string {
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-  }
-
-  downloadAttachment(att: MailAttachment) {
-    const binary = atob(att.content);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: att.contentType || 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = att.filename || 'attachment';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
   badgeClass(result: string | null | undefined): string {
-    if (!result) return 'badge-none';
+    if (!result) return 'badge-secondary';
     const r = result.toLowerCase();
-    if (r === 'pass') return 'badge-pass';
-    if (r === 'fail' || r === 'softfail') return 'badge-fail';
-    if (r === 'neutral' || r === 'none') return 'badge-neutral';
-    return 'badge-neutral';
+    if (r === 'pass') return 'badge-success';
+    if (r === 'fail' || r === 'softfail') return 'badge-danger';
+    return 'badge-secondary';
   }
 }

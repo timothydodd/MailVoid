@@ -37,7 +37,7 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
                       }
                     </span>
                   </button>
-                  <button class="copy-button" (click)="copyEmail(item.name)" title="Copy email address">
+                  <button class="copy-btn" (click)="copyEmail(item.name)" title="Copy email address">
                     <svg lucideIcon="copy" size="14"></svg>
                   </button>
                   <span class="row-spacer"></span>

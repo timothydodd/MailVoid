@@ -16,7 +16,7 @@
               <span class="meta-label">To</span>
               <span class="meta-value with-copy">
                 <span class="copy-text">{{ mail()?.to }}</span>
-                <button class="copy-button" (click)="copyEmail(mail()?.to)" title="Copy email address">
+                <button class="copy-btn" (click)="copyEmail(mail()?.to)" title="Copy email address">
                   <svg lucideIcon="copy" size="16"></svg>
                 </button>
               </span>
@@ -104,26 +104,7 @@
     </div>
 
     <!-- Attachments -->
-    @if (attachments().length > 0) {
-      <div class="attachments-panel">
-        <div class="attachments-header">
-          <svg lucideIcon="paperclip" size="16"></svg>
-          <span>{{ attachments().length }} attachment{{ attachments().length === 1 ? '' : 's' }}</span>
-        </div>
-        <div class="attachments-list">
-          @for (att of attachments(); track att.filename) {
-            <button class="attachment" (click)="downloadAttachment(att)" [title]="'Download ' + att.filename">
-              <svg lucideIcon="file" size="20"></svg>
-              <div class="attachment-info">
-                <div class="attachment-name">{{ att.filename }}</div>
-                <div class="attachment-meta">{{ att.contentType }} &middot; {{ formatBytes(att.sizeBytes) }}</div>
-              </div>
-              <svg lucideIcon="download" size="16"></svg>
-            </button>
-          }
-        </div>
-      </div>
-    }
+    <app-mail-attachments [attachments]="attachments()" />
   </div>
 } @else {
   <div class="loading-container">

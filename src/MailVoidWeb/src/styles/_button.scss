@@ -260,6 +260,33 @@ button.btn-no-border {
     background-color: unset;
 }
 
+/* Small inline "copy to clipboard" icon button (shared by box-list, mail-detail) */
+.copy-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--comment);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease;
+
+    &:hover {
+        color: var(--primary);
+        background: var(--bGLight);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: -2px;
+    }
+}
+
 .btn-error {
     box-sizing: border-box;
     position: relative;

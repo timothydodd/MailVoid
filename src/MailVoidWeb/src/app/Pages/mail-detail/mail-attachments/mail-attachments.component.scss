@@ -1,0 +1,64 @@
+.attachments-panel {
+  border-top: 1px solid var(--border-color, #2a2a3a);
+  padding: 1rem 0 0;
+  margin-top: 1rem;
+
+  .attachments-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500;
+    color: var(--foreground);
+    opacity: 0.7;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .attachments-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .attachment {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #2a2a3a);
+    background: var(--bGLight, transparent);
+    color: var(--foreground);
+    cursor: pointer;
+    text-align: left;
+    min-width: 220px;
+    max-width: 360px;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+
+    &:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+    }
+
+    .attachment-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .attachment-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .attachment-meta {
+      font-size: 0.7rem;
+      opacity: 0.6;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}

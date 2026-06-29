@@ -93,6 +93,12 @@ npm run format                # Format code with Prettier
   3. Example: For Clock icon, add `Clock` to both the import and the pick object
 - **IMPORTANT**: For Lucide icons, ALWAYS use the `size` attribute instead of setting `width` and `height` in CSS. Use `<lucide-icon name="icon-name" size="16"></lucide-icon>` format.
 
+### Component Style Budgets (avoid SCSS bloat)
+The prod build enforces per-component style budgets in `angular.json` (`anyComponentStyle`): **2 kB = warning, 4 kB = error**. Exceeding 4 kB **fails** `npm run build`. Do not raise these budgets to make a build pass — keep component stylesheets small instead. The budget measures the compiled/minified CSS, which is ≈ `sass --style=compressed` output (the WSL `esbuild` binary is win32-only, so the full build only runs on Windows). Keep each component comfortably under 4 kB by:
+- **Reuse global styles** in `src/styles/` (imported via `src/styles.scss`) instead of redefining per component. Existing shared utilities: `.badge`/`.badge-success|danger|secondary` (`_utils.scss`), `.btn-icon` and `.copy-btn` (`_button.scss`), cards, forms, modal, tables, alerts. If a style is reusable, add it to the relevant global partial rather than a component.
+- **Split large components into subcomponents** so their styles live in separate files, each under budget (e.g. `mail-detail` extracted its attachments panel into `mail-attachments/`).
+- **Delete dead CSS** — selectors with no matching template usage (grep the template before assuming a class is used).
+
 ## Authentication Flow
 1. Login with username/password receives JWT access token + refresh token
 2. HTTP interceptor automatically adds Bearer token to requests

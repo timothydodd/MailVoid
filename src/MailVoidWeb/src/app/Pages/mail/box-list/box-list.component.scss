@@ -58,52 +58,6 @@
   gap: 0.0625rem;
 }
 
-/* Show All item styling */
-.show-all-item {
-  margin-bottom: 0.75rem;
-  background: linear-gradient(135deg, var(--bGLight) 0%, var(--bGDark) 100%);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  
-  .mailbox-button {
-    padding: 0.5rem 0.75rem;
-    font-weight: 600;
-    color: var(--foreground);
-    position: relative;
-    
-    .mailbox-name {
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      font-size: 0.8rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      
-    }
-  }
-  
-  &.selected {
-    background: var(--primary);
-    border-color: var(--primary);
-    
-    .mailbox-button {
-      color: var(--background);
-    }
-  }
-  
-  &:hover:not(.selected) {
-    background: linear-gradient(135deg, rgba(189, 147, 249, 0.1) 0%, rgba(189, 147, 249, 0.2) 100%);
-    border-color: var(--primary);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-    
-    .mailbox-button {
-      color: var(--primary);
-    }
-  }
-}
-
 .mailbox-item {
   display: flex;
   align-items: stretch;
@@ -197,37 +151,15 @@
     flex: 1 1 auto;
   }
 
-  .copy-button {
-    flex-shrink: 0;
+  // Shared .copy-btn (global); here it's hidden until the row is hovered/focused
+  .copy-btn {
     align-self: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--comment);
-    cursor: pointer;
-    border-radius: 4px;
     opacity: 0;
-    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease;
-
-    &:hover {
-      color: var(--primary);
-      background: var(--bGLight);
-    }
-
-    &:focus-visible {
-      opacity: 1;
-      outline: 2px solid var(--primary);
-      outline-offset: -2px;
-    }
   }
 
-  &:hover .copy-button,
-  &.selected .copy-button {
+  &:hover .copy-btn,
+  &.selected .copy-btn,
+  .copy-btn:focus-visible {
     opacity: 1;
   }
 
