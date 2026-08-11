@@ -1,49 +1,58 @@
-
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
-import {
-  AbstractControl,
-  FormControl,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-  ValidationErrors,
-  ValidatorFn,
-  Validators,
-} from '@angular/forms';
+import { form, required, validate, FormField } from '@angular/forms/signals';
 import { ToastService } from '@rd-ui';
-import { ValdemortModule } from 'ngx-valdemort';
 import { AuthService } from '../../../_services/auth-service';
-import { ValidationDefaultsComponent } from '../../validation-defaults/validation-defaults.component';
+
+interface ChangePasswordModel {
+  oldPassword: string;
+  newPassword: string;
+  newPassword2: string;
+}
 
 @Component({
   selector: 'app-change-password',
   standalone: true,
-  imports: [FormsModule, ReactiveFormsModule, ValdemortModule, ValidationDefaultsComponent],
+  imports: [FormField],
   template: `
-    <div [formGroup]="form()" class="flex-column gap10">
+    <div class="flex-column gap10">
       <div class="form-group">
         <label for="op">Old Password</label>
-        <input formControlName="oldPassword" type="password" class="form-control" id="op" />
-        <val-errors controlName="oldPassword" label="Old Password"></val-errors>
+        <input [formField]="changePasswordForm.oldPassword" type="password" class="form-control" id="op" />
+        @if ((submitted() || changePasswordForm.oldPassword().touched()) && changePasswordForm.oldPassword().invalid()) {
+          <div class="text-danger">
+            @for (error of changePasswordForm.oldPassword().errors(); track error.kind) {
+              <div>{{ error.message }}</div>
+            }
+          </div>
+        }
       </div>
       <div class="form-group">
         <label for="np">New Password</label>
-        <input formControlName="newPassword" type="password" class="form-control" id="np" />
-        <val-errors controlName="newPassword" label="New Password"></val-errors>
+        <input [formField]="changePasswordForm.newPassword" type="password" class="form-control" id="np" />
+        @if ((submitted() || changePasswordForm.newPassword().touched()) && changePasswordForm.newPassword().invalid()) {
+          <div class="text-danger">
+            @for (error of changePasswordForm.newPassword().errors(); track error.kind) {
+              <div>{{ error.message }}</div>
+            }
+          </div>
+        }
       </div>
       <div class="form-group">
         <label for="np2">Confirm New Password</label>
-        <input formControlName="newPassword2" type="password" class="form-control" id="np2" />
-        <val-errors controlName="newPassword2" label="Confirm New Password">
-          <ng-template valError="noMatch">Password must match</ng-template>
-        </val-errors>
+        <input [formField]="changePasswordForm.newPassword2" type="password" class="form-control" id="np2" />
+        @if ((submitted() || changePasswordForm.newPassword2().touched()) && changePasswordForm.newPassword2().invalid()) {
+          <div class="text-danger">
+            @for (error of changePasswordForm.newPassword2().errors(); track error.kind) {
+              <div>{{ error.message }}</div>
+            }
+          </div>
+        }
       </div>
       <button class="btn btn-primary" (click)="submit()">Save</button>
       @if (errorMessage()) {
         <div class="text-danger">{{ errorMessage() }}</div>
       }
     </div>
-    <app-validation-defaults> </app-validation-defaults>
   `,
   styleUrl: './change-password.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,30 +61,33 @@ export class ChangePasswordComponent {
   private authService = inject(AuthService);
   private toastr = inject(ToastService);
   errorMessage = signal('');
-  form = signal<FormGroup<ChangePasswordForm>>(
-    new FormGroup(
-      {
-        oldPassword: new FormControl<string>('', [Validators.required]),
-        newPassword: new FormControl<string>('', [Validators.required]),
-        newPassword2: new FormControl<string>('', [Validators.required]),
-      },
-      [fieldsMatchValidator('newPassword', 'newPassword2')]
-    )
-  );
+  submitted = signal(false);
   saveEvent = output();
-  submit() {
-    const form = this.form();
 
-    if (!form.valid) {
-      form.markAllAsTouched();
-      form.updateValueAndValidity();
+  model = signal<ChangePasswordModel>({ oldPassword: '', newPassword: '', newPassword2: '' });
+  changePasswordForm = form(this.model, (path) => {
+    required(path.oldPassword, { message: 'Old Password is required' });
+    required(path.newPassword, { message: 'New Password is required' });
+    required(path.newPassword2, { message: 'Confirm New Password is required' });
+    validate(path.newPassword2, ({ value, valueOf }) => {
+      if (value() !== valueOf(path.newPassword)) {
+        return { kind: 'noMatch', message: 'Password must match' };
+      }
+      return null;
+    });
+  });
+
+  submit() {
+    if (this.changePasswordForm().invalid()) {
+      this.submitted.set(true);
       this.errorMessage.set('Please correct the errors');
       return;
     }
+    const value = this.model();
     this.authService
       .changePassword({
-        oldPassword: form.value.oldPassword ?? '',
-        newPassword: form.value.newPassword ?? '',
+        oldPassword: value.oldPassword,
+        newPassword: value.newPassword,
       })
       .subscribe({
         next: () => {
@@ -89,32 +101,4 @@ export class ChangePasswordComponent {
         },
       });
   }
-}
-
-export interface ChangePasswordForm {
-  oldPassword: FormControl<string | null>;
-  newPassword: FormControl<string | null>;
-  newPassword2: FormControl<string | null>;
-}
-
-export function fieldsMatchValidator(controlName: string, matchingControlName: string): ValidatorFn {
-  return (c: AbstractControl): ValidationErrors | null => {
-    const formGroup = c as FormGroup;
-    const control = formGroup.controls[controlName];
-    const matchingControl = formGroup.controls[matchingControlName];
-
-    if (matchingControl.errors && !matchingControl.errors['noMatch']) {
-      // return if another validator has already found an error on the matchingControl
-      return null;
-    }
-
-    // set error on matchingControl if validation fails
-    if (control.value !== matchingControl.value) {
-      matchingControl.setErrors({ noMatch: true });
-    } else {
-      matchingControl.setErrors(null);
-    }
-
-    return null;
-  };
 }

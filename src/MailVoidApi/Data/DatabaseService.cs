@@ -92,6 +92,7 @@ public class DatabaseService : IDatabaseService
         await db.CreateTableIfNotExistsAsync<MailGroupUser>(true);
         await db.CreateTableIfNotExistsAsync<RefreshToken>(true);
         await db.CreateTableIfNotExistsAsync<UserMailRead>(true);
+        await db.CreateTableIfNotExistsAsync<HiddenMailGroup>(true);
 
         // Webhook tables
         await db.CreateTableIfNotExistsAsync<WebhookBucket>(true);

@@ -13,13 +13,14 @@ RUN apt-get update \
         openssl \
     && rm -rf /var/lib/apt/lists/*
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Build on the runner's native platform; framework-dependent output is
+# architecture-neutral, so one build serves amd64 and arm64 without QEMU.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["MailVoidSmtpServer.csproj", "./"]
 RUN dotnet restore "MailVoidSmtpServer.csproj"
 COPY . .
-RUN dotnet build "MailVoidSmtpServer.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release

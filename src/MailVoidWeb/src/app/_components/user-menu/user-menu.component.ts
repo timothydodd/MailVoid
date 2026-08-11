@@ -17,7 +17,7 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
         <svg lucideIcon="user" size="20"></svg>
       </button>
       @if (isOpen()) {
-        <div class="menu" appClickOutside (clickOutside)="isOpen.set(false)" [delayTime]="200">
+        <div class="menu" appClickOutside (clickOutside)="isOpen.set(false)" (document:keydown.escape)="isOpen.set(false)" [delayTime]="200">
           <div class="user-menu-info">
             <div class="avatar-spacer">
               <div class="avatar-wrap">

@@ -3,12 +3,15 @@ import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@a
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { catchError, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, of } from 'rxjs';
 import { WebhookBucket, WebhookListItem, WebhookService } from '../../_services/api/webhook.service';
 import { SignalRService } from '../../services/signalr.service';
 
 type SortColumn = 'httpMethod' | 'path' | 'contentType' | 'createdOn';
 type SortDirection = 'asc' | 'desc';
+
+// Large page used to pull a bucket's full history when aggregating the "All" view.
+const AGGREGATE_PAGE_SIZE = 500;
 
 @Component({
   selector: 'app-hooks',
@@ -36,8 +39,12 @@ type SortDirection = 'asc' | 'desc';
                 @for (bucket of buckets(); track bucket.id) {
                   <li
                     class="bucket-item"
+                    role="button"
+                    tabindex="0"
                     [class.selected]="selectedBucket() === bucket.name"
                     (click)="selectBucket(bucket.name)"
+                    (keydown.enter)="selectBucket(bucket.name)"
+                    (keydown.space)="$event.preventDefault(); selectBucket(bucket.name)"
                   >
                     <svg lucideIcon="folder" size="16"></svg>
                     <span class="bucket-name">{{ bucket.name }}</span>
@@ -115,9 +122,25 @@ type SortDirection = 'asc' | 'desc';
               </tr>
             </thead>
             <tbody>
-              @if (paginatedWebhooks()) {
+              @if (loading()) {
+                <tr>
+                  <td colspan="4" class="table-status">Loading webhooks...</td>
+                </tr>
+              } @else if (error()) {
+                <tr>
+                  <td colspan="4" class="table-status table-status-error">
+                    Failed to load webhooks. Please try again.
+                  </td>
+                </tr>
+              } @else if (paginatedWebhooks() && paginatedWebhooks()!.length > 0) {
                 @for (webhook of paginatedWebhooks(); track webhook.id) {
-                  <tr (click)="clickWebhook(webhook)">
+                  <tr
+                    role="button"
+                    tabindex="0"
+                    (click)="clickWebhook(webhook)"
+                    (keydown.enter)="clickWebhook(webhook)"
+                    (keydown.space)="$event.preventDefault(); clickWebhook(webhook)"
+                  >
                     <td>
                       <span class="method-badge method-{{ webhook.httpMethod.toLowerCase() }}">
                         {{ webhook.httpMethod }}
@@ -128,10 +151,9 @@ type SortDirection = 'asc' | 'desc';
                     <td>{{ webhook.createdOn | date: 'short' }}</td>
                   </tr>
                 }
-              }
-              @if (!webhooks() || webhooks()!.length === 0) {
+              } @else {
                 <tr>
-                  <td colspan="4" class="no-data">No webhooks captured yet</td>
+                  <td colspan="4" class="table-status">No webhooks captured yet</td>
                 </tr>
               }
             </tbody>
@@ -156,7 +178,7 @@ type SortDirection = 'asc' | 'desc';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './hooks.component.scss',
 })
 export class HooksComponent {
@@ -165,10 +187,17 @@ export class HooksComponent {
   signalRService = inject(SignalRService);
 
   buckets = signal<WebhookBucket[] | null>(null);
+  // Full dataset for the current view (a bucket's page, or all buckets aggregated).
   webhooks = signal<WebhookListItem[] | null>(null);
   selectedBucket = signal<string | null>(null);
   copyIcon = signal<string>('copy');
   copyTooltip = signal<string>('Copy URL');
+  loading = signal(false);
+  error = signal(false);
+
+  // Server total for the selected bucket; for the aggregated "All" view it is the
+  // total number of aggregated items.
+  totalCount = signal(0);
 
   endpointUrl = computed(() => {
     const origin = window.location.origin;
@@ -181,13 +210,15 @@ export class HooksComponent {
 
   // Pagination
   currentPage = signal(1);
-  itemsPerPage = 20;
+  pageSize = 20;
+
+  totalPages = computed(() => Math.ceil(this.totalCount() / this.pageSize));
 
   sortedWebhooks = computed(() => {
     const webhooks = this.webhooks();
     if (!webhooks) return null;
 
-    const sorted = [...webhooks].sort((a, b) => {
+    return [...webhooks].sort((a, b) => {
       const column = this.sortColumn();
       const direction = this.sortDirection();
 
@@ -208,73 +239,99 @@ export class HooksComponent {
       if (aVal > bVal) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-
-    return sorted;
   });
 
-  totalPages = computed(() => {
-    const webhooks = this.sortedWebhooks();
-    if (!webhooks) return 0;
-    return Math.ceil(webhooks.length / this.itemsPerPage);
-  });
-
+  // The aggregated "All" view holds every item in memory, so it is paged locally.
+  // A single bucket is paged on the server, so its page is shown as-is.
   paginatedWebhooks = computed(() => {
-    const webhooks = this.sortedWebhooks();
-    if (!webhooks) return null;
-
-    const start = (this.currentPage() - 1) * this.itemsPerPage;
-    const end = start + this.itemsPerPage;
-
-    return webhooks.slice(start, end);
+    const sorted = this.sortedWebhooks();
+    if (!sorted) return null;
+    if (this.selectedBucket()) return sorted;
+    const start = (this.currentPage() - 1) * this.pageSize;
+    return sorted.slice(start, start + this.pageSize);
   });
 
   constructor() {
-    // Load buckets
     this.refreshBuckets();
 
-    // Load webhooks when selected bucket changes
+    // Load webhooks when the selected bucket changes.
     toObservable(this.selectedBucket)
-      .pipe(
-        switchMap((bucketName) => {
-          if (!bucketName) {
-            // Show all webhooks - get from all buckets
-            return this.webhookService.getBuckets().pipe(
-              switchMap((buckets) => {
-                if (!buckets || buckets.length === 0) return of({ items: [], totalCount: 0, page: 1, pageSize: 50 });
-                // Get webhooks from the first bucket for now (could aggregate later)
-                return this.webhookService.getWebhooks(buckets[0].name);
-              }),
-              catchError(() => of({ items: [], totalCount: 0, page: 1, pageSize: 50 }))
-            );
-          }
-          return this.webhookService.getWebhooks(bucketName).pipe(
-            catchError(() => of({ items: [], totalCount: 0, page: 1, pageSize: 50 }))
-          );
-        }),
-        takeUntilDestroyed()
-      )
-      .subscribe((result) => {
-        this.webhooks.set(result?.items ?? []);
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
         this.currentPage.set(1);
+        this.fetchWebhooks();
       });
 
     // Subscribe to new webhook notifications
     this.signalRService.newWebhook$.pipe(takeUntilDestroyed()).subscribe((webhook) => {
       const currentBucket = this.selectedBucket();
+      // Refresh whenever we're in the All view or the webhook belongs to the open bucket.
       if (!currentBucket || webhook.bucketName === currentBucket) {
-        // Refresh webhooks for the current view
-        if (currentBucket) {
-          this.webhookService
-            .getWebhooks(currentBucket)
-            .pipe(catchError(() => of({ items: [], totalCount: 0, page: 1, pageSize: 50 })))
-            .subscribe((result) => {
-              this.webhooks.set(result?.items ?? []);
-            });
-        }
+        this.fetchWebhooks();
       }
       // Always refresh buckets to update counts/activity
       this.refreshBuckets();
     });
+  }
+
+  private fetchWebhooks() {
+    const bucket = this.selectedBucket();
+    this.loading.set(true);
+    this.error.set(false);
+
+    if (bucket) {
+      this.webhookService.getWebhooks(bucket, this.currentPage(), this.pageSize).subscribe({
+        next: (result) => {
+          this.webhooks.set(result?.items ?? []);
+          this.totalCount.set(result?.totalCount ?? 0);
+          this.loading.set(false);
+        },
+        error: () => this.onFetchError(),
+      });
+      return;
+    }
+
+    // "All" view - aggregate webhooks across every bucket.
+    this.webhookService
+      .getBuckets()
+      .pipe(
+        map((buckets) => buckets ?? []),
+        catchError(() => of([] as WebhookBucket[]))
+      )
+      .subscribe({
+        next: (buckets) => {
+          if (buckets.length === 0) {
+            this.webhooks.set([]);
+            this.totalCount.set(0);
+            this.loading.set(false);
+            return;
+          }
+          forkJoin(
+            buckets.map((b) =>
+              this.webhookService.getWebhooks(b.name, 1, AGGREGATE_PAGE_SIZE).pipe(
+                map((r) => r?.items ?? []),
+                catchError(() => of([] as WebhookListItem[]))
+              )
+            )
+          ).subscribe({
+            next: (lists) => {
+              const all = lists.flat();
+              this.webhooks.set(all);
+              this.totalCount.set(all.length);
+              this.loading.set(false);
+            },
+            error: () => this.onFetchError(),
+          });
+        },
+        error: () => this.onFetchError(),
+      });
+  }
+
+  private onFetchError() {
+    this.webhooks.set([]);
+    this.totalCount.set(0);
+    this.loading.set(false);
+    this.error.set(true);
   }
 
   refreshBuckets() {
@@ -303,12 +360,15 @@ export class HooksComponent {
   nextPage() {
     if (this.currentPage() < this.totalPages()) {
       this.currentPage.update((page) => page + 1);
+      // Server-paged bucket needs a refetch; aggregated view re-slices reactively.
+      if (this.selectedBucket()) this.fetchWebhooks();
     }
   }
 
   previousPage() {
     if (this.currentPage() > 1) {
       this.currentPage.update((page) => page - 1);
+      if (this.selectedBucket()) this.fetchWebhooks();
     }
   }
 

@@ -47,77 +47,48 @@ public class QueueMonitoringService : BackgroundService
         _logger.LogInformation("Queue monitoring service stopped");
     }
 
-    private async Task ReportQueueStatistics()
+    private Task ReportQueueStatistics()
     {
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var inboundQueue = scope.ServiceProvider.GetRequiredService<IInboundEmailQueueService>();
-            var outboundQueue = scope.ServiceProvider.GetRequiredService<IOutboundEmailQueueService>();
+            var queue = scope.ServiceProvider.GetRequiredService<IEmailQueueService>();
 
-            var inboundCount = await inboundQueue.GetQueueCountAsync();
-            var outboundCount = await outboundQueue.GetQueueCountAsync();
-            var inboundFailed = await inboundQueue.GetFailedEmailsAsync();
-            var outboundFailed = await outboundQueue.GetFailedEmailsAsync();
-            var outboundRetryable = await outboundQueue.GetRetryableEmailsAsync();
+            var pending = queue.PendingCount;
+            var failed = queue.FailedEmails;
+            var failedCount = failed.Count;
 
-            var inboundFailedCount = inboundFailed.Count();
-            var outboundFailedCount = outboundFailed.Count();
-            var outboundRetryableCount = outboundRetryable.Count();
-
-            // Log basic statistics
-            if (inboundCount > 0 || outboundCount > 0 || inboundFailedCount > 0 || outboundFailedCount > 0 || outboundRetryableCount > 0)
+            if (pending > 0 || failedCount > 0)
             {
-                _logger.LogInformation("📊 Queue Statistics - Inbound: {InboundCount} pending, {InboundFailed} failed | " +
-                                     "Outbound: {OutboundCount} pending, {OutboundRetryable} retrying, {OutboundFailed} failed",
-                    inboundCount, inboundFailedCount, outboundCount, outboundRetryableCount, outboundFailedCount);
+                _logger.LogInformation("📊 Queue Statistics - {Pending} pending, {Failed} dead-lettered",
+                    pending, failedCount);
             }
             else if (_options.LogWhenEmpty)
             {
-                _logger.LogDebug("📊 All queues are empty");
+                _logger.LogDebug("📊 Queue is empty");
             }
 
-            // Report on old failed emails
-            if (inboundFailedCount > 0)
+            if (failedCount > 0)
             {
-                var oldFailedInbound = inboundFailed
-                    .Where(e => e.LastAttemptAt.HasValue && 
-                               DateTime.UtcNow - e.LastAttemptAt.Value > TimeSpan.FromHours(1))
-                    .Count();
-                
-                if (oldFailedInbound > 0)
+                var oldFailed = failed.Count(e => e.LastAttemptAt.HasValue &&
+                    DateTime.UtcNow - e.LastAttemptAt.Value > TimeSpan.FromHours(1));
+                if (oldFailed > 0)
                 {
-                    _logger.LogWarning("⚠️ {Count} inbound emails have been failed for over 1 hour", oldFailedInbound);
+                    _logger.LogWarning("⚠️ {Count} emails have been dead-lettered for over 1 hour", oldFailed);
                 }
             }
 
-            if (outboundFailedCount > 0)
+            if (pending > _options.HighQueueDepthThreshold)
             {
-                var oldFailedOutbound = outboundFailed
-                    .Where(e => DateTime.UtcNow - e.QueuedAt > TimeSpan.FromHours(1))
-                    .Count();
-                
-                if (oldFailedOutbound > 0)
-                {
-                    _logger.LogWarning("⚠️ {Count} outbound emails have been failed for over 1 hour", oldFailedOutbound);
-                }
-            }
-
-            // Report on high queue depths
-            if (inboundCount > _options.HighQueueDepthThreshold)
-            {
-                _logger.LogWarning("🚨 High inbound queue depth: {Count} emails pending", inboundCount);
-            }
-
-            if (outboundCount > _options.HighQueueDepthThreshold)
-            {
-                _logger.LogWarning("🚨 High outbound queue depth: {Count} emails pending", outboundCount);
+                _logger.LogWarning("🚨 High queue depth: {Count} emails pending", pending);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to report queue statistics: {Error}", ex.Message);
         }
+
+        return Task.CompletedTask;
     }
 }
 

@@ -51,7 +51,21 @@ public class WebhookBucketService : IWebhookBucketService
             CreatedAt = DateTime.UtcNow
         };
 
-        await db.InsertAsync(newBucket);
+        try
+        {
+            await db.InsertAsync(newBucket);
+        }
+        catch (Exception ex)
+        {
+            // Lost a race with a concurrent insert (unique Name index); re-fetch the winner.
+            var raced = await db.SingleAsync<WebhookBucket>(b => b.Name == name);
+            if (raced != null)
+            {
+                return raced;
+            }
+            _logger.LogError(ex, "Failed to create webhook bucket: {Name}", name);
+            throw;
+        }
 
         _logger.LogInformation("Created new webhook bucket: {Name}", name);
 

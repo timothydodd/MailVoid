@@ -170,7 +170,9 @@ public class LetsEncryptService : ILetsEncryptService
                 return false;
 
             var now = DateTime.UtcNow;
-            var isValid = certificate.NotBefore <= now && certificate.NotAfter > now.AddDays(_options.RenewalDaysBeforeExpiry);
+            var notBefore = certificate.NotBefore.ToUniversalTime();
+            var notAfter = certificate.NotAfter.ToUniversalTime();
+            var isValid = notBefore <= now && notAfter > now.AddDays(_options.RenewalDaysBeforeExpiry);
 
             _logger.LogDebug("Certificate for domain {Domain} is valid: {IsValid} (expires: {Expiry})",
                 domain, isValid, certificate.NotAfter);
@@ -189,7 +191,7 @@ public class LetsEncryptService : ILetsEncryptService
         try
         {
             var certificate = await GetCertificateAsync(domain, cancellationToken);
-            return certificate?.NotAfter;
+            return certificate?.NotAfter.ToUniversalTime();
         }
         catch (Exception ex)
         {
@@ -198,7 +200,7 @@ public class LetsEncryptService : ILetsEncryptService
         }
     }
 
-    private string BuildCertbotCommand(string domain, bool isRenewal)
+    private List<string> BuildCertbotCommand(string domain, bool isRenewal)
     {
         var args = new List<string>();
 
@@ -206,14 +208,16 @@ public class LetsEncryptService : ILetsEncryptService
         {
             args.Add("renew");
             args.Add("--quiet");
-            args.Add($"--cert-name {domain}");
+            args.Add("--cert-name");
+            args.Add(domain);
         }
         else
         {
             args.Add("certonly");
             args.Add("--non-interactive");
             args.Add("--agree-tos");
-            args.Add($"--email {_options.Email}");
+            args.Add("--email");
+            args.Add(_options.Email);
 
             // Choose challenge method
             switch (_options.ChallengeMethod.ToLowerInvariant())
@@ -221,11 +225,15 @@ public class LetsEncryptService : ILetsEncryptService
                 case "http":
                     args.Add("--standalone");
                     if (_options.HttpPort.HasValue)
-                        args.Add($"--http-01-port {_options.HttpPort}");
+                    {
+                        args.Add("--http-01-port");
+                        args.Add(_options.HttpPort.Value.ToString());
+                    }
                     break;
                 case "dns":
                     args.Add("--manual");
-                    args.Add("--preferred-challenges dns");
+                    args.Add("--preferred-challenges");
+                    args.Add("dns");
                     break;
                 case "dns-cloudflare":
                     args.Add("--dns-cloudflare");
@@ -234,41 +242,49 @@ public class LetsEncryptService : ILetsEncryptService
                     break;
                 case "webroot":
                     args.Add("--webroot");
-                    args.Add($"--webroot-path {_options.WebrootPath}");
+                    args.Add("--webroot-path");
+                    args.Add(_options.WebrootPath);
                     break;
                 default:
                     args.Add("--standalone");
                     break;
             }
 
-            args.Add($"--domains {domain}");
+            args.Add("--domains");
+            args.Add(domain);
 
             if (!string.IsNullOrWhiteSpace(_options.CertificateDirectory))
             {
-                args.Add($"--work-dir {_options.CertificateDirectory}/work");
-                args.Add($"--config-dir {_options.CertificateDirectory}/config");
-                args.Add($"--logs-dir {_options.CertificateDirectory}/logs");
+                args.Add("--work-dir");
+                args.Add($"{_options.CertificateDirectory}/work");
+                args.Add("--config-dir");
+                args.Add($"{_options.CertificateDirectory}/config");
+                args.Add("--logs-dir");
+                args.Add($"{_options.CertificateDirectory}/logs");
             }
         }
 
-        return string.Join(" ", args);
+        return args;
     }
 
-    private async Task<bool> RunCertbotAsync(string arguments, CancellationToken cancellationToken)
+    private async Task<bool> RunCertbotAsync(IEnumerable<string> arguments, CancellationToken cancellationToken)
     {
         try
         {
             var startInfo = new ProcessStartInfo
             {
                 FileName = _options.CertbotPath,
-                Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
+            foreach (var arg in arguments)
+            {
+                startInfo.ArgumentList.Add(arg);
+            }
 
-            _logger.LogDebug("Running certbot with arguments: {Arguments}", arguments);
+            _logger.LogDebug("Running certbot with arguments: {Arguments}", string.Join(" ", startInfo.ArgumentList));
 
             using var process = Process.Start(startInfo);
             if (process == null)
@@ -395,19 +411,29 @@ public class LetsEncryptService : ILetsEncryptService
                 "# Cloudflare API credentials for certbot-dns-cloudflare\n" +
                 $"dns_cloudflare_api_token = {_options.CloudflareApiToken}\n";
 
-            await File.WriteAllTextAsync(credentialsPath, credentialsContent, cancellationToken);
-
-            // certbot refuses to use the credentials file if group/world-readable.
-            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            // Create the file with owner-only permissions from the start (no world-readable window),
+            // otherwise certbot refuses to use it. UnixCreateMode is ignored on Windows.
+            var streamOptions = new FileStreamOptions
             {
-                var chmod = new ProcessStartInfo("chmod", $"600 {credentialsPath}")
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var process = Process.Start(chmod);
-                if (process != null)
-                    await process.WaitForExitAsync(cancellationToken);
+                Mode = FileMode.Create,
+                Access = FileAccess.Write,
+                Share = FileShare.None
+            };
+            if (!OperatingSystem.IsWindows())
+            {
+                streamOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            }
+
+            await using (var stream = new FileStream(credentialsPath, streamOptions))
+            await using (var writer = new StreamWriter(stream))
+            {
+                await writer.WriteAsync(credentialsContent.AsMemory(), cancellationToken);
+            }
+
+            // Tighten in case the file already existed with looser permissions.
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(credentialsPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
 
             _logger.LogDebug("Wrote Cloudflare credentials file: {Path}", credentialsPath);

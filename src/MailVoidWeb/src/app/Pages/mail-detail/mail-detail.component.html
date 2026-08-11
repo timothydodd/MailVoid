@@ -1,32 +1,36 @@
 @if (!!mail()) {
   <div class="mail-detail-container">
     <!-- Header Section -->
-    <div class="mail-header">
+    <div class="mail-header" [class.details-expanded]="detailsExpanded()">
       <div class="mail-header-content">
         <button class="btn btn-outline back-button" (click)="goBack()">
           <svg lucideIcon="arrow-left" size="16"></svg>
         </button>
         <div class="mail-meta">
           <div class="meta-row">
-            <div class="meta-item">
+            <div class="meta-item from">
               <span class="meta-label">From</span>
               <span class="meta-value">{{ mail()?.from }}</span>
             </div>
-            <div class="meta-item">
+            <div class="meta-item to">
               <span class="meta-label">To</span>
               <span class="meta-value with-copy">
                 <span class="copy-text">{{ mail()?.to }}</span>
-                <button class="copy-btn" (click)="copyEmail(mail()?.to)" title="Copy email address">
-                  <svg lucideIcon="copy" size="16"></svg>
+                <button
+                  class="copy-btn"
+                  (click)="copyEmail(mail()?.to)"
+                  [title]="copied() ? 'Copied!' : 'Copy email address'"
+                >
+                  <svg [lucideIcon]="copied() ? 'circle-check' : 'copy'" size="16"></svg>
                 </button>
               </span>
             </div>
             <div class="meta-item date">
               <span class="meta-label">Date</span>
-              <span class="meta-value">{{ $safeNavigationMigration(mail()?.createdOn) | date: 'medium' }}</span>
+              <span class="meta-value">{{ mail()?.createdOn | date: 'medium' }}</span>
             </div>
           </div>
-          <div class="meta-row">
+          <div class="meta-row subject-row">
             <div class="meta-item subject">
               <span class="meta-label">Subject</span>
               <span class="meta-value">{{ mail()?.subject }}</span>
@@ -36,45 +40,46 @@
           @if (mail()?.spfResult || mail()?.dkimResult) {
             <div class="meta-row badges">
               @if (mail()?.spfResult) {
-                <span class="badge" [class]="badgeClass($safeNavigationMigration(mail()?.spfResult))">SPF: {{ mail()?.spfResult }}</span>
+                <span class="badge" [class]="badgeClass(mail()?.spfResult)">SPF: {{ mail()?.spfResult }}</span>
               }
               @if (mail()?.dkimResult) {
-                <span class="badge" [class]="badgeClass($safeNavigationMigration(mail()?.dkimResult))">DKIM: {{ mail()?.dkimResult }}</span>
+                <span class="badge" [class]="badgeClass(mail()?.dkimResult)">DKIM: {{ mail()?.dkimResult }}</span>
               }
             </div>
           }
+
+          <!-- Mobile-only: expand/collapse the secondary fields (To, Date, auth badges) -->
+          <button type="button" class="details-toggle" (click)="toggleDetails()">
+            {{ detailsExpanded() ? 'Hide details' : 'Details' }}
+            <svg [lucideIcon]="detailsExpanded() ? 'chevron-up' : 'chevron-down'" size="14"></svg>
+          </button>
+        </div>
+
+        <div class="header-actions">
+          <div class="mail-tabs">
+            <button class="tab" [class.active]="activeTab() === 'preview'" (click)="setTab('preview')">Message</button>
+            <button
+              class="tab"
+              [class.active]="activeTab() === 'headers'"
+              [disabled]="headers().length === 0"
+              (click)="setTab('headers')"
+            >
+              Headers
+              @if (headers().length > 0) {
+                <span class="tab-count">{{ headers().length }}</span>
+              }
+            </button>
+            <button
+              class="tab"
+              [class.active]="activeTab() === 'raw'"
+              [disabled]="!hasRawSource()"
+              (click)="setTab('raw')"
+            >
+              Raw
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="mail-tabs">
-      <button
-        class="tab"
-        [class.active]="activeTab() === 'preview'"
-        (click)="setTab('preview')"
-      >
-        Preview
-      </button>
-      <button
-        class="tab"
-        [class.active]="activeTab() === 'headers'"
-        [disabled]="headers().length === 0"
-        (click)="setTab('headers')"
-      >
-        Headers
-        @if (headers().length > 0) {
-          <span class="tab-count">{{ headers().length }}</span>
-        }
-      </button>
-      <button
-        class="tab"
-        [class.active]="activeTab() === 'raw'"
-        [disabled]="!hasRawSource()"
-        (click)="setTab('raw')"
-      >
-        Raw
-      </button>
     </div>
 
     <!-- Tab content -->
@@ -82,7 +87,54 @@
       @switch (activeTab()) {
         @case ('preview') {
           @if (mail()?.isHtml) {
-            <iframe #emailContent class="html-content" sandbox="allow-same-origin"></iframe>
+            <div class="preview-toolbar">
+              <div class="remote-split">
+                <button
+                  class="btn btn-sm"
+                  (click)="toggleRemote()"
+                  [title]="loadRemote() ? 'Remote content is loaded' : 'Load remote images and content'"
+                >
+                  <svg [lucideIcon]="loadRemote() ? 'eye' : 'eye-off'" size="14"></svg>
+                  {{ loadRemote() ? 'Remote content loaded' : 'Load remote images' }}
+                </button>
+                <button
+                  class="btn btn-sm remote-caret"
+                  #remoteTrigger
+                  (click)="toggleRemoteMenu()"
+                  title="More remote content options"
+                  aria-label="More remote content options"
+                >
+                  <svg lucideIcon="chevron-down" size="14"></svg>
+                </button>
+                @if (remoteMenuOpen()) {
+                  <div
+                    class="menu"
+                    #remoteMenu
+                    [style.top.px]="menuPosition().top"
+                    [style.left.px]="menuPosition().left"
+                    appClickOutside
+                    [delayTime]="200"
+                    (clickOutside)="closeRemoteMenu()"
+                    (document:keydown.escape)="closeRemoteMenu()"
+                  >
+                    <button dropdown-item (click)="toggleAlwaysAllowSender()" [disabled]="!senderEmail()">
+                      <svg [lucideIcon]="isSenderTrusted() ? 'circle-check' : 'eye'" size="16"></svg>
+                      @if (isSenderTrusted()) {
+                        Always allowing this sender
+                      } @else {
+                        Always show remote content from sender
+                      }
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+            <iframe
+              class="html-content"
+              [srcdoc]="srcDoc()"
+              sandbox="allow-popups allow-popups-to-escape-sandbox"
+              referrerpolicy="no-referrer"
+            ></iframe>
           } @else {
             <div class="text-content">{{ mail()?.text }}</div>
           }

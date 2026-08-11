@@ -1,11 +1,9 @@
 @if (authService.isLoggedIn | async) {
   <app-main-nav></app-main-nav>
-  <app-mail-notification></app-mail-notification>
 }
 <div class="app-container">
   <main role="main" class="app-main">
     <router-outlet />
   </main>
 </div>
-<app-validation-defaults> </app-validation-defaults>
 <rd-toast></rd-toast>

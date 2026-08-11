@@ -9,50 +9,38 @@ public class LetsEncryptHostedService : BackgroundService
 {
     private readonly ILogger<LetsEncryptHostedService> _logger;
     private readonly ILetsEncryptService _letsEncryptService;
+    private readonly ICertificateService _certificateService;
     private readonly IServiceProvider _serviceProvider;
     private readonly LetsEncryptOptions _options;
 
     public LetsEncryptHostedService(
         ILogger<LetsEncryptHostedService> logger,
         ILetsEncryptService letsEncryptService,
+        ICertificateService certificateService,
         IServiceProvider serviceProvider,
         IOptions<LetsEncryptOptions> options)
     {
         _logger = logger;
         _letsEncryptService = letsEncryptService;
+        _certificateService = certificateService;
         _serviceProvider = serviceProvider;
         _options = options.Value;
-    }
-
-    public override async Task StartAsync(CancellationToken cancellationToken)
-    {
-        if (!_options.Enabled)
-        {
-            _logger.LogInformation("Let's Encrypt service is disabled");
-            return;
-        }
-
-        if (!_options.Domains.Any())
-        {
-            _logger.LogWarning("No domains configured for Let's Encrypt");
-            return;
-        }
-
-        _logger.LogInformation("Starting Let's Encrypt service for domains: {Domains}",
-            string.Join(", ", _options.Domains));
-
-        // Initial certificate check and acquisition
-        await InitialCertificateSetupAsync(cancellationToken);
-
-        await base.StartAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!_options.Enabled || !_options.Domains.Any())
         {
+            _logger.LogInformation("Let's Encrypt service is disabled or has no domains configured");
             return;
         }
+
+        _logger.LogInformation("Let's Encrypt service starting for domains: {Domains}",
+            string.Join(", ", _options.Domains));
+
+        // Run initial acquisition in the background so we never block host startup for minutes on a
+        // DNS-01 challenge. Once a certificate is available the SMTP server is re-bound to enable TLS.
+        await InitialCertificateSetupAsync(stoppingToken);
 
         _logger.LogInformation("Let's Encrypt renewal service started. Checking every {Hours} hours",
             _options.RenewalCheckIntervalHours);
@@ -194,8 +182,11 @@ public class LetsEncryptHostedService : BackgroundService
         {
             _logger.LogInformation("Restarting SMTP server to load updated certificates");
 
+            // Drop the cached certificate so the restarted server reloads the freshly issued one.
+            _certificateService.Invalidate();
+
             // Get the SMTP server service and restart it
-            var scope = _serviceProvider.CreateScope();
+            using var scope = _serviceProvider.CreateScope();
             var smtpService = scope.ServiceProvider.GetRequiredService<SmtpServerService>();
 
             // Stop the current server

@@ -1,11 +1,30 @@
 <!doctype html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https: http:; img-src 'self' data: https: http:; media-src 'self' data: https: http:; font-src 'self' data: https: http:; connect-src 'self' http: https: ws: wss:; frame-src 'self' data:; base-uri 'self'; object-src 'none';"
+    />
     <title>MailVoid</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <script>
+      // Set the theme before bootstrap to avoid a flash of the wrong theme (FOUC).
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme-preference');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = saved || (prefersDark ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+          document.documentElement.setAttribute('data-bs-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.setAttribute('data-bs-theme', 'dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>

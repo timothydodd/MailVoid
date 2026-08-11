@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
+import { form, required, pattern, min, max, FormField } from '@angular/forms/signals';
 import { SelectComponent } from '@rd-ui';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { ValdemortModule } from 'ngx-valdemort';
 import { ConfirmDialogService } from '@rd-ui';
 import {
   AdminMailGroup,
@@ -15,7 +15,7 @@ import {
 import { AuthService } from '../../../_services/auth-service';
 @Component({
   selector: 'app-mail-group',
-  imports: [LucideDynamicIcon, ReactiveFormsModule, FormsModule, SelectComponent, ValdemortModule],
+  imports: [LucideDynamicIcon, FormsModule, SelectComponent, FormField],
   template: `
     <div class="mail-group-layout">
       <!-- Header with create button -->
@@ -33,7 +33,7 @@ import { AuthService } from '../../../_services/auth-service';
       </div>
 
       <!-- Create Group Inline Form -->
-      @if (creatingGroup() && createForm()) {
+      @if (creatingGroup()) {
         <div class="inline-form">
           <div class="inline-form-header">
             <h5>Create New Mail Group</h5>
@@ -41,7 +41,7 @@ import { AuthService } from '../../../_services/auth-service';
               <svg lucideIcon="x" size="16"></svg>
             </button>
           </div>
-          <div class="inline-form-body" [formGroup]="createForm()!">
+          <div class="inline-form-body">
             <div class="form-row">
               <div class="form-group">
                 <label for="subdomain" class="form-label">Subdomain</label>
@@ -49,10 +49,16 @@ import { AuthService } from '../../../_services/auth-service';
                   id="subdomain"
                   type="text"
                   class="form-control"
-                  formControlName="subdomain"
+                  [formField]="createGroupForm.subdomain"
                   placeholder="e.g., support, sales"
                 />
-                <val-errors controlName="subdomain" label="Subdomain"></val-errors>
+                @if ((createSubmitted() || createGroupForm.subdomain().touched()) && createGroupForm.subdomain().invalid()) {
+                  <div class="text-danger">
+                    @for (error of createGroupForm.subdomain().errors(); track error.kind) {
+                      <div>{{ error.message }}</div>
+                    }
+                  </div>
+                }
               </div>
               <div class="form-group">
                 <label for="description" class="form-label">Description</label>
@@ -60,7 +66,7 @@ import { AuthService } from '../../../_services/auth-service';
                   id="description"
                   type="text"
                   class="form-control"
-                  formControlName="description"
+                  [formField]="createGroupForm.description"
                   placeholder="Optional description"
                 />
               </div>
@@ -69,7 +75,7 @@ import { AuthService } from '../../../_services/auth-service';
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
-                  [disabled]="!createForm()?.valid || isLoading()"
+                  [disabled]="createGroupForm().invalid() || isLoading()"
                   (click)="createGroup()"
                 >
                   {{ isLoading() ? 'Creating...' : 'Create' }}
@@ -116,10 +122,20 @@ import { AuthService } from '../../../_services/auth-service';
                 @if (group.isUserPrivate) {
                   <span class="badge badge-private">Private</span>
                 }
+                @if (group.isHidden) {
+                  <span class="badge badge-secondary">Hidden</span>
+                }
               </div>
               <div class="col-actions">
+                <button
+                  class="btn btn-icon-sm"
+                  (click)="toggleHidden(group)"
+                  [title]="group.isHidden ? 'Show in mailbox list' : 'Hide from mailbox list'"
+                >
+                  <svg [lucideIcon]="group.isHidden ? 'eye' : 'eye-off'" size="14"></svg>
+                </button>
                 <button class="btn btn-icon-sm" (click)="toggleExpand(group)" title="Edit">
-                  <svg lucideIcon="edit" size="14"></svg>
+                  <svg lucideIcon="square-pen" size="14"></svg>
                 </button>
                 @if (!group.isUserPrivate) {
                   <button class="btn btn-icon-sm" (click)="manageUsers(group)" title="Share">
@@ -135,13 +151,13 @@ import { AuthService } from '../../../_services/auth-service';
             </div>
 
             <!-- Inline Edit Panel -->
-            @if (expandedGroupId() === group.id && editForm()) {
+            @if (expandedGroupId() === group.id) {
               <div class="expand-panel">
-                <div class="expand-panel-content" [formGroup]="editForm()!">
+                <div class="expand-panel-content">
                   <div class="edit-fields">
                     <div class="form-group">
                       <label class="form-label">Description</label>
-                      <input type="text" class="form-control" formControlName="description" placeholder="Group description" />
+                      <input type="text" class="form-control" [formField]="editGroupForm.description" placeholder="Group description" />
                     </div>
                     <div class="form-group">
                       <label class="form-label">Retention (days)</label>
@@ -149,16 +165,14 @@ import { AuthService } from '../../../_services/auth-service';
                         <input
                           type="number"
                           class="form-control"
-                          formControlName="retentionDays"
-                          min="0"
-                          max="365"
+                          [formField]="editGroupForm.retentionDays"
                           placeholder="0 = no deletion"
                         />
                         <span class="retention-hint">
-                          @if (editForm()?.get('retentionDays')?.value === 0 || $safeNavigationMigration(editForm()?.get('retentionDays')?.value) === null) {
+                          @if (editGroupModel().retentionDays === 0 || editGroupModel().retentionDays === null) {
                             No auto-deletion
                           } @else {
-                            Auto-delete after {{ editForm()?.get('retentionDays')?.value }} days
+                            Auto-delete after {{ editGroupModel().retentionDays }} days
                           }
                         </span>
                       </div>
@@ -168,7 +182,7 @@ import { AuthService } from '../../../_services/auth-service';
                     <button class="btn btn-secondary btn-sm" (click)="cancelEdit()">Cancel</button>
                     <button
                       class="btn btn-primary btn-sm"
-                      [disabled]="!editForm()?.valid || isLoading()"
+                      [disabled]="editGroupForm().invalid() || isLoading()"
                       (click)="saveGroup()"
                     >
                       {{ isLoading() ? 'Saving...' : 'Save' }}
@@ -324,9 +338,20 @@ export class MailGroupComponent {
   // Retention cache
   retentionCache = signal<Record<number, number | null>>({});
 
-  // Form signals
-  editForm = signal<FormGroup | null>(null);
-  createForm = signal<FormGroup | null>(null);
+  // Signal forms: models are always present; visibility is driven by creatingGroup()/expandedGroupId().
+  createGroupModel = signal<{ subdomain: string; description: string }>({ subdomain: '', description: '' });
+  createGroupForm = form(this.createGroupModel, (path) => {
+    required(path.subdomain, { message: 'Subdomain is required' });
+    pattern(path.subdomain, /^[a-z0-9-]+$/, { message: 'Subdomain may only contain lowercase letters, numbers and hyphens' });
+  });
+  createSubmitted = signal(false);
+
+  editGroupModel = signal<{ description: string; retentionDays: number | null }>({ description: '', retentionDays: null });
+  editGroupForm = form(this.editGroupModel, (path) => {
+    min(path.retentionDays, 0, { message: 'Retention cannot be negative' });
+    max(path.retentionDays, 365, { message: 'Retention cannot exceed 365 days' });
+  });
+
   selectedUserId: string | null = null;
 
   constructor() {
@@ -337,6 +362,18 @@ export class MailGroupComponent {
   loadMailGroups() {
     this.mailService.getMailGroups().subscribe((groups) => {
       this.mailGroups.set(groups);
+    });
+  }
+
+  // Per-user hide/show. Hidden groups drop out of the mailbox sidebar (the sidebar
+  // refreshes when this settings modal closes).
+  toggleHidden(group: MailGroup) {
+    const request$ = group.isHidden
+      ? this.mailService.unhideMailGroup(group.id)
+      : this.mailService.hideMailGroup(group.id);
+    request$.subscribe({
+      next: () => this.loadMailGroups(),
+      error: (error) => console.error('Error updating mailbox visibility:', error),
     });
   }
 
@@ -431,50 +468,45 @@ export class MailGroupComponent {
     this.expandedGroupId.set(group.id);
     this.selectedGroup.set(group);
 
-    const form = new FormGroup({
-      description: new FormControl(group.description || ''),
-      retentionDays: new FormControl<number | null>(null),
-    });
-
-    this.editForm.set(form);
+    this.editGroupModel.set({ description: group.description || '', retentionDays: null });
 
     this.mailService.getRetentionSettings(group.id).subscribe({
       next: (settings) => {
-        form.get('retentionDays')?.setValue(settings.retentionDays);
+        this.editGroupModel.update((m) => ({ ...m, retentionDays: settings.retentionDays }));
         this.retentionCache.update((cache) => ({ ...cache, [group.id]: settings.retentionDays }));
       },
       error: () => {
-        form.get('retentionDays')?.setValue(3);
+        this.editGroupModel.update((m) => ({ ...m, retentionDays: 3 }));
       },
     });
   }
 
   cancelEdit() {
     this.expandedGroupId.set(null);
-    this.editForm.set(null);
     this.selectedGroup.set(null);
   }
 
   saveGroup() {
-    const form = this.editForm();
     const group = this.selectedGroup();
 
-    if (!form || !group || !form.valid) return;
+    if (!group || this.editGroupForm().invalid()) return;
 
     this.isLoading.set(true);
 
+    const { description, retentionDays } = this.editGroupModel();
+
     const updateData = {
       id: group.id,
-      description: form.value.description,
+      description,
       isPublic: group.isPublic,
     };
 
     this.mailService.updateMailGroup(updateData).subscribe({
       next: (updatedGroup) => {
-        if (form.value.retentionDays !== null) {
-          this.mailService.updateRetentionSettings(group.id, form.value.retentionDays).subscribe({
+        if (retentionDays !== null) {
+          this.mailService.updateRetentionSettings(group.id, retentionDays).subscribe({
             next: () => {
-              this.retentionCache.update((cache) => ({ ...cache, [group.id]: form.value.retentionDays }));
+              this.retentionCache.update((cache) => ({ ...cache, [group.id]: retentionDays }));
               this.finishGroupUpdate(updatedGroup);
             },
             error: () => {
@@ -509,7 +541,6 @@ export class MailGroupComponent {
     this.selectedGroup.set(group);
     this.expandedGroupId.set(null);
     this.managingUsers.set(true);
-    this.editForm.set(null);
     this.selectedUserId = null;
 
     this.loadGroupUsers(group.id);
@@ -568,28 +599,27 @@ export class MailGroupComponent {
     this.expandedGroupId.set(null);
     this.managingUsers.set(false);
 
-    const form = new FormGroup({
-      subdomain: new FormControl('', [Validators.required, Validators.pattern(/^[a-z0-9-]+$/)]),
-      description: new FormControl(''),
-    });
-
-    this.createForm.set(form);
+    this.createGroupModel.set({ subdomain: '', description: '' });
+    this.createSubmitted.set(false);
   }
 
   cancelCreate() {
     this.creatingGroup.set(false);
-    this.createForm.set(null);
+    this.createSubmitted.set(false);
   }
 
   createGroup() {
-    const form = this.createForm();
-    if (!form || !form.valid) return;
+    if (this.createGroupForm().invalid()) {
+      this.createSubmitted.set(true);
+      return;
+    }
 
     this.isLoading.set(true);
 
+    const { subdomain, description } = this.createGroupModel();
     const request: CreateMailGroupRequest = {
-      subdomain: form.get('subdomain')?.value,
-      description: form.get('description')?.value || undefined,
+      subdomain,
+      description: description || undefined,
       isPublic: false,
     };
 

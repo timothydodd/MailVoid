@@ -3,7 +3,7 @@ import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@a
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { catchError, combineLatest, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
+import { combineLatest, debounceTime, distinctUntilChanged } from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
 import { ModalContainerService } from '@rd-ui';
 import {
@@ -110,9 +110,26 @@ type SortDirection = 'asc' | 'desc';
               </tr>
             </thead>
             <tbody>
-              @if (paginatedEmails()) {
-                @for (email of paginatedEmails(); track email.id) {
-                  <tr (click)="clickMail(email)" [class.read]="email.isRead">
+              @if (loading()) {
+                <tr>
+                  <td colspan="4" class="table-status">Loading emails...</td>
+                </tr>
+              } @else if (error()) {
+                <tr>
+                  <td colspan="4" class="table-status table-status-error">
+                    Failed to load emails. Please try again.
+                  </td>
+                </tr>
+              } @else if (sortedEmails() && sortedEmails()!.length > 0) {
+                @for (email of sortedEmails(); track email.id) {
+                  <tr
+                    role="button"
+                    tabindex="0"
+                    (click)="clickMail(email)"
+                    (keydown.enter)="clickMail(email)"
+                    (keydown.space)="$event.preventDefault(); clickMail(email)"
+                    [class.read]="email.isRead"
+                  >
                     <td class="from-email">{{ email.from }}</td>
                     <td style="max-width: 100px;overflow:hidden;">{{ email.to }}</td>
                     <td style="max-width: 300px;word-break: break-all;">
@@ -121,6 +138,10 @@ type SortDirection = 'asc' | 'desc';
                     <td>{{ email.createdOn | date: 'short' }}</td>
                   </tr>
                 }
+              } @else {
+                <tr>
+                  <td colspan="4" class="table-status">No emails found</td>
+                </tr>
               }
             </tbody>
           </table>
@@ -143,7 +164,7 @@ type SortDirection = 'asc' | 'desc';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './mail.component.scss',
 })
 export class MailComponent {
@@ -160,33 +181,36 @@ export class MailComponent {
   emails = signal<MailWithReadStatus[] | null>(null);
   selectedBox = signal<string | null>(null);
   isMobileMenuOpen = signal(false);
+  loading = signal(false);
+  error = signal(false);
 
-  // Sorting
+  // Sorting (applied to the current server page)
   sortColumn = signal<SortColumn>('createdOn');
   sortDirection = signal<SortDirection>('desc');
 
-  // Pagination
+  // Server-side pagination
   currentPage = signal(1);
-  itemsPerPage = 20;
+  pageSize = 20;
+  totalCount = signal(0);
+
+  totalPages = computed(() => Math.ceil(this.totalCount() / this.pageSize));
 
   sortedEmails = computed(() => {
     const emails = this.emails();
     if (!emails) return null;
 
-    const sorted = [...emails].sort((a, b) => {
+    return [...emails].sort((a, b) => {
       const column = this.sortColumn();
       const direction = this.sortDirection();
 
       let aVal: any = a[column];
       let bVal: any = b[column];
 
-      // Handle date sorting
       if (column === 'createdOn') {
         aVal = new Date(aVal).getTime();
         bVal = new Date(bVal).getTime();
       }
 
-      // Handle string sorting (case insensitive)
       if (typeof aVal === 'string') {
         aVal = aVal.toLowerCase();
         bVal = bVal.toLowerCase();
@@ -196,43 +220,20 @@ export class MailComponent {
       if (aVal > bVal) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-
-    return sorted;
-  });
-
-  totalPages = computed(() => {
-    const emails = this.sortedEmails();
-    if (!emails) return 0;
-    return Math.ceil(emails.length / this.itemsPerPage);
-  });
-
-  paginatedEmails = computed(() => {
-    const emails = this.sortedEmails();
-    if (!emails) return null;
-
-    const start = (this.currentPage() - 1) * this.itemsPerPage;
-    const end = start + this.itemsPerPage;
-
-    return emails.slice(start, end);
   });
 
   constructor() {
+    // Refetch (page 1) whenever the selected box or search term changes.
     combineLatest([
       toObservable(this.selectedBox),
       toObservable(this.mailSearchService.searchText).pipe(debounceTime(250), distinctUntilChanged()),
     ])
-      .pipe(
-        switchMap(([selectedBox, search]) =>
-          this.mailService
-            .getEmails(this.buildFilter(selectedBox, search))
-            .pipe(catchError(() => of({ items: null, totalCount: 0 })))
-        ),
-        takeUntilDestroyed()
-      )
-      .subscribe((result) => {
-        this.emails.set(result?.items);
-        this.currentPage.set(1); // Reset to first page when emails change
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
+        this.currentPage.set(1);
+        this.fetchEmails();
       });
+
     this.refreshMail();
     this.mobileMenuService.menuToggled.pipe(takeUntilDestroyed()).subscribe(() => {
       this.toggleMobileMenu();
@@ -240,26 +241,38 @@ export class MailComponent {
 
     // Subscribe to new mail notifications
     this.signalRService.newMail$.pipe(takeUntilDestroyed()).subscribe((mail) => {
-      // Refresh the current email list when new mail arrives
       const currentBox = this.selectedBox();
       if (!currentBox || mail.to === currentBox || (mail.mailGroupPath && currentBox.includes(mail.mailGroupPath))) {
-        // Refresh emails for the current view
-        this.mailService
-          .getEmails(this.buildFilter(currentBox, this.mailSearchService.searchText()))
-          .pipe(catchError(() => of({ items: null, totalCount: 0 })))
-          .subscribe((result) => {
-            this.emails.set(result?.items);
-          });
+        this.fetchEmails();
       }
       // Always refresh mailboxes to update counts
       this.refreshMail();
     });
   }
 
-  private buildFilter(box: string | null, search: string): FilterOptions | undefined {
+  private fetchEmails() {
+    this.loading.set(true);
+    this.error.set(false);
+    this.mailService
+      .getEmails(this.buildFilter(this.selectedBox(), this.mailSearchService.searchText(), this.currentPage()))
+      .subscribe({
+        next: (result) => {
+          this.emails.set(result?.items ?? null);
+          this.totalCount.set(result?.totalCount ?? 0);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.emails.set(null);
+          this.totalCount.set(0);
+          this.loading.set(false);
+          this.error.set(true);
+        },
+      });
+  }
+
+  private buildFilter(box: string | null, search: string, page: number): FilterOptions {
     const trimmed = search.trim();
-    if (!box && !trimmed) return undefined;
-    return { to: box, search: trimmed || null } as FilterOptions;
+    return { to: box, search: trimmed || null, page, pageSize: this.pageSize };
   }
 
   refreshMail() {
@@ -278,7 +291,7 @@ export class MailComponent {
     this.router.navigate(['mail', mail.id]);
   }
   deleteBox(email: string) {
-    this.mailService.deleteBoxes({ to: email } as FilterOptions).subscribe(() => {
+    this.mailService.deleteBoxes({ to: email, search: null, page: 1, pageSize: this.pageSize }).subscribe(() => {
       this.refreshMail();
     });
   }
@@ -289,7 +302,6 @@ export class MailComponent {
     let mailboxPath: string | undefined;
 
     if (mailboxGroups) {
-      // Look through all groups to find the mailbox with this name
       for (const group of mailboxGroups) {
         const mailbox = group.mailBoxes.find((mb: MailBox) => mb.name === mailboxName);
         if (mailbox) {
@@ -300,10 +312,10 @@ export class MailComponent {
     }
 
     this.mailService.markAllAsRead(mailboxPath).subscribe({
-      next: (response) => {
-        console.log(response.message);
+      next: () => {
         // Refresh mail data to update unread counts
         this.refreshMail();
+        this.fetchEmails();
       },
       error: (error) => {
         console.error('Error marking emails as read:', error);
@@ -313,10 +325,8 @@ export class MailComponent {
 
   toggleSort(column: SortColumn) {
     if (this.sortColumn() === column) {
-      // Toggle direction if same column
       this.sortDirection.set(this.sortDirection() === 'asc' ? 'desc' : 'asc');
     } else {
-      // New column, default to ascending (except for dates which default to descending)
       this.sortColumn.set(column);
       this.sortDirection.set(column === 'createdOn' ? 'desc' : 'asc');
     }
@@ -325,12 +335,14 @@ export class MailComponent {
   nextPage() {
     if (this.currentPage() < this.totalPages()) {
       this.currentPage.update((page) => page + 1);
+      this.fetchEmails();
     }
   }
 
   previousPage() {
     if (this.currentPage() > 1) {
       this.currentPage.update((page) => page - 1);
+      this.fetchEmails();
     }
   }
 
@@ -348,21 +360,22 @@ export class MailComponent {
     this.closeMobileMenu();
   }
   mailSettingsClick() {
-    MailSettingsModalComponent.show(this.modalContainerService);
+    // Refresh the sidebar when the settings modal closes so group create/delete
+    // and retention changes are reflected without a hard reload.
+    MailSettingsModalComponent.show(this.modalContainerService).onClose.subscribe(() => {
+      this.refreshMail();
+    });
   }
   private updateLastSeen(box: string | null) {
     if (!box) return; // Don't track "Show All"
 
-    // Find the mailgroup path for this box
     const mailGroups = this.mailGroups();
     if (!mailGroups) return;
 
-    // Find matching mailgroup by looking for one that would contain this email address
     const matchingGroup = mailGroups.find((group) => {
       const mailboxes = this.mailboxes();
       if (!mailboxes) return false;
 
-      // Look for this box in any group and check if it matches the mailgroup path
       for (const mbGroup of mailboxes) {
         const foundBox = mbGroup.mailBoxes.find((mb) => mb.name === box);
         if (foundBox && foundBox.path === group.path) {

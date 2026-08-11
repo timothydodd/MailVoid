@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace MailVoidApi.Middleware;
 
 public class RequestLoggingMiddleware
@@ -25,10 +27,12 @@ public class RequestLoggingMiddleware
         var startTime = DateTime.UtcNow;
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
+        var redactedQuery = RedactQueryString(request.QueryString);
+
         _logger.LogInformation("HTTP {Method} {Path}{Query} started - User: {User}, IP: {IP}, UserAgent: {UserAgent}",
             request.Method,
             request.Path,
-            request.QueryString,
+            redactedQuery,
             context.User?.Identity?.Name ?? "Anonymous",
             GetClientIpAddress(context),
             request.Headers.UserAgent.ToString());
@@ -47,11 +51,23 @@ public class RequestLoggingMiddleware
             _logger.Log(logLevel, "HTTP {Method} {Path}{Query} completed - Status: {StatusCode}, Duration: {Duration}ms, User: {User}",
                 request.Method,
                 request.Path,
-                request.QueryString,
+                redactedQuery,
                 response.StatusCode,
                 stopwatch.ElapsedMilliseconds,
                 context.User?.Identity?.Name ?? "Anonymous");
         }
+    }
+
+    private static string RedactQueryString(QueryString queryString)
+    {
+        if (!queryString.HasValue)
+            return string.Empty;
+
+        return Regex.Replace(
+            queryString.Value!,
+            @"([?&](?:api_key|access_token)=)[^&]*",
+            "$1***",
+            RegexOptions.IgnoreCase);
     }
 
     private static bool ShouldSkipLogging(PathString path)

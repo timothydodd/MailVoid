@@ -104,6 +104,11 @@ ClientBin
 ~$*
 *.dbmdl
 
+# Local SQLite databases (contain real captured emails / user data)
+mailvoid.db
+mailvoid.db-shm
+mailvoid.db-wal
+
 *.[Pp]ublish.xml
 
 Generated_Code #added for RIA/Silverlight projects

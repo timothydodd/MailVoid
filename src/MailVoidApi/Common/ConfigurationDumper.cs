@@ -31,7 +31,7 @@ public static class ConfigurationDumper
                          kvp.Key.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
                          kvp.Key.Contains("Key", StringComparison.OrdinalIgnoreCase))
                 {
-                    value = value.Length <= 8 ? "***" : value.Substring(0, 4) + "***" + value.Substring(value.Length - 4);
+                    value = "***";
                 }
             }
             Console.WriteLine($"  {kvp.Key} = {value}");

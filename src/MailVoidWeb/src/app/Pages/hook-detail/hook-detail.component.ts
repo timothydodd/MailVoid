@@ -11,7 +11,7 @@ import { WebhookDetail, WebhookService } from '../../_services/api/webhook.servi
   standalone: true,
   imports: [CommonModule, LucideDynamicIcon],
   templateUrl: './hook-detail.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './hook-detail.component.scss',
 })
 export class HookDetailComponent {

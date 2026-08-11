@@ -12,11 +12,12 @@ public class DiagnosticsService : BackgroundService
 
     public DiagnosticsService(
         ILogger<DiagnosticsService> logger,
-        HttpClient httpClient,
+        IHttpClientFactory httpClientFactory,
         IOptions<MailVoidApiOptions> apiOptions)
     {
         _logger = logger;
-        _httpClient = httpClient;
+        _httpClient = httpClientFactory.CreateClient();
+        _httpClient.Timeout = TimeSpan.FromSeconds(15);
         _apiOptions = apiOptions.Value;
     }
 

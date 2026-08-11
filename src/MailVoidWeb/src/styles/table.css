@@ -204,3 +204,13 @@ td.status-offline {
         max-width: 150px;
     }
 }
+/* Shared empty/loading/error row status for list tables (mail, hooks). */
+.table-status {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--muted, #888);
+}
+
+.table-status-error {
+    color: var(--danger, #dc3545);
+}

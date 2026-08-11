@@ -1,21 +1,19 @@
 import {
-  HTTP_INTERCEPTORS,
   HttpErrorResponse,
   HttpEvent,
   HttpHandler,
   HttpInterceptor,
   HttpRequest,
 } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, catchError, filter, Observable, switchMap, take, throwError } from 'rxjs';
+import { inject, Injectable } from '@angular/core';
+import { Router } from '@angular/router';
+import { catchError, from, Observable, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth-service';
 
 @Injectable()
 export class JwtInterceptor implements HttpInterceptor {
-  private isRefreshing = false;
-  private refreshTokenSubject: BehaviorSubject<string | null> = new BehaviorSubject<string | null>(null);
-
-  constructor(private authService: AuthService) {}
+  private authService = inject(AuthService);
+  private router = inject(Router);
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     // Skip token attachment and 401 handling for auth endpoints
@@ -24,15 +22,10 @@ export class JwtInterceptor implements HttpInterceptor {
       request.url.includes('/auth/refresh') ||
       request.url.includes('/auth/logout')
     ) {
-      return next.handle(request).pipe(
-        catchError((error) => {
-          return this.handleError(error);
-        })
-      );
+      return next.handle(request).pipe(catchError((error) => this.handleError(error)));
     }
 
     const token = this.authService.getToken();
-
     if (token) {
       request = this.addTokenToRequest(request, token);
     }
@@ -42,7 +35,6 @@ export class JwtInterceptor implements HttpInterceptor {
         if (error instanceof HttpErrorResponse && error.status === 401) {
           return this.handle401Error(request, next);
         }
-
         return this.handleError(error);
       })
     );
@@ -57,80 +49,42 @@ export class JwtInterceptor implements HttpInterceptor {
   }
 
   private handle401Error(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Don't try to refresh if we don't have tokens
-    if (!this.authService.getToken() || !this.authService.getRefreshToken()) {
-      this.authService.clearAuthState();
+    // No access token to refresh with - bail out to the login page. (The refresh
+    // token itself is an httpOnly cookie the browser attaches automatically.)
+    if (!this.authService.getToken()) {
+      this.forceLogin();
       return throwError(() => 'No valid tokens available');
     }
 
-    if (!this.isRefreshing) {
-      this.isRefreshing = true;
-      this.refreshTokenSubject.next(null);
+    // Single refresh mechanism lives in AuthService; concurrent 401s share it.
+    return from(this.authService.refreshToken()).pipe(
+      switchMap((token) => {
+        if (token) {
+          return next.handle(this.addTokenToRequest(request, token));
+        }
+        this.forceLogin();
+        return throwError(() => 'Session expired. Please log in again.');
+      })
+    );
+  }
 
-      return new Observable((observer) => {
-        this.authService
-          .refreshToken()
-          .then((token) => {
-            if (token) {
-              this.refreshTokenSubject.next(token);
-              observer.next(null);
-              observer.complete();
-            } else {
-              this.authService.clearAuthState();
-              observer.error('Token refresh failed');
-            }
-          })
-          .catch((error) => {
-            observer.error(error);
-          })
-          .finally(() => {
-            this.isRefreshing = false;
-          });
-      }).pipe(
-        switchMap(() => {
-          const newToken = this.authService.getToken();
-          if (newToken) {
-            return next.handle(this.addTokenToRequest(request, newToken));
-          } else {
-            return throwError(() => 'No token available after refresh');
-          }
-        })
-      );
-    } else {
-      return this.refreshTokenSubject.pipe(
-        filter((token) => token !== null),
-        take(1),
-        switchMap((token) => {
-          return next.handle(this.addTokenToRequest(request, token!));
-        })
-      );
-    }
+  private forceLogin(): void {
+    this.authService.clearAuthState();
+    this.router.navigate(['/login']);
   }
 
   private handleError(err: any): Observable<never> {
-    let error = '';
-    if (err) {
-      if (err.error) {
-        const val = err.error as ValidationError;
-        if (val && val.errors) {
-          return throwError(() => val);
-        }
-      }
-      if (err.message) {
-        error = err.message;
-      } else if (err.error && err.error.message) {
-        error = err.error.message || err.statusText;
-      }
+    // Preserve structured validation errors for form consumers.
+    const val = err?.error as ValidationError | undefined;
+    if (val && val.errors) {
+      return throwError(() => val);
     }
-    return throwError(() => error);
+    // Otherwise pass the original error through so genuine failures (500s, network
+    // errors, timeouts) remain distinguishable from auth failures at the call site.
+    return throwError(() => err);
   }
 }
 
-export const JwtInterceptorProvider = {
-  provide: HTTP_INTERCEPTORS,
-  useClass: JwtInterceptor,
-  multi: true,
-};
 export interface ValidationError {
   message: string;
   errors: FieldError[];

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace MailVoidSmtpServer.Models;
 
@@ -8,23 +9,17 @@ public class QueuedEmail
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public EmailWebhookData EmailData { get; set; } = new();
     public DateTime QueuedAt { get; set; } = DateTime.UtcNow;
-    public int ProcessingAttempts { get; set; } = 0;
+    public int Attempts { get; set; }
     public DateTime? LastAttemptAt { get; set; }
     public string? LastError { get; set; }
-    public bool IsProcessing { get; set; }
-    public int Priority { get; set; } = 0; // Higher number = higher priority
-}
 
-public class OutboundQueueItem
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public EmailWebhookData EmailData { get; set; } = new();
-    public DateTime QueuedAt { get; set; } = DateTime.UtcNow;
-    public int RetryAttempts { get; set; } = 0;
+    // Absolute path of the on-disk spool file backing this item. Not serialized into the file itself.
+    [JsonIgnore]
+    public string? SpoolPath { get; set; }
+
+    // In-memory retry scheduling; recovered items simply retry immediately after a restart.
+    [JsonIgnore]
     public DateTime? NextRetryAt { get; set; }
-    public string? LastError { get; set; }
-    public bool IsProcessing { get; set; }
-    public int Priority { get; set; } = 0;
 }
 
 public class EmailWebhookData
@@ -39,6 +34,7 @@ public class EmailWebhookData
     public string? MessageId { get; set; }
     public DateTime Date { get; set; }
     public string RawEmail { get; set; } = "";
+    public bool ParseFailed { get; set; }
 }
 
 public class AttachmentData

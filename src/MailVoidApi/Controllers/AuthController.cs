@@ -3,6 +3,7 @@ using MailVoidApi.Services;
 using MailVoidWeb.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Controllers;
@@ -17,6 +18,12 @@ public class AuthController : Controller
     private readonly RefreshTokenService _refreshTokenService;
     private readonly IConfiguration _configuration;
 
+    // The refresh token is delivered as an httpOnly cookie so it is never readable
+    // from JavaScript (XSS-safe). Scoped to /api/auth so it only rides along on the
+    // refresh/logout/revoke calls, not on every API request.
+    private const string RefreshTokenCookieName = "refreshToken";
+    private const string RefreshTokenCookiePath = "/api/auth";
+
     public AuthController(IDatabaseService db, AuthService authService, PasswordService passwordService, RefreshTokenService refreshTokenService, IConfiguration configuration)
     {
         _db = db;
@@ -25,7 +32,37 @@ public class AuthController : Controller
         _refreshTokenService = refreshTokenService;
         _configuration = configuration;
     }
+
+    private CookieOptions BuildRefreshCookieOptions(DateTimeOffset expires)
+    {
+        // Defaults suit a cross-origin SPA over HTTPS (SameSite=None requires Secure).
+        // For a same-origin deployment set JwtSettings:RefreshTokenCookieSameSite=Lax.
+        var sameSiteSetting = _configuration.GetValue<string>("JwtSettings:RefreshTokenCookieSameSite") ?? "None";
+        var sameSite = Enum.TryParse<SameSiteMode>(sameSiteSetting, ignoreCase: true, out var parsed) ? parsed : SameSiteMode.None;
+        var secure = _configuration.GetValue<bool?>("JwtSettings:RefreshTokenCookieSecure") ?? true;
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = secure,
+            SameSite = sameSite,
+            Path = RefreshTokenCookiePath,
+            Expires = expires,
+            IsEssential = true
+        };
+    }
+
+    private void SetRefreshTokenCookie(string token)
+    {
+        var expiryDays = _configuration.GetValue<int>("JwtSettings:RefreshTokenExpiryDays", 30);
+        Response.Cookies.Append(RefreshTokenCookieName, token, BuildRefreshCookieOptions(DateTimeOffset.UtcNow.AddDays(expiryDays)));
+    }
+
+    private void DeleteRefreshTokenCookie()
+    {
+        Response.Cookies.Append(RefreshTokenCookieName, string.Empty, BuildRefreshCookieOptions(DateTimeOffset.UnixEpoch));
+    }
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -38,11 +75,11 @@ public class AuthController : Controller
 
         var token = _authService.GenerateJwtToken(user);
         var refreshToken = await _refreshTokenService.CreateRefreshTokenAsync(user.Id);
+        SetRefreshTokenCookie(refreshToken.Token);
 
         return Ok(new LoginResponse
         {
             AccessToken = token,
-            RefreshToken = refreshToken.Token,
             ExpiresIn = _configuration.GetValue<int>("JwtSettings:ExpiryMinutes", 30) * 60
         });
     }
@@ -106,7 +143,28 @@ public class AuthController : Controller
             return BadRequest("Invalid access token");
         }
 
-        if (!await _refreshTokenService.ValidateRefreshTokenAsync(request.RefreshToken))
+        // Prefer the httpOnly cookie; fall back to the request body for transitional
+        // clients that still send the token inline.
+        var refreshTokenValue = Request.Cookies[RefreshTokenCookieName];
+        if (string.IsNullOrEmpty(refreshTokenValue))
+        {
+            refreshTokenValue = request.RefreshToken;
+        }
+        if (string.IsNullOrEmpty(refreshTokenValue))
+        {
+            return Unauthorized("Invalid refresh token");
+        }
+
+        // GetRefreshTokenAsync only returns non-revoked tokens, so a previously used/rotated
+        // (and therefore revoked) token cannot be reused here.
+        var storedToken = await _refreshTokenService.GetRefreshTokenAsync(refreshTokenValue);
+        if (storedToken == null || storedToken.ExpiryDate <= DateTime.UtcNow)
+        {
+            return Unauthorized("Invalid refresh token");
+        }
+
+        // Bind the refresh token to the user identified by the (expired) access token.
+        if (storedToken.UserId != userId.Value)
         {
             return Unauthorized("Invalid refresh token");
         }
@@ -119,13 +177,13 @@ public class AuthController : Controller
         }
 
         // Rotate refresh token
-        var newRefreshToken = await _refreshTokenService.RotateRefreshTokenAsync(request.RefreshToken, user.Id);
+        var newRefreshToken = await _refreshTokenService.RotateRefreshTokenAsync(refreshTokenValue, user.Id);
         var newAccessToken = _authService.GenerateJwtToken(user);
+        SetRefreshTokenCookie(newRefreshToken.Token);
 
         return Ok(new LoginResponse
         {
             AccessToken = newAccessToken,
-            RefreshToken = newRefreshToken.Token,
             ExpiresIn = _configuration.GetValue<int>("JwtSettings:ExpiryMinutes", 30) * 60
         });
     }
@@ -133,7 +191,31 @@ public class AuthController : Controller
     [HttpPost("revoke")]
     public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequest request)
     {
-        await _refreshTokenService.RevokeRefreshTokenAsync(request.RefreshToken);
+        var userId = _authService.GetUserIdFromPrincipal(User);
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var refreshTokenValue = Request.Cookies[RefreshTokenCookieName];
+        if (string.IsNullOrEmpty(refreshTokenValue))
+        {
+            refreshTokenValue = request.RefreshToken;
+        }
+        if (string.IsNullOrEmpty(refreshTokenValue))
+        {
+            return BadRequest("No refresh token supplied");
+        }
+
+        // Only allow a user to revoke their own refresh tokens.
+        var storedToken = await _refreshTokenService.GetRefreshTokenAsync(refreshTokenValue);
+        if (storedToken != null && storedToken.UserId != userId.Value)
+        {
+            return Forbid();
+        }
+
+        await _refreshTokenService.RevokeRefreshTokenAsync(refreshTokenValue);
+        DeleteRefreshTokenCookie();
         return Ok();
     }
 
@@ -145,6 +227,7 @@ public class AuthController : Controller
         {
             await _refreshTokenService.RevokeAllUserRefreshTokensAsync(userId.Value);
         }
+        DeleteRefreshTokenCookie();
         return Ok();
     }
 
@@ -168,17 +251,18 @@ public class UserResponse
 public class LoginResponse
 {
     public required string AccessToken { get; set; }
-    public required string RefreshToken { get; set; }
     public int ExpiresIn { get; set; }
 }
 
 public class RefreshTokenRequest
 {
     public required string AccessToken { get; set; }
-    public required string RefreshToken { get; set; }
+    // Refresh token now arrives via the httpOnly cookie; kept optional for transitional clients.
+    public string? RefreshToken { get; set; }
 }
 
 public class RevokeTokenRequest
 {
-    public required string RefreshToken { get; set; }
+    // Optional: the httpOnly cookie is used when present.
+    public string? RefreshToken { get; set; }
 }

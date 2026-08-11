@@ -9,6 +9,9 @@ namespace MailVoidSmtpServer.Services;
 
 public class MailForwardingService
 {
+    private const int MaxErrorBodyChars = 2048;
+    private const int MaxTransientRetries = 2;
+
     private readonly HttpClient _httpClient;
     private readonly ILogger<MailForwardingService> _logger;
     private readonly MailVoidApiOptions _options;
@@ -33,91 +36,125 @@ public class MailForwardingService
             return false;
         }
 
-        var mailData = ConvertToMailData(emailData);
-        var json = JsonSerializer.Serialize(mailData);
+        var recipients = emailData.To.Count > 0 ? emailData.To : new List<string> { "" };
 
         var allSucceeded = true;
-        foreach (var target in enabledTargets)
+        // The API keys the inbox off a single recipient, so fan out one webhook per envelope
+        // recipient. BCC and multi-recipient mail therefore lands in every correct inbox.
+        foreach (var recipient in recipients)
         {
-            var ok = await ForwardToTargetAsync(target, emailData, json, cancellationToken);
-            if (!ok)
+            var payload = JsonSerializer.Serialize(ConvertToMailData(emailData, recipient));
+            foreach (var target in enabledTargets)
             {
-                allSucceeded = false;
+                var ok = await ForwardToTargetAsync(target, emailData, recipient, payload, cancellationToken);
+                if (!ok)
+                {
+                    allSucceeded = false;
+                }
             }
         }
 
-        // Returning false triggers a retry of the whole message against all targets.
-        // That can cause duplicates on already-succeeded targets — accept that for now;
-        // the alternative is per-target persistence in the queue.
+        // Returning false retries the whole message against all targets/recipients, which can
+        // duplicate already-succeeded deliveries — accepted for now (a dev tool tolerates dupes).
         return allSucceeded;
     }
 
     private async Task<bool> ForwardToTargetAsync(
         MailVoidApiTarget target,
         EmailWebhookData emailData,
+        string recipient,
         string payload,
         CancellationToken cancellationToken)
     {
         var url = $"{target.BaseUrl.TrimEnd('/')}{target.WebhookEndpoint}";
 
+        for (var attempt = 1; attempt <= MaxTransientRetries; attempt++)
+        {
+            try
+            {
+                _logger.LogInformation("🚀 [{Target}] Forwarding email from {From} to {To} via {Url} (attempt {Attempt})",
+                    target.Name, emailData.From, recipient, url, attempt);
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                };
+
+                if (!string.IsNullOrEmpty(target.ApiKey))
+                {
+                    request.Headers.Authorization = new AuthenticationHeaderValue("ApiKey", target.ApiKey);
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ [{Target}] No API key configured", target.Name);
+                }
+
+                var response = await _httpClient.SendAsync(request, cancellationToken);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("✅ [{Target}] Forwarded - Status: {StatusCode}, From: {From}, To: {To}",
+                        target.Name, response.StatusCode, emailData.From, recipient);
+                    return true;
+                }
+
+                var responseBody = await ReadCappedAsync(response, cancellationToken);
+                _logger.LogError("❌ [{Target}] Failed - Status: {StatusCode}, URL: {Url}, Response: {Response}",
+                    target.Name, response.StatusCode, url, responseBody);
+
+                // Retry only server-side (5xx) failures; client errors won't succeed on retry.
+                if ((int)response.StatusCode < 500 || attempt == MaxTransientRetries)
+                {
+                    return false;
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "🔌 [{Target}] Network error - URL: {Url} (attempt {Attempt})", target.Name, url, attempt);
+                if (attempt == MaxTransientRetries)
+                {
+                    return false;
+                }
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError(ex, "⏰ [{Target}] Timeout - URL: {Url} (attempt {Attempt})", target.Name, url, attempt);
+                if (attempt == MaxTransientRetries)
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💥 [{Target}] Unexpected error - URL: {Url}", target.Name, url);
+                return false;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt), cancellationToken);
+        }
+
+        return false;
+    }
+
+    private static async Task<string> ReadCappedAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
         try
         {
-            _logger.LogInformation("🚀 [{Target}] Forwarding email from {From} to {To} via {Url}",
-                target.Name, emailData.From, string.Join(", ", emailData.To), url);
-
-            using var request = new HttpRequestMessage(HttpMethod.Post, url)
-            {
-                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
-            };
-
-            if (!string.IsNullOrEmpty(target.ApiKey))
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("ApiKey", target.ApiKey);
-            }
-            else
-            {
-                _logger.LogWarning("⚠️ [{Target}] No API key configured", target.Name);
-            }
-
-            var response = await _httpClient.SendAsync(request, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-            {
-                _logger.LogInformation("✅ [{Target}] Forwarded - Status: {StatusCode}, From: {From}, Subject: {Subject}",
-                    target.Name, response.StatusCode, emailData.From, emailData.Subject ?? "(no subject)");
-                return true;
-            }
-
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogError("❌ [{Target}] Failed - Status: {StatusCode}, URL: {Url}, Response: {Response}",
-                target.Name, response.StatusCode, url, responseBody);
-            return false;
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return body.Length <= MaxErrorBodyChars ? body : body[..MaxErrorBodyChars] + "…(truncated)";
         }
-        catch (HttpRequestException ex)
+        catch
         {
-            _logger.LogError(ex, "🔌 [{Target}] Network error - URL: {Url}, Error: {Error}",
-                target.Name, url, ex.Message);
-            return false;
-        }
-        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
-        {
-            _logger.LogError(ex, "⏰ [{Target}] Timeout - URL: {Url}", target.Name, url);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "💥 [{Target}] Unexpected error - URL: {Url}, Error: {Error}",
-                target.Name, url, ex.Message);
-            return false;
+            return "(unreadable response body)";
         }
     }
 
-    private MailData ConvertToMailData(EmailWebhookData emailData)
+    private MailData ConvertToMailData(EmailWebhookData emailData, string recipient)
     {
-        var mailData = new MailData
+        return new MailData
         {
             From = emailData.From,
-            To = emailData.To.FirstOrDefault() ?? "",
+            To = recipient,
             Headers = emailData.Headers,
             Html = emailData.Html,
             Text = emailData.Text,
@@ -130,13 +167,7 @@ public class MailForwardingService
                 Content = a.Content
             }).ToList()
         };
-
-        _logger.LogDebug("Converted email data - From: {From}, To: {To}, Has HTML: {HasHtml}, Has Text: {HasText}, Attachments: {AttachmentCount}",
-            mailData.From, mailData.To, !string.IsNullOrEmpty(mailData.Html), !string.IsNullOrEmpty(mailData.Text), mailData.Attachments?.Count ?? 0);
-
-        return mailData;
     }
-
 
     // MailData class for API compatibility
     public class MailData

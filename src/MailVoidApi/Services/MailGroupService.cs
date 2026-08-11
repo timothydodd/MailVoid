@@ -88,7 +88,21 @@ public class MailGroupService : IMailGroupService
             Description = $"Auto-generated group for {subdomain} subdomain"
         };
 
-        await db.InsertAsync(newGroup);
+        try
+        {
+            await db.InsertAsync(newGroup);
+        }
+        catch (Exception ex)
+        {
+            // Lost a race with a concurrent insert (unique Subdomain index); re-fetch the winner.
+            var raced = await db.SingleAsync<MailGroup>(mg => mg.Subdomain == subdomain);
+            if (raced != null)
+            {
+                return raced;
+            }
+            _logger.LogError(ex, "Failed to create mail group for subdomain: {Subdomain}", subdomain);
+            throw;
+        }
 
         _logger.LogInformation("Created new mail group for subdomain: {Subdomain}", subdomain);
         return newGroup;

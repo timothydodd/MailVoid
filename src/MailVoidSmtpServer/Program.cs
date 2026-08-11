@@ -13,29 +13,14 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
-        // Check if running password hash utility
-        if (args.Length > 0 && args[0] == "hash-password")
-        {
-            Utils.PasswordHasher.GeneratePasswordHash(args);
-            return;
-        }
-
-        // Debug environment variables before anything else
-        Console.WriteLine($"ASPNETCORE_ENVIRONMENT from system: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
-
         var host = CreateHostBuilder(args).Build();
         await host.RunAsync();
     }
 
     public static IHostBuilder CreateHostBuilder(string[] args) =>
+        // Host.CreateDefaultBuilder already loads appsettings.json + appsettings.{Environment}.json
+        // + user secrets (Development) + environment variables + command line, in the correct order.
         Host.CreateDefaultBuilder(args)
-            .ConfigureAppConfiguration((context, config) =>
-            {
-                config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-                config.AddEnvironmentVariables();
-                config.AddUserSecrets<Program>(optional: true);
-
-            })
             .ConfigureServices((hostContext, services) =>
             {
                 services.Configure<SmtpServerOptions>(hostContext.Configuration.GetSection("SmtpServer"));
@@ -45,8 +30,11 @@ public class Program
                 services.Configure<MailboxFilterOptions>(hostContext.Configuration.GetSection("MailboxFilter"));
                 services.Configure<LetsEncryptOptions>(hostContext.Configuration.GetSection("LetsEncrypt"));
 
-                services.AddHttpClient<MailForwardingService>();
-                services.AddHttpClient<DiagnosticsService>();
+                services.AddHttpClient<MailForwardingService>(client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(30);
+                });
+                services.AddHttpClient(); // IHttpClientFactory for DiagnosticsService
                 services.AddTransient<IMessageStore, MailMessageStore>();
                 services.AddSingleton<ILetsEncryptService, LetsEncryptService>();
                 services.AddSingleton<ICertificateService, CertificateService>();
@@ -60,43 +48,16 @@ public class Program
                 services.AddSingleton<NoAuthenticator>();
                 services.AddSingleton<IUserAuthenticator>(provider => provider.GetRequiredService<NoAuthenticator>());
 
-                // Queue services
-                services.AddSingleton<IInboundEmailQueueService, InboundEmailQueueService>();
-                services.AddSingleton<IOutboundEmailQueueService, OutboundEmailQueueService>();
-                
-                // Background services
-                services.AddHostedService<SmtpServerHostedService>();
+                // Single durable, disk-backed queue.
+                services.AddSingleton<IEmailQueueService, EmailSpoolQueue>();
+
+                // Background services. Let's Encrypt is registered first so cert acquisition kicks off
+                // early; it runs in the background and re-binds the SMTP server once a cert is available.
                 services.AddHostedService<LetsEncryptHostedService>();
-                services.AddHostedService<InboundEmailProcessorService>();
-                services.AddHostedService<OutboundEmailProcessorService>();
+                services.AddHostedService<SmtpServerHostedService>();
+                services.AddHostedService<EmailProcessorService>();
                 services.AddHostedService<QueueMonitoringService>();
                 services.AddHostedService<DiagnosticsService>();
-
-                // Debug configuration loading
-                var configuration = hostContext.Configuration;
-                Console.WriteLine($"\n=== CONFIGURATION DEBUG ===");
-                Console.WriteLine($"Environment: {hostContext.HostingEnvironment.EnvironmentName}");
-                Console.WriteLine($"IsDevelopment: {hostContext.HostingEnvironment.IsDevelopment()}");
-                Console.WriteLine($"UserSecretsId: d2ee9be3-64bf-42ea-b392-36fc8ec6bf45");
-
-                // Print some config values to verify loading
-                var smtpConfig = configuration.GetSection("SmtpServer");
-                Console.WriteLine($"SMTP Port from config: {smtpConfig["Port"]}");
-                Console.WriteLine($"SMTP SSL Port from config: {smtpConfig["SslPort"]}");
-
-                var targetsSection = configuration.GetSection("MailVoidApi:Targets");
-                var targets = targetsSection.GetChildren().ToList();
-                Console.WriteLine($"MailVoidApi targets configured: {targets.Count}");
-                foreach (var t in targets)
-                {
-                    var name = t["Name"] ?? "(unnamed)";
-                    var baseUrl = t["BaseUrl"];
-                    var enabled = t["Enabled"] ?? "true";
-                    var key = t["ApiKey"];
-                    var keyDisplay = string.IsNullOrEmpty(key) ? "(empty)" : $"(loaded: {key.Substring(0, Math.Min(10, key.Length))}...)";
-                    Console.WriteLine($"  - [{name}] BaseUrl={baseUrl}, Enabled={enabled}, ApiKey={keyDisplay}");
-                }
-                Console.WriteLine($"=== END CONFIG DEBUG ===\n");
             })
             .ConfigureLogging((context, logging) =>
             {

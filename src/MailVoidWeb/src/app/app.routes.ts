@@ -1,11 +1,5 @@
 import { Routes } from '@angular/router';
 import { adminGuard, authGuard } from './_services/auth.guard';
-import { ErrorPageComponent } from './Pages/error-page/error-page.component';
-import { HookDetailComponent } from './Pages/hook-detail/hook-detail.component';
-import { HooksComponent } from './Pages/hooks/hooks.component';
-import { LoginPageComponent } from './Pages/login-page/login-page.component';
-import { MailDetailComponent } from './Pages/mail-detail/mail-detail.component';
-import { MailComponent } from './Pages/mail/mail.component';
 
 export const routes: Routes = [
   {
@@ -15,27 +9,31 @@ export const routes: Routes = [
   },
   {
     path: 'login',
-    component: LoginPageComponent,
+    loadComponent: () => import('./Pages/login-page/login-page.component').then((m) => m.LoginPageComponent),
   },
   {
     path: 'mail',
-    component: MailComponent,
+    loadComponent: () => import('./Pages/mail/mail.component').then((m) => m.MailComponent),
     canActivate: [authGuard],
   },
   {
     path: 'mail/:id',
-    component: MailDetailComponent,
+    loadComponent: () => import('./Pages/mail-detail/mail-detail.component').then((m) => m.MailDetailComponent),
     canActivate: [authGuard],
   },
   {
     path: 'hooks',
-    component: HooksComponent,
+    loadComponent: () => import('./Pages/hooks/hooks.component').then((m) => m.HooksComponent),
     canActivate: [adminGuard],
   },
   {
     path: 'hooks/:bucket/:id',
-    component: HookDetailComponent,
+    loadComponent: () => import('./Pages/hook-detail/hook-detail.component').then((m) => m.HookDetailComponent),
     canActivate: [adminGuard],
   },
-  { path: 'error/:errorCode', pathMatch: 'full', component: ErrorPageComponent },
+  {
+    path: 'error/:errorCode',
+    pathMatch: 'full',
+    loadComponent: () => import('./Pages/error-page/error-page.component').then((m) => m.ErrorPageComponent),
+  },
 ];

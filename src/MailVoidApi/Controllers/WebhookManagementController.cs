@@ -16,24 +16,33 @@ public class WebhookManagementController : ControllerBase
     private readonly ILogger<WebhookManagementController> _logger;
     private readonly IDatabaseService _db;
     private readonly IUserService _userService;
+    private readonly IWebhookBucketService _bucketService;
 
     public WebhookManagementController(
         ILogger<WebhookManagementController> logger,
         IDatabaseService db,
-        IUserService userService)
+        IUserService userService,
+        IWebhookBucketService bucketService)
     {
         _logger = logger;
         _db = db;
         _userService = userService;
+        _bucketService = bucketService;
     }
 
     [HttpGet("buckets")]
     public async Task<IActionResult> GetBuckets()
     {
+        var currentUserId = _userService.GetUserId();
+        var isAdmin = _userService.IsAdmin();
+
         using var db = await _db.GetConnectionAsync();
         var buckets = await db.SelectAsync<WebhookBucket>();
 
-        var result = buckets.Select(b => new
+        // Only buckets the user owns or has access to (public); admins see all.
+        var result = buckets
+            .Where(b => isAdmin || b.OwnerUserId == currentUserId || b.IsPublic)
+            .Select(b => new
         {
             b.Id,
             b.Name,
@@ -47,6 +56,13 @@ public class WebhookManagementController : ControllerBase
         return Ok(result);
     }
 
+    private async Task<bool> CanAccessBucketAsync(WebhookBucket bucket)
+    {
+        if (_userService.IsAdmin())
+            return true;
+        return await _bucketService.HasUserAccess(bucket.Id, _userService.GetUserId());
+    }
+
     [HttpGet("buckets/{name}")]
     public async Task<IActionResult> GetBucket(string name)
     {
@@ -56,6 +72,11 @@ public class WebhookManagementController : ControllerBase
         if (bucket == null)
         {
             return NotFound();
+        }
+
+        if (!await CanAccessBucketAsync(bucket))
+        {
+            return Forbid();
         }
 
         return Ok(new
@@ -76,12 +97,21 @@ public class WebhookManagementController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
+        // Bound paging inputs.
+        if (page < 1) page = 1;
+        pageSize = Math.Clamp(pageSize, 1, 200);
+
         using var db = await _db.GetConnectionAsync();
 
         var bucket = await db.SingleAsync<WebhookBucket>(b => b.Name == name);
         if (bucket == null)
         {
             return NotFound("Bucket not found");
+        }
+
+        if (!await CanAccessBucketAsync(bucket))
+        {
+            return Forbid();
         }
 
         var offset = (page - 1) * pageSize;
@@ -115,6 +145,12 @@ public class WebhookManagementController : ControllerBase
             return NotFound();
         }
 
+        var bucket = await db.SingleAsync<WebhookBucket>(b => b.Name == webhook.BucketName);
+        if (bucket == null || !await CanAccessBucketAsync(bucket))
+        {
+            return NotFound();
+        }
+
         return Ok(new
         {
             webhook.Id,
@@ -141,6 +177,12 @@ public class WebhookManagementController : ControllerBase
             return NotFound();
         }
 
+        var bucket = await db.SingleAsync<WebhookBucket>(b => b.Name == webhook.BucketName);
+        if (bucket == null || !await CanAccessBucketAsync(bucket))
+        {
+            return NotFound();
+        }
+
         await db.DeleteAsync(webhook);
         return NoContent();
     }
@@ -154,6 +196,11 @@ public class WebhookManagementController : ControllerBase
         if (bucket == null)
         {
             return NotFound();
+        }
+
+        if (!await CanAccessBucketAsync(bucket))
+        {
+            return Forbid();
         }
 
         // Delete all webhooks in the bucket first

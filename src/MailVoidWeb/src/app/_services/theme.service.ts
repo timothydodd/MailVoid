@@ -13,6 +13,13 @@ export class ThemeService {
 
   constructor() {
     this.initializeTheme();
+
+    // Follow the OS preference when the user hasn't explicitly chosen a theme.
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem(this.THEME_KEY)) {
+        this.applyTheme(e.matches ? 'dark' : 'light');
+      }
+    });
   }
 
   private initializeTheme(): void {
@@ -20,13 +27,18 @@ export class ThemeService {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const theme = savedTheme || (prefersDark ? 'dark' : 'light');
 
-    this.setTheme(theme);
+    this.applyTheme(theme);
   }
 
   setTheme(theme: Theme): void {
-    this.themeSignal.set(theme);
     localStorage.setItem(this.THEME_KEY, theme);
+    this.applyTheme(theme);
+  }
+
+  private applyTheme(theme: Theme): void {
+    this.themeSignal.set(theme);
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-bs-theme', theme);
   }
 
   toggleTheme(): void {

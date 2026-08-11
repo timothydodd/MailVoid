@@ -5,31 +5,25 @@
     </div>
     
     <div class="auth-body">
-      <form (ngSubmit)="login()" class="auth-form">
+      <form (submit)="login($event)" class="auth-form">
         <div class="form-group">
           <label for="username">Username</label>
-          <input 
-            type="text" 
+          <input
+            type="text"
             id="username"
-            name="username"
-            [(ngModel)]="username" 
+            [formField]="loginForm.username"
             class="form-control"
-            placeholder="Enter username"
-            [disabled]="loading"
-            required>
+            placeholder="Enter username">
         </div>
         
         <div class="form-group">
           <label for="password">Password</label>
-          <input 
-            type="password" 
+          <input
+            type="password"
             id="password"
-            name="password"
-            [(ngModel)]="password" 
+            [formField]="loginForm.password"
             class="form-control"
-            placeholder="Enter password"
-            [disabled]="loading"
-            required>
+            placeholder="Enter password">
         </div>
         
         @if (error) {

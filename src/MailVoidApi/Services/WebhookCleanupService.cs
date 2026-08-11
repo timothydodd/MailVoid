@@ -68,10 +68,8 @@ public class WebhookCleanupService : BackgroundService
                         "Deleting {Count} webhooks from bucket '{Name}' older than {Days} days",
                         webhooksToDelete.Count, bucket.Name, bucket.RetentionDays);
 
-                    foreach (var webhook in webhooksToDelete)
-                    {
-                        await db.DeleteAsync(webhook);
-                    }
+                    // Single batched delete instead of one round-trip per row.
+                    await db.DeleteAsync<Webhook>(w => w.BucketName == bucket.Name && w.CreatedOn < cutoffDate);
 
                     _logger.LogInformation(
                         "Successfully deleted {Count} webhooks from bucket '{Name}'",

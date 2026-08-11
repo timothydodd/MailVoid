@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using MailVoidApi.Authentication;
 using MailVoidApi.Common;
 using MailVoidApi.Data;
@@ -57,11 +58,21 @@ public class Program
         builder.Services.AddMemoryCache();
         // Register HttpContextAccessor
         builder.Services.AddHttpContextAccessor();
+        // The appsettings.json DefaultConnection is only a placeholder (SQLite default);
+        // supply a real MySQL/SQLite connection string via environment/user-secrets in production.
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
         if (connectionString is null)
         {
             throw new InvalidOperationException("Connection string not found");
+        }
+
+        // Fail fast if the JWT secret is missing or too short instead of a null-deref/500 at login time.
+        var jwtSecret = builder.Configuration["JwtSettings:Secret"];
+        if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "JwtSettings:Secret must be configured and at least 32 characters long.");
         }
 
         // Add OrmLite Database Service
@@ -171,6 +182,30 @@ public class Program
             options.Capacity = 100; // Set a default or load from configuration
         });
 
+        // Rate limiting: strict limiter on login, a looser one on the anonymous webhook capture endpoint.
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            options.AddPolicy("login", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1)
+                    }));
+
+            options.AddPolicy("webhook-capture", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1)
+                    }));
+        });
+
 
         var origins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>();
         if (origins is not null && origins.Length > 0)
@@ -180,10 +215,9 @@ public class Program
                 options.AddPolicy("MailVoidOrigins",
                     policy =>
                     {
-                        policy.WithOrigins(origins) // Specify the allowed domains
+                        policy.WithOrigins(origins) // Only the configured origins are allowed
                                             .AllowAnyHeader()
                                             .AllowAnyMethod()
-                                            .SetIsOriginAllowed(x => true)
                                             .AllowCredentials()
                                             .WithExposedHeaders("X-Total-Count");
                     });
@@ -216,7 +250,23 @@ public class Program
         else
         {
             app.UseMiddleware<ExceptionHandlingMiddleware>();
+            // HSTS is safe to advertise in production. HTTPS redirection is intentionally NOT enabled:
+            // the container is fronted by a proxy and serves plain HTTP inside the cluster.
+            app.UseHsts();
         }
+
+        // Security response headers. A restrictive CSP is applied only to API responses so it
+        // does not break the SPA's own scripts/styles served from the fallback index.html.
+        app.Use(async (context, next) =>
+        {
+            context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            if (context.Request.Path.StartsWithSegments("/api"))
+            {
+                context.Response.Headers["Content-Security-Policy"] =
+                    "default-src 'none'; frame-ancestors 'none'";
+            }
+            await next();
+        });
 
         // Initialize database tables and seed data
         using (var scope = app.Services.CreateScope())
@@ -240,6 +290,8 @@ public class Program
             await dbInitializer.SeedDefaultData();
         }
         app.UseCors("MailVoidOrigins");
+
+        app.UseRateLimiter();
 
         app.UseResponseCaching();
         app.UseResponseCompression();

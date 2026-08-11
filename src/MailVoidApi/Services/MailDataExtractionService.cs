@@ -151,6 +151,11 @@ public class MailDataExtractionService : IMailDataExtractionService
         if (string.IsNullOrEmpty(dateStr))
             return null;
 
+        // Normalize any offset to UTC so CreatedOn is genuinely UTC; assume UTC when no offset is present.
+        const System.Globalization.DateTimeStyles styles =
+            System.Globalization.DateTimeStyles.AdjustToUniversal |
+            System.Globalization.DateTimeStyles.AssumeUniversal;
+
         // Try common date formats
         var formats = new[]
         {
@@ -162,18 +167,28 @@ public class MailDataExtractionService : IMailDataExtractionService
 
         foreach (var format in formats)
         {
-            if (DateTime.TryParseExact(dateStr, format, null, System.Globalization.DateTimeStyles.None, out var date))
+            if (DateTime.TryParseExact(dateStr, format, System.Globalization.CultureInfo.InvariantCulture, styles, out var date))
             {
-                return date;
+                return ClampToReceiptWindow(date);
             }
         }
 
-        if (DateTime.TryParse(dateStr, out var parsedDate))
+        if (DateTime.TryParse(dateStr, System.Globalization.CultureInfo.InvariantCulture, styles, out var parsedDate))
         {
-            return parsedDate;
+            return ClampToReceiptWindow(parsedDate);
         }
 
         return null;
+    }
+
+    // Reject absurd Date headers (far future/past) so a spoofed header cannot skew ordering/retention;
+    // callers fall back to DateTime.UtcNow when this returns null.
+    private static DateTime? ClampToReceiptWindow(DateTime utc)
+    {
+        var now = DateTime.UtcNow;
+        if (utc > now.AddDays(1) || utc < now.AddYears(-10))
+            return null;
+        return utc;
     }
 
     private bool DetectHtmlContent(string content)

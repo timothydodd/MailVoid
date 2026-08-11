@@ -8,6 +8,9 @@ public interface ICertificateService
 {
     X509Certificate2? GetCertificate();
     bool IsCertificateAvailable();
+
+    /// <summary>Clears the cached certificate so the next GetCertificate() reloads from disk (e.g. after renewal).</summary>
+    void Invalidate();
 }
 
 public class CertificateService : ICertificateService
@@ -17,6 +20,7 @@ public class CertificateService : ICertificateService
     private readonly ILetsEncryptService _letsEncryptService;
     private X509Certificate2? _certificate;
     private bool _certificateLoadAttempted = false;
+    private readonly object _lock = new();
 
     public CertificateService(
         ILogger<CertificateService> logger,
@@ -28,7 +32,25 @@ public class CertificateService : ICertificateService
         _letsEncryptService = letsEncryptService;
     }
 
+    public void Invalidate()
+    {
+        lock (_lock)
+        {
+            _certificate = null;
+            _certificateLoadAttempted = false;
+            _logger.LogInformation("Certificate cache invalidated; will reload on next request");
+        }
+    }
+
     public X509Certificate2? GetCertificate()
+    {
+        lock (_lock)
+        {
+            return GetCertificateUnlocked();
+        }
+    }
+
+    private X509Certificate2? GetCertificateUnlocked()
     {
         if (_certificateLoadAttempted)
         {
@@ -86,17 +108,22 @@ public class CertificateService : ICertificateService
 
             if (_certificate != null)
             {
-                _logger.LogInformation("Certificate loaded successfully. Subject: {Subject}, Expires: {Expiry}",
-                    _certificate.Subject, _certificate.NotAfter);
-                
-                // Validate certificate
-                if (_certificate.NotAfter < DateTime.Now)
+                _logger.LogInformation("Certificate loaded successfully. Subject: {Subject}, Expires (UTC): {Expiry}",
+                    _certificate.Subject, _certificate.NotAfter.ToUniversalTime());
+
+                // Never bind an expired certificate.
+                if (IsExpired(_certificate))
                 {
-                    _logger.LogWarning("Certificate has expired on {ExpiryDate}", _certificate.NotAfter);
+                    _logger.LogError("Certificate has expired on {ExpiryDate} (UTC); refusing to use it",
+                        _certificate.NotAfter.ToUniversalTime());
+                    _certificate = null;
+                    return null;
                 }
-                else if (_certificate.NotAfter < DateTime.Now.AddDays(30))
+
+                if (_certificate.NotAfter.ToUniversalTime() < DateTime.UtcNow.AddDays(30))
                 {
-                    _logger.LogWarning("Certificate will expire soon on {ExpiryDate}", _certificate.NotAfter);
+                    _logger.LogWarning("Certificate will expire soon on {ExpiryDate} (UTC)",
+                        _certificate.NotAfter.ToUniversalTime());
                 }
             }
 
@@ -176,6 +203,11 @@ public class CertificateService : ICertificateService
         return GetCertificate() != null;
     }
 
+    private static bool IsExpired(X509Certificate2 certificate)
+    {
+        return certificate.NotAfter.ToUniversalTime() <= DateTime.UtcNow;
+    }
+
     private X509Certificate2? TryGetLetsEncryptCertificate()
     {
         try
@@ -191,6 +223,13 @@ public class CertificateService : ICertificateService
                 
                 if (certificate != null)
                 {
+                    if (IsExpired(certificate))
+                    {
+                        _logger.LogError("Let's Encrypt certificate for {Domain} is expired (NotAfter UTC: {Expiry}); refusing to use it",
+                            _options.LetsEncryptDomain, certificate.NotAfter.ToUniversalTime());
+                        return null;
+                    }
+
                     _logger.LogInformation("Successfully loaded Let's Encrypt certificate for domain: {Domain}", _options.LetsEncryptDomain);
                     return certificate;
                 }

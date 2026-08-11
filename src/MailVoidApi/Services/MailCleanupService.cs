@@ -1,3 +1,4 @@
+using Dapper;
 using MailVoidApi.Data;
 using MailVoidWeb;
 using MailVoidWeb.Data.Models;
@@ -10,6 +11,10 @@ namespace MailVoidApi.Services
         private readonly IDatabaseService _dbService;
         private readonly ILogger<MailCleanupService> _logger;
         private readonly TimeSpan _cleanupInterval = TimeSpan.FromHours(1); // Run every hour
+
+        // Global backstop: mail whose MailGroup was deleted (orphaned) is not covered by any
+        // per-mailbox retention rule, so it would otherwise live forever. Reclaim it after this many days.
+        private const int GlobalOrphanMaxAgeDays = 30;
 
         public MailCleanupService(
             IDatabaseService dbService,
@@ -69,18 +74,9 @@ namespace MailVoidApi.Services
                             "Deleting {Count} emails from mailbox '{Path}' older than {Days} days",
                             emailsToDelete.Count, mailbox.Path, mailbox.RetentionDays);
 
-                        // Delete associated read records first
-                        var mailIds = emailsToDelete.Select(m => m.Id).ToList();
-                        foreach (var mailId in mailIds)
-                        {
-                            await db.DeleteAsync<UserMailRead>(r => r.MailId == mailId);
-                        }
-
-                        // Delete the emails
-                        foreach (var email in emailsToDelete)
-                        {
-                            await db.DeleteAsync(email);
-                        }
+                        // Single batched delete. Associated UserMailRead rows are removed by the
+                        // declared ON DELETE CASCADE (enforced on both MySQL InnoDB and SQLite w/ PRAGMA).
+                        await db.DeleteAsync<Mail>(m => m.MailGroupPath == mailbox.Path && m.CreatedOn < cutoffDate);
 
                         _logger.LogInformation(
                             "Successfully deleted {Count} emails from mailbox '{Path}'",
@@ -95,7 +91,38 @@ namespace MailVoidApi.Services
                 }
             }
 
+            await CleanupOrphanedMail(db, cancellationToken);
+
             _logger.LogInformation("Mail cleanup cycle completed");
+        }
+
+        // Backstop for orphaned mail (MailGroupPath no longer maps to a MailGroup). Such mail is
+        // otherwise unreachable by per-mailbox retention, so delete it once it exceeds the global max age.
+        private async Task CleanupOrphanedMail(System.Data.Common.DbConnection db, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            try
+            {
+                var cutoffDate = DateTime.UtcNow.AddDays(-GlobalOrphanMaxAgeDays);
+                var deleted = await db.ExecuteAsync(
+                    @"DELETE FROM Mail
+                      WHERE CreatedOn < @Cutoff
+                        AND (MailGroupPath IS NULL
+                             OR NOT EXISTS (SELECT 1 FROM MailGroup mg WHERE mg.Path = Mail.MailGroupPath))",
+                    new { Cutoff = cutoffDate });
+
+                if (deleted > 0)
+                {
+                    _logger.LogInformation(
+                        "Deleted {Count} orphaned emails older than {Days} days", deleted, GlobalOrphanMaxAgeDays);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up orphaned mail");
+            }
         }
     }
 }

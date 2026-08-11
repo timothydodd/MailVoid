@@ -39,7 +39,8 @@ public class AuthService
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var now = DateTime.UtcNow.Subtract(new TimeSpan(0, 10, 0));
+        // Rely on TokenValidationParameters.ClockSkew for clock differences rather than backdating notBefore.
+        var now = DateTime.UtcNow;
         var expiry = now.AddMinutes(expiryMinutes);
 
         // Create claims

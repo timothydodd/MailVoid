@@ -16,7 +16,7 @@ public class MailGroup
     [Index("IX_MailGroup_Path")]
     public string? Path { get; set; }
 
-    [Index("IX_MailGroup_Subdomain")]
+    [Index("IX_MailGroup_Subdomain", IsUnique = true)]
     public string? Subdomain { get; set; }
 
     public string? Description { get; set; }

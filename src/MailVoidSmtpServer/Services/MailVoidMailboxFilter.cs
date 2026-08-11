@@ -11,11 +11,17 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
 {
     private readonly ILogger<MailVoidMailboxFilter> _logger;
     private readonly MailboxFilterOptions _options;
+    private readonly int _maxMessageSize;
 
-    public MailVoidMailboxFilter(ILogger<MailVoidMailboxFilter> logger, IOptions<MailboxFilterOptions> options)
+    public MailVoidMailboxFilter(
+        ILogger<MailVoidMailboxFilter> logger,
+        IOptions<MailboxFilterOptions> options,
+        IOptions<SmtpServerOptions> smtpOptions)
     {
         _logger = logger;
         _options = options.Value;
+        // Single source of truth for the size limit: the server-level SmtpServer:MaxMessageSize.
+        _maxMessageSize = smtpOptions.Value.MaxMessageSize;
     }
 
     /// <summary>
@@ -55,10 +61,10 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
             return Task.FromResult(false);
         }
 
-        // Check message size limits
-        if (size > _options.MaxMessageSizeBytes)
+        // Advisory MAIL FROM SIZE check; the authoritative limit is enforced by the server itself.
+        if (size > _maxMessageSize)
         {
-            _logger.LogWarning("Rejected email exceeding size limit. Size: {Size}, Max: {MaxSize}", size, _options.MaxMessageSizeBytes);
+            _logger.LogWarning("Rejected email exceeding size limit. Size: {Size}, Max: {MaxSize}", size, _maxMessageSize);
             return Task.FromResult(false);
         }
 
@@ -124,7 +130,7 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
         return this;
     }
 
-    private string GetDomainFromEmail(string email)
+    internal static string GetDomainFromEmail(string email)
     {
         var atIndex = email.LastIndexOf('@');
         return atIndex >= 0 ? email.Substring(atIndex + 1) : string.Empty;
@@ -134,7 +140,7 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
     /// Checks if a domain is allowed, supporting subdomain matching.
     /// If "mailvoid.com" is in the allowed list, "subdomain.mailvoid.com" will also be allowed.
     /// </summary>
-    private bool IsAllowedDomain(string domainToCheck, IEnumerable<string> allowedDomains)
+    internal static bool IsAllowedDomain(string domainToCheck, IEnumerable<string> allowedDomains)
     {
         if (string.IsNullOrWhiteSpace(domainToCheck))
             return false;
@@ -147,19 +153,14 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
             // Exact match (case-insensitive)
             if (domainToCheck.Equals(allowedDomain, StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogDebug("Domain allowed by exact match: {Domain} matches {AllowedDomain}", 
-                    domainToCheck, allowedDomain);
                 return true;
             }
 
-            // Subdomain match: check if domainToCheck ends with "." + allowedDomain
-            // This ensures "subdomain.mailvoid.com" matches "mailvoid.com" 
-            // but prevents "notmailvoid.com" from matching "mailvoid.com"
+            // Subdomain match: "subdomain.mailvoid.com" matches "mailvoid.com" but
+            // "notmailvoid.com" does not - this prevents open-relay via lookalike domains.
             var domainSuffix = "." + allowedDomain;
             if (domainToCheck.EndsWith(domainSuffix, StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogDebug("Domain allowed by subdomain match: {Domain} is subdomain of {AllowedDomain}", 
-                    domainToCheck, allowedDomain);
                 return true;
             }
         }
@@ -167,7 +168,7 @@ public class MailVoidMailboxFilter : IMailboxFilter, IMailboxFilterFactory
         return false;
     }
 
-    private bool IsValidEmailFormat(string email)
+    internal static bool IsValidEmailFormat(string email)
     {
         if (string.IsNullOrWhiteSpace(email))
             return false;

@@ -1,6 +1,6 @@
 
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { form, required, minLength, pattern, FormField } from '@angular/forms/signals';
 import { ConfirmDialogService } from '@rd-ui';
 import { CreateUserRequest, Role, UpdateUserRoleRequest, User } from '../../_models/user.model';
 import { AuthService } from '../../_services/auth-service';
@@ -8,20 +8,20 @@ import { UserManagementService } from '../../_services/user-management.service';
 
 @Component({
   selector: 'app-user-management',
-  imports: [ReactiveFormsModule],
+  imports: [FormField],
   template: `
     <div class="user-management">
       <!-- Create User Form -->
       <div class="create-user-section">
         <h4>Create New User</h4>
-        <form [formGroup]="createUserForm" (ngSubmit)="createUser()" class="create-form">
+        <form (submit)="createUser($event)" class="create-form">
           <div class="form-row">
             <div class="form-group">
               <label for="username">Username</label>
               <input
                 id="username"
                 type="text"
-                formControlName="username"
+                [formField]="createUserForm.username"
                 class="form-control"
                 placeholder="Enter username"
               />
@@ -31,7 +31,7 @@ import { UserManagementService } from '../../_services/user-management.service';
               <input
                 id="password"
                 type="password"
-                formControlName="password"
+                [formField]="createUserForm.password"
                 class="form-control"
                 placeholder="Enter password"
               />
@@ -41,20 +41,20 @@ import { UserManagementService } from '../../_services/user-management.service';
               <input
                 id="subdomain"
                 type="text"
-                formControlName="subdomain"
+                [formField]="createUserForm.subdomain"
                 class="form-control"
                 placeholder="e.g., sales, support"
               />
             </div>
             <div class="form-group">
               <label for="role">Role</label>
-              <select id="role" formControlName="role" class="form-control">
+              <select id="role" [formField]="createUserForm.role" class="form-control">
                 <option value="0">User</option>
                 <option value="1">Admin</option>
               </select>
             </div>
             <div class="form-group">
-              <button type="submit" class="btn btn-primary" [disabled]="createUserForm.invalid || isCreatingUser()">
+              <button type="submit" class="btn btn-primary" [disabled]="createUserForm().invalid() || isCreatingUser()">
                 {{ isCreatingUser() ? 'Creating...' : 'Create User' }}
               </button>
             </div>
@@ -149,7 +149,6 @@ import { UserManagementService } from '../../_services/user-management.service';
 export class UserManagementComponent {
   private userManagementService = inject(UserManagementService);
   private authService = inject(AuthService);
-  private fb = inject(FormBuilder);
   private confirmDialog = inject(ConfirmDialogService);
 
   users = signal<User[]>([]);
@@ -162,16 +161,22 @@ export class UserManagementComponent {
   successMessage = signal('');
   currentUserId = signal<string | null>(null);
 
-  createUserForm: FormGroup;
+  createUserModel = signal<{ username: string; password: string; subdomain: string; role: string }>({
+    username: '',
+    password: '',
+    subdomain: '',
+    role: '0',
+  });
+  createUserForm = form(this.createUserModel, (path) => {
+    required(path.username, { message: 'Username is required' });
+    minLength(path.username, 3, { message: 'Username must be at least 3 characters' });
+    required(path.password, { message: 'Password is required' });
+    minLength(path.password, 6, { message: 'Password must be at least 6 characters' });
+    pattern(path.subdomain, /^[a-z0-9-]*$/, { message: 'Subdomain has an invalid format' });
+    required(path.role, { message: 'Role is required' });
+  });
 
   constructor() {
-    this.createUserForm = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(3)]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
-      subdomain: ['', [Validators.pattern(/^[a-z0-9-]*$/)]],
-      role: [0, Validators.required],
-    });
-
     this.loadUsers();
     this.getCurrentUserId();
   }
@@ -194,13 +199,14 @@ export class UserManagementComponent {
     }
   }
 
-  async createUser() {
-    if (this.createUserForm.invalid) return;
+  async createUser(event: Event) {
+    event.preventDefault();
+    if (this.createUserForm().invalid()) return;
 
     this.isCreatingUser.set(true);
     this.clearMessages();
 
-    const formValue = this.createUserForm.value;
+    const formValue = this.createUserModel();
     const request: CreateUserRequest = {
       userName: formValue.username,
       password: formValue.password,
@@ -211,7 +217,7 @@ export class UserManagementComponent {
     try {
       await this.userManagementService.createUser(request);
       this.successMessage.set('User created successfully');
-      this.createUserForm.reset({ role: 0, subdomain: '' });
+      this.createUserModel.set({ username: '', password: '', subdomain: '', role: '0' });
       await this.loadUsers();
     } catch (error: any) {
       this.errorMessage.set(error.message || 'Failed to create user');

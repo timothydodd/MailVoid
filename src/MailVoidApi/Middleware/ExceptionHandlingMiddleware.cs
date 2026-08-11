@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace MailVoidApi.Middleware;
 
@@ -26,18 +27,26 @@ public class ExceptionHandlingMiddleware
         }
     }
 
+    private static readonly HashSet<string> SensitiveHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Authorization", "Cookie", "Set-Cookie", "X-Api-Key"
+    };
+
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         var request = context.Request;
-        var requestBody = await GetRequestBodyAsync(request);
-        
-        _logger.LogError(exception, 
-            "Unhandled exception occurred. Method: {Method}, Path: {Path}, Query: {Query}, Headers: {@Headers}, Body: {Body}, User: {User}, IP: {IP}",
+
+        // Do not log credentials: redact sensitive headers and never log the request body.
+        var safeHeaders = request.Headers.ToDictionary(
+            h => h.Key,
+            h => SensitiveHeaders.Contains(h.Key) ? "***" : h.Value.ToString());
+
+        _logger.LogError(exception,
+            "Unhandled exception occurred. Method: {Method}, Path: {Path}, Query: {Query}, Headers: {@Headers}, User: {User}, IP: {IP}",
             request.Method,
             request.Path,
-            request.QueryString,
-            request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString()),
-            requestBody,
+            RedactQueryString(request.QueryString),
+            safeHeaders,
             context.User?.Identity?.Name ?? "Anonymous",
             GetClientIpAddress(context));
 
@@ -67,26 +76,16 @@ public class ExceptionHandlingMiddleware
         await response.WriteAsync(jsonResponse);
     }
 
-    private static async Task<string> GetRequestBodyAsync(HttpRequest request)
+    private static string RedactQueryString(QueryString queryString)
     {
-        try
-        {
-            if (request.ContentLength == 0 || request.ContentLength == null)
-                return string.Empty;
+        if (!queryString.HasValue)
+            return string.Empty;
 
-            request.EnableBuffering();
-            request.Body.Position = 0;
-
-            using var reader = new StreamReader(request.Body, leaveOpen: true);
-            var body = await reader.ReadToEndAsync();
-            request.Body.Position = 0;
-
-            return body.Length > 1000 ? $"{body[..1000]}... (truncated)" : body;
-        }
-        catch
-        {
-            return "[Unable to read request body]";
-        }
+        return Regex.Replace(
+            queryString.Value!,
+            @"([?&](?:api_key|access_token)=)[^&]*",
+            "$1***",
+            RegexOptions.IgnoreCase);
     }
 
     private static string GetClientIpAddress(HttpContext context)

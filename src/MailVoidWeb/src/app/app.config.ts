@@ -1,10 +1,9 @@
-import { ApplicationConfig, importProvidersFrom, LOCALE_ID, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, LOCALE_ID, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { registerLocaleData } from '@angular/common';
 import localeEn from '@angular/common/locales/en';
 
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/common/http';
-import { JwtModule } from '@auth0/angular-jwt';
 import {
   provideLucideIcons,
   LucideArrowLeft,
@@ -50,12 +49,8 @@ import {
   LucideWebhook,
   LucideX,
 } from '@lucide/angular';
-import { environment } from '../environments/environment';
 import { JwtInterceptor } from './_services/jwt-interceptor';
 import { routes } from './app.routes';
-export function tokenGetter() {
-  return localStorage.getItem('authToken');
-}
 
 registerLocaleData(localeEn);
 
@@ -69,15 +64,6 @@ export const appConfig: ApplicationConfig = {
       useClass: JwtInterceptor,
       multi: true,
     },
-    importProvidersFrom(
-      JwtModule.forRoot({
-        config: {
-          tokenGetter: tokenGetter,
-          allowedDomains: undefined, // Update with your API domain
-          disallowedRoutes: [`${environment.apiUrl}/api/auth/login`, `${environment.apiUrl}/api/health`], // Update with any routes you want to exclude
-        },
-      })
-    ),
     provideLucideIcons(
       LucideEllipsisVertical,
       LucideX,

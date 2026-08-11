@@ -1,6 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, model, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, model, output, signal } from '@angular/core';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { ToastService } from '@rd-ui';
 import { MailBoxGroups } from '../../../_services/api/mail.service';
 import { BoxMenuComponent } from './box-menu/box-menu.component';
 
@@ -10,7 +9,7 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
   imports: [LucideDynamicIcon, BoxMenuComponent],
   template: `
     <div class="box-list-container">
-      @if (sortedMailboxes(); as mb) {
+      @if (mailboxes(); as mb) {
         @for (group of mb; track $index) {
           <div class="group-section">
             <div class="group-header">
@@ -37,8 +36,12 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
                       }
                     </span>
                   </button>
-                  <button class="copy-btn" (click)="copyEmail(item.name)" title="Copy email address">
-                    <svg lucideIcon="copy" size="14"></svg>
+                  <button
+                    class="copy-btn"
+                    (click)="copyEmail(item.name)"
+                    [title]="copiedBox() === item.name ? 'Copied!' : 'Copy email address'"
+                  >
+                    <svg [lucideIcon]="copiedBox() === item.name ? 'circle-check' : 'copy'" size="14"></svg>
                   </button>
                   <span class="row-spacer"></span>
                   @if (item.unreadCount > 0) {
@@ -74,15 +77,8 @@ export class BoxListComponent {
   markAllAsReadEvent = output<string>();
   boxClick = output<string | null>();
 
-  private toastr = inject(ToastService);
-
-  sortedMailboxes = computed(() => {
-    const mb = this.mailboxes();
-    if (!mb) return null;
-
-    // Sorting is now handled in the service, just return as-is
-    return mb;
-  });
+  copiedBox = signal<string | null>(null);
+  private copiedTimer?: ReturnType<typeof setTimeout>;
 
   clickBox(box: string | null) {
     this.selectedBox.set(box);
@@ -91,12 +87,10 @@ export class BoxListComponent {
 
   copyEmail(email: string) {
     navigator.clipboard.writeText(email).then(() => {
-      this.toastr.success('Email address copied');
+      // Inline feedback: swap this row's copy icon to a check briefly instead of a toast.
+      this.copiedBox.set(email);
+      clearTimeout(this.copiedTimer);
+      this.copiedTimer = setTimeout(() => this.copiedBox.set(null), 1500);
     });
-  }
-
-  deleteClick(item: string) {
-    console.log('Deleted: ', item);
-    this.deleteEvent.emit(item);
   }
 }

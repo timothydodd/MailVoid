@@ -1,21 +1,31 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, shareReplay, tap } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, Observable, shareReplay, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { LastSeenService } from './last-seen.service';
+import { MailSearchService } from './mail-search.service';
 
+// The refresh token is held server-side as an httpOnly cookie (set by /api/auth on
+// login/refresh), so it is never exposed to JavaScript. Only the short-lived access
+// token lives in localStorage; requests that rotate the cookie use withCredentials.
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
   private tokenKey = 'authToken';
-  private refreshTokenKey = 'refreshToken';
-  private isRefreshing = false;
-  private refreshTokenSubject = new BehaviorSubject<string | null>(null);
+  private legacyRefreshTokenKey = 'refreshToken';
   private currentUserSubject = new BehaviorSubject<User | null>(null);
+
+  // Single in-flight refresh so concurrent 401s share one refresh request.
+  private refreshInFlight?: Promise<string | null>;
+  // Cached, shared user request so the user is fetched once, not per-consumer.
+  private user$?: Observable<User>;
 
   private http = inject(HttpClient);
   private router = inject(Router);
+  private lastSeenService = inject(LastSeenService);
+  private mailSearchService = inject(MailSearchService);
 
   isLoggedIn = new BehaviorSubject<boolean>(false);
   currentUser$ = this.currentUserSubject.asObservable();
@@ -27,43 +37,45 @@ export class AuthService {
     // User data will be loaded when needed or on login
   }
   login(userName: string, password: string) {
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/api/auth/login`, { userName, password }).pipe(
-      tap((response) => {
-        this.storeTokens(response.accessToken, response.refreshToken);
-        this.isLoggedIn.next(true);
-        this.loadCurrentUser();
-      })
-    );
+    // withCredentials so the browser stores the httpOnly refresh-token cookie.
+    return this.http
+      .post<LoginResponse>(`${environment.apiUrl}/api/auth/login`, { userName, password }, { withCredentials: true })
+      .pipe(
+        tap((response) => {
+          this.storeToken(response.accessToken);
+          this.user$ = undefined;
+          this.isLoggedIn.next(true);
+          this.loadCurrentUser();
+        })
+      );
   }
   changePassword(request: ChangePasswordRequest) {
     return this.http.post(`${environment.apiUrl}/api/auth/change-password`, request);
   }
   getUser() {
-    return this.http.get<User>(`${environment.apiUrl}/api/auth/user`).pipe(shareReplay(1));
+    if (!this.user$) {
+      this.user$ = this.http.get<User>(`${environment.apiUrl}/api/auth/user`).pipe(shareReplay(1));
+    }
+    return this.user$;
   }
   async logout() {
     // Only call the logout API if we have a valid token
     if (this.isAuthenticated()) {
       try {
-        await this.http.post(`${environment.apiUrl}/api/auth/logout`, {}).toPromise();
+        // withCredentials so the server can clear the refresh-token cookie.
+        await firstValueFrom(this.http.post(`${environment.apiUrl}/api/auth/logout`, {}, { withCredentials: true }));
       } catch (error) {
         // Ignore errors during logout - we're logging out anyway
         console.warn('Logout API call failed, but continuing with local logout:', error);
       }
     }
 
-    this.clearTokens();
-    this.isLoggedIn.next(false);
-    this.currentUserSubject.next(null);
+    this.clearAuthState();
     this.router.navigate(['/login']);
   }
 
   getToken(): string | null {
     return localStorage.getItem(this.tokenKey);
-  }
-
-  getRefreshToken(): string | null {
-    return localStorage.getItem(this.refreshTokenKey);
   }
 
   isAuthenticated(): boolean {
@@ -97,7 +109,7 @@ export class AuthService {
     try {
       const payload = this.getTokenPayload(token);
       // Use standard claim for name which contains username
-      return payload?.['"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"'] || payload?.name || null;
+      return payload?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || payload?.name || null;
     } catch (error) {
       console.error('Error parsing token:', error);
       return null;
@@ -175,23 +187,27 @@ export class AuthService {
     }
   }
 
-  private storeTokens(accessToken: string, refreshToken: string) {
+  private storeToken(accessToken: string) {
     localStorage.setItem(this.tokenKey, accessToken);
-    localStorage.setItem(this.refreshTokenKey, refreshToken);
   }
 
   private clearTokens() {
     localStorage.removeItem(this.tokenKey);
-    localStorage.removeItem(this.refreshTokenKey);
+    // Remove any refresh token left by an older build; it now lives in an httpOnly cookie.
+    localStorage.removeItem(this.legacyRefreshTokenKey);
   }
 
-  // Method to clear auth state without API call (for error scenarios)
+  // Method to clear auth state without API call (for error scenarios).
+  // Clears ALL per-user app state so a shared machine doesn't leak the previous
+  // user's mailbox paths / search terms.
   clearAuthState() {
     this.clearTokens();
+    this.user$ = undefined;
+    this.refreshInFlight = undefined;
+    this.lastSeenService.clearLastSeenData();
+    this.mailSearchService.clear();
     this.isLoggedIn.next(false);
     this.currentUserSubject.next(null);
-    this.isRefreshing = false;
-    this.refreshTokenSubject.next(null);
   }
 
   private loadCurrentUser() {
@@ -200,7 +216,7 @@ export class AuthService {
       error: (error) => {
         console.error('Failed to load current user:', error);
         this.currentUserSubject.next(null);
-      }
+      },
     });
   }
 
@@ -212,59 +228,47 @@ export class AuthService {
     }
   }
 
-  async refreshToken(): Promise<string | null> {
-    const refreshToken = this.getRefreshToken();
+  // Single refresh mechanism: concurrent callers share one in-flight request.
+  refreshToken(): Promise<string | null> {
+    if (this.refreshInFlight) {
+      return this.refreshInFlight;
+    }
+
     const accessToken = this.getToken();
-
-    if (!refreshToken || !accessToken) {
-      this.clearTokens();
-      this.isLoggedIn.next(false);
-      return null;
+    if (!accessToken) {
+      this.clearAuthState();
+      return Promise.resolve(null);
     }
 
-    if (this.isRefreshing) {
-      return new Promise((resolve, reject) => {
-        const subscription = this.refreshTokenSubject.subscribe((token) => {
-          if (token !== null) {
-            subscription.unsubscribe();
-            resolve(token);
-          }
-        });
+    this.refreshInFlight = this.doRefresh(accessToken).finally(() => {
+      this.refreshInFlight = undefined;
+    });
+    return this.refreshInFlight;
+  }
 
-        // Add timeout to prevent infinite waiting
-        setTimeout(() => {
-          subscription.unsubscribe();
-          reject('Token refresh timeout');
-        }, 10000);
-      });
-    }
-
-    this.isRefreshing = true;
-    this.refreshTokenSubject.next(null);
-
+  private async doRefresh(accessToken: string): Promise<string | null> {
     try {
-      const response = await this.http
-        .post<LoginResponse>(`${environment.apiUrl}/api/auth/refresh`, { accessToken, refreshToken })
-        .toPromise();
-
+      // The refresh token rides along as an httpOnly cookie (withCredentials); only
+      // the expired access token is sent in the body so the server can identify the user.
+      const response = await firstValueFrom(
+        this.http.post<LoginResponse>(
+          `${environment.apiUrl}/api/auth/refresh`,
+          { accessToken },
+          { withCredentials: true }
+        )
+      );
       if (response) {
-        this.storeTokens(response.accessToken, response.refreshToken);
-        this.refreshTokenSubject.next(response.accessToken);
+        this.storeToken(response.accessToken);
         this.isLoggedIn.next(true);
         return response.accessToken;
       }
+      this.clearAuthState();
+      return null;
     } catch (error) {
       console.error('Token refresh failed:', error);
-      this.clearTokens();
-      this.isLoggedIn.next(false);
-      this.currentUserSubject.next(null);
-      this.refreshTokenSubject.next('');
-      // Don't navigate here to avoid conflicts with interceptor
-    } finally {
-      this.isRefreshing = false;
+      this.clearAuthState();
+      return null;
     }
-
-    return null;
   }
 }
 
@@ -280,6 +284,5 @@ export interface ChangePasswordRequest {
 
 export interface LoginResponse {
   accessToken: string;
-  refreshToken: string;
   expiresIn: number;
 }

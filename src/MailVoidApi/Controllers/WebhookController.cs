@@ -1,3 +1,4 @@
+using Dapper;
 using MailVoidApi.Authentication;
 using MailVoidApi.Data;
 using MailVoidApi.Hubs;
@@ -59,8 +60,7 @@ public class WebhookController : ControllerBase
             _logger.LogInformation("Successfully processed MailData for {From} to {To}",
                 mail.From, mail.To);
 
-            // Send SignalR notification to all connected clients
-            await _hubContext.Clients.All.SendAsync("NewMail", new
+            var payload = new
             {
                 id = mail.Id,
                 from = mail.From,
@@ -68,7 +68,29 @@ public class WebhookController : ControllerBase
                 subject = mail.Subject,
                 receivedDate = DateTime.UtcNow,
                 mailGroupPath = mail.MailGroupPath
-            });
+            };
+
+            // Notify only users who can access this mail's group (mirrors the mail-list visibility rules),
+            // rather than broadcasting to every connected client.
+            if (!string.IsNullOrEmpty(mail.MailGroupPath))
+            {
+                var recipientIds = await db.QueryAsync<Guid>(
+                    @"SELECT DISTINCT u.Id
+                      FROM `User` u
+                      LEFT JOIN MailGroup mg ON mg.Path = @Path
+                      WHERE mg.Id IS NOT NULL AND (
+                          mg.OwnerUserId = u.Id
+                          OR mg.Subdomain = u.Subdomain
+                          OR EXISTS (SELECT 1 FROM MailGroupUser mgu WHERE mgu.MailGroupId = mg.Id AND mgu.UserId = u.Id)
+                          OR (u.Role = 1 AND mg.Subdomain = 'default')
+                      )",
+                    new { Path = mail.MailGroupPath });
+
+                foreach (var recipientId in recipientIds)
+                {
+                    await _hubContext.Clients.Group($"user-{recipientId}").SendAsync("NewMail", payload);
+                }
+            }
 
             return Ok();
         }

@@ -4,13 +4,17 @@ using MailVoidApi.Hubs;
 using MailVoidApi.Models;
 using MailVoidApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using RoboDodd.OrmLite;
 
 namespace MailVoidApi.Controllers;
 
+// Anonymous by design: external systems POST here. Guarded by a request-size cap and rate limiting.
 [ApiController]
 [Route("api/hook")]
+[EnableRateLimiting("webhook-capture")]
+[RequestSizeLimit(5 * 1024 * 1024)]
 public class HooksController : ControllerBase
 {
     private readonly ILogger<HooksController> _logger;
@@ -90,8 +94,8 @@ public class HooksController : ControllerBase
 
             _logger.LogInformation("Successfully captured webhook for bucket {Bucket}", bucket);
 
-            // Send SignalR notification
-            await _hubContext.Clients.All.SendAsync("NewWebhook", new
+            // Send SignalR notification only to the bucket owner, not every connected client.
+            await _hubContext.Clients.Group($"user-{webhookBucket.OwnerUserId}").SendAsync("NewWebhook", new
             {
                 id = webhook.Id,
                 bucketName = webhook.BucketName,

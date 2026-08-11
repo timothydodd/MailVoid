@@ -102,6 +102,15 @@ export class MailService {
     return this.http.delete(`${environment.apiUrl}/api/mail/mail-groups/${id}`);
   }
 
+  // Per-user hide/show of a mail group in the mailbox list
+  hideMailGroup(id: number) {
+    return this.http.post(`${environment.apiUrl}/api/mail/groups/${id}/hide`, {});
+  }
+
+  unhideMailGroup(id: number) {
+    return this.http.delete(`${environment.apiUrl}/api/mail/groups/${id}/hide`);
+  }
+
   // Retention settings
   getRetentionSettings(mailboxId: number) {
     return this.http.get<RetentionSettingsResponse>(`${environment.apiUrl}/api/mail/mailbox/${mailboxId}/retention`);
@@ -123,6 +132,8 @@ export class MailService {
 export interface FilterOptions {
   to: string | null;
   search?: string | null;
+  page?: number;
+  pageSize?: number;
 }
 export interface Mail {
   id: number;
@@ -160,6 +171,7 @@ export interface MailGroup {
   createdAt: string;
   lastActivity: string | null;
   isOwner: boolean;
+  isHidden: boolean;
 }
 export interface PagedResults<T> {
   items: T[] | null;

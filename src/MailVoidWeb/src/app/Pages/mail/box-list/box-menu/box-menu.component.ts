@@ -15,13 +15,14 @@ import { ClickOutsideDirective } from '../../../../_services/click-outside.direc
         #menuElement
         [style.top.px]="menuPosition().top" 
         [style.left.px]="menuPosition().left"
-        appClickOutside 
-        (clickOutside)="close()" 
+        appClickOutside
+        (clickOutside)="close()"
+        (document:keydown.escape)="close()"
         [delayTime]="200"
       >
         @if (unreadCount() > 0) {
           <button dropdown-item (click)="markAllAsReadClick()">
-            <svg lucideIcon="check-circle" size="16"></svg>
+            <svg lucideIcon="circle-check" size="16"></svg>
             Mark all as read
           </button>
           <div class="menu-divider"></div>

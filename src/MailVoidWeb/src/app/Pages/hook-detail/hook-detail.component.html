@@ -20,7 +20,7 @@
             </div>
             <div class="meta-item date">
               <span class="meta-label">Received</span>
-              <span class="meta-value">{{ $safeNavigationMigration(webhook()?.createdOn) | date: 'medium' }}</span>
+              <span class="meta-value">{{ webhook()?.createdOn | date: 'medium' }}</span>
             </div>
           </div>
           <div class="meta-row">

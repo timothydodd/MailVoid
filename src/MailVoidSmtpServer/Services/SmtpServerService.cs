@@ -160,8 +160,16 @@ public class SmtpServerService
 
         if (_server != null)
         {
+            // Signal shutdown, then wait for in-flight sessions (mid-DATA) to drain.
             _server.Shutdown();
-            await Task.CompletedTask;
+            try
+            {
+                await _server.ShutdownTask.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("SMTP server shutdown timed out before all sessions drained");
+            }
         }
 
         _logger.LogInformation("SMTP server stopped");
