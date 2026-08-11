@@ -2,12 +2,12 @@ name: Build and Deploy SMTP Server
 
 on:
   push:
-    branches: [ "master", "main" ]
+    branches: [ "main" ]
     paths:
       - 'src/MailVoidSmtpServer/**'
       - '.github/workflows/smtp-server.yml'
   pull_request:
-    branches: [ "master", "main" ]
+    branches: [ "main" ]
     paths:
       - 'src/MailVoidSmtpServer/**'
       - '.github/workflows/smtp-server.yml'
@@ -47,7 +47,7 @@ jobs:
   docker-build:
     name: Build and Push SMTP Docker Image
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
 
     steps:
     - name: Checkout repository
