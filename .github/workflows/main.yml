@@ -12,7 +12,7 @@ env:
   NODE_VERSION: '22.x'
 
 jobs:
-  # PR validation only — on master pushes the Docker build compiles everything
+  # PR validation only — on main pushes the Docker build compiles everything
   # itself, so running these first would just build the same code twice.
   build-backend:
     name: Build Backend

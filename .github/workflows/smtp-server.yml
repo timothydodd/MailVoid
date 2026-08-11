@@ -17,7 +17,7 @@ env:
   DOTNET_VERSION: '10.0.x'
 
 jobs:
-  # PR validation only — on master pushes the Docker build compiles the
+  # PR validation only — on main pushes the Docker build compiles the
   # project itself, so a separate native build would be redundant.
   build:
     name: Build SMTP Server
