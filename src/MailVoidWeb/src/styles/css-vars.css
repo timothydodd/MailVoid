@@ -23,6 +23,37 @@
   --rd-on-primary: #1a1a1a;
   --rd-shadow-color: rgba(0, 0, 0, 0.3);
   --rd-border-radius-sm: 4px;
+
+  /* Remaining rd-ui variables mapped to the app palette so every rd-ui component
+     (modal, dropdown, select, toast-indicator, etc.) themes consistently in both
+     light and dark. Without these, components fall back to dark-biased defaults
+     that look wrong in the light theme. */
+  --rd-secondary: var(--secondary);
+  --rd-on-surface-muted: var(--text-secondary);
+  --rd-on-surface-variant: var(--foreground);
+  --rd-surface-container: var(--bGLight);
+  --rd-surface-container-high: var(--bGLighter);
+  --rd-surface-container-highest: var(--bGLighter);
+  --rd-input-bg: var(--input-bg);
+  --rd-modal-bg: var(--card-bg);
+  --rd-dropdown-bg: var(--bGDark);
+  --rd-border-radius-lg: 12px;
+  --rd-font-size-base: 0.875rem;
+  --rd-font-size-sm: 0.75rem;
+
+  /* Toast-indicator (rd-toast-indicator) */
+  --rd-ti-surface: var(--bGDark);
+  --rd-ti-variant: var(--bGLight);
+  --rd-ti-text: var(--foreground);
+  --rd-ti-muted: var(--comment);
+  --rd-ti-border: var(--border-color);
+  --rd-ti-success: var(--green);
+  --rd-ti-error: var(--red);
+  --rd-ti-info: var(--cyan);
+  --rd-ti-warning: var(--yellow);
+  --rd-ti-radius: 8px;
+  --rd-ti-shadow: var(--dropdown-shadow);
+  --rd-ti-font-sm: 0.75rem;
 }
 
 /* Dark Theme (default) */
