@@ -19,7 +19,7 @@ The application receives webhook events from your mail server and stores emails 
 - **Data**: DatabaseService for RoboDodd.OrmLite database operations (Dapper-based)
 - **Common**: Shared utilities including pagination, caching (TimedCache), and database extensions
 - **Authentication**: JWT-based authentication with refresh token support
-- **Database**: MySQL with RoboDodd.OrmLite (Dapper-based micro ORM)
+- **Database**: MySQL or SQLite with RoboDodd.OrmLite (Dapper-based micro ORM)
 - **Real-time**: SignalR hub for real-time email and webhook notifications
 
 ### Frontend (src/MailVoidWeb/)
@@ -60,7 +60,7 @@ npm run format                # Format code with Prettier
 ### Backend Configuration
 - **appsettings.json**: Configure database connection, JWT settings, and CORS origins
 - **JWT Settings**: Requires symmetric key, issuer, audience, and expiry configuration
-- **Database**: MySQL connection string required in "DefaultConnection"
+- **Database**: MySQL or SQLite connection string required in "DefaultConnection". Provider is chosen by the optional "DatabaseProvider" setting ("MySql" or "Sqlite"); if unset, a connection string containing "Data Source" selects SQLite (e.g. `Data Source=mailvoid.db`), otherwise MySQL. A MySQL database can be exported to SQLite with `dotnet run --project src/MailVoidDbExport -- "<mysql-conn>" mailvoid.db`
 - **CORS**: Configure allowed origins via "CorsOrigins" setting
 
 ### Frontend Configuration

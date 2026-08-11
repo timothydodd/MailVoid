@@ -1,4 +1,5 @@
-﻿using Dapper;
+﻿using System.Globalization;
+using Dapper;
 using MailVoidApi.Common;
 using MailVoidApi.Data;
 using MailVoidApi.Services;
@@ -27,6 +28,27 @@ public class MailController : ControllerBase
         _mailGroupService = mailGroupService;
         _userService = userService;
     }
+
+    // SQLite returns dates and GUIDs from dynamic queries as strings; MySQL returns native types
+    private static DateTime AsDateTime(object? value) => value switch
+    {
+        DateTime dt => dt,
+        string s => DateTime.Parse(s, CultureInfo.InvariantCulture),
+        _ => Convert.ToDateTime(value, CultureInfo.InvariantCulture)
+    };
+
+    private static DateTime? AsNullableDateTime(object? value) => value == null ? null : AsDateTime(value);
+
+    private static Guid? AsNullableGuid(object? value) => value switch
+    {
+        null => null,
+        Guid g => g,
+        string s => Guid.Parse(s),
+        _ => throw new InvalidCastException($"Cannot convert {value.GetType()} to Guid")
+    };
+
+    private static Guid AsGuid(object? value) => AsNullableGuid(value)
+        ?? throw new InvalidCastException("Unexpected null GUID value");
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMail(long id, [FromQuery] bool markAsRead = false)
     {
@@ -41,9 +63,10 @@ public class MailController : ControllerBase
         {
             var currentUserId = _userService.GetUserId();
 
-            // Use raw SQL to perform "INSERT IGNORE"
+            // Insert-if-not-exists; relies on the unique (UserId, MailId) index
+            var insertIgnore = _db.Provider == DatabaseProvider.SQLite ? "INSERT OR IGNORE" : "INSERT IGNORE";
             await db.ExecuteAsync(
-                @"INSERT IGNORE INTO UserMailRead (UserId, MailId, ReadAt)
+                $@"{insertIgnore} INTO UserMailRead (UserId, MailId, ReadAt)
                   VALUES (@UserId, @MailId, @ReadAt)",
                 new { UserId = currentUserId, MailId = id, ReadAt = DateTime.UtcNow });
         }
@@ -87,7 +110,7 @@ public class MailController : ControllerBase
                 Path = mailbox.MailGroupPath,
                 MailBoxName = mailbox.Subdomain,
                 IsPublic = Convert.ToBoolean(mailbox.IsPublic),
-                IsOwner = mailbox.OwnerUserId != null && (Guid)mailbox.OwnerUserId == currentUserId,
+                IsOwner = AsNullableGuid((object?)mailbox.OwnerUserId) == currentUserId,
                 UnreadCount = unreadCount
             });
         }
@@ -221,9 +244,9 @@ public class MailController : ControllerBase
             Subdomain = mg.Subdomain ?? "",
             Description = mg.Description ?? "",
             IsPublic = Convert.ToBoolean(mg.IsPublic),
-            CreatedAt = (DateTime)mg.CreatedAt,
-            LastActivity = mg.LastActivity as DateTime?,
-            IsOwner = mg.OwnerUserId != null && (Guid)mg.OwnerUserId == userId,
+            CreatedAt = AsDateTime((object?)mg.CreatedAt),
+            LastActivity = AsNullableDateTime((object?)mg.LastActivity),
+            IsOwner = AsNullableGuid((object?)mg.OwnerUserId) == userId,
             IsUserPrivate = Convert.ToBoolean(mg.IsUserPrivate)
         }).ToList();
 
@@ -255,12 +278,12 @@ public class MailController : ControllerBase
             Subdomain = mg.Subdomain ?? "",
             Description = mg.Description ?? "",
             IsPublic = Convert.ToBoolean(mg.IsPublic),
-            CreatedAt = (DateTime)mg.CreatedAt,
-            LastActivity = mg.LastActivity as DateTime?,
-            IsOwner = mg.OwnerUserId != null && (Guid)mg.OwnerUserId == userId,
+            CreatedAt = AsDateTime((object?)mg.CreatedAt),
+            LastActivity = AsNullableDateTime((object?)mg.LastActivity),
+            IsOwner = AsNullableGuid((object?)mg.OwnerUserId) == userId,
             IsUserPrivate = Convert.ToBoolean(mg.IsUserPrivate),
             OwnerUserName = (string?)mg.OwnerUserName ?? "",
-            HasAccess = Convert.ToBoolean(mg.HasAccess) || (mg.OwnerUserId != null && (Guid)mg.OwnerUserId == userId)
+            HasAccess = Convert.ToBoolean(mg.HasAccess) || AsNullableGuid((object?)mg.OwnerUserId) == userId
         }).ToList();
 
         return Ok(result);
@@ -370,14 +393,14 @@ public class MailController : ControllerBase
         {
             Id = (long)mgu.Id,
             MailGroupId = (long)mgu.MailGroupId,
-            UserId = (Guid)mgu.UserId,
-            GrantedAt = (DateTime)mgu.GrantedAt,
+            UserId = AsGuid((object?)mgu.UserId),
+            GrantedAt = AsDateTime((object?)mgu.GrantedAt),
             User = new
             {
-                Id = (Guid)mgu.User_Id,
+                Id = AsGuid((object?)mgu.User_Id),
                 UserName = (string)mgu.User_UserName,
-                Role = (Role)mgu.User_Role,
-                TimeStamp = (DateTime)mgu.User_TimeStamp
+                Role = (Role)Convert.ToInt32(mgu.User_Role),
+                TimeStamp = AsDateTime((object?)mgu.User_TimeStamp)
             }
         }).ToList();
 

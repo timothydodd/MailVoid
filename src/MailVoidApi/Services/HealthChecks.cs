@@ -1,6 +1,7 @@
 ﻿using System.Dynamic;
 using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using RoboDodd.OrmLite;
 
 
 
@@ -8,15 +9,27 @@ namespace MailVoidWeb;
 
 public static class HealthCheck
 {
-    public static void AddHealthChecks(IServiceCollection services, string connectionString)
+    public static void AddHealthChecks(IServiceCollection services, string connectionString, DatabaseProvider provider)
     {
-        _ = services.AddHealthChecks()
-            .AddMySql(
+        var healthChecks = services.AddHealthChecks();
+        if (provider == DatabaseProvider.SQLite)
+        {
+            _ = healthChecks.AddSqlite(
+                connectionString: connectionString,
+                name: "SQLITE DB",
+                failureStatus: HealthStatus.Degraded,
+                tags: new string[] { "db", "sql" }
+            );
+        }
+        else
+        {
+            _ = healthChecks.AddMySql(
                 connectionString: connectionString,
                 name: "MYSQL DB",
                 failureStatus: HealthStatus.Degraded,
                 tags: new string[] { "db", "sql" }
             );
+        }
     }
 
 

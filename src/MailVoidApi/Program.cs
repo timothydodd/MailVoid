@@ -203,7 +203,7 @@ public class Program
         }
 
 
-        HealthCheck.AddHealthChecks(builder.Services, connectionString);
+        HealthCheck.AddHealthChecks(builder.Services, connectionString, DatabaseService.DetectProvider(builder.Configuration));
         var app = builder.Build();
 
         // Add request logging middleware
