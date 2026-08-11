@@ -11,6 +11,18 @@
   --rd-focus-ring: var(--primary);
   --rd-select-bg: var(--bGDark);
   --rd-border-radius: 8px;
+
+  /* Status/toast variables required by rd-ui (rd-toast, etc.). These were missing,
+     which left toasts with no background color, shadow, or rounded corners. Values
+     match the rd-ui reference theme (bright background + dark text, readable in both
+     light and dark app themes). */
+  --rd-success: #50fa7b;
+  --rd-danger: #ff5555;
+  --rd-warning: #f1fa8c;
+  --rd-info: #8be9fd;
+  --rd-on-primary: #1a1a1a;
+  --rd-shadow-color: rgba(0, 0, 0, 0.3);
+  --rd-border-radius-sm: 4px;
 }
 
 /* Dark Theme (default) */
