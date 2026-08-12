@@ -1,0 +1,38 @@
+schema = 1
+name = "Send Mail"
+seq = 10
+kind = "http"
+method = "POST"
+url = "http://localhost:5133/api/webhook/mail"
+params = []
+
+[[headers]]
+key = "X-Api-Key"
+value = "e4351ad6-1d77-4a1d-a43a-e68db4a66fcf"
+enabled = true
+
+[[headers]]
+key = "Content-Type"
+value = "application/json"
+enabled = true
+
+[body]
+type = "raw"
+contentType = "application/json"
+text = """
+{
+    \"from\": \"Test Sender <sender@example.com>\",
+    \"to\": \"test@dbmk2.com\",
+    \"headers\": { \"Subject\": \"🔔 Local toast test\", \"Date\": \"Wed, 13 Aug 2026 10:00:00 +0000\" },
+    \"html\": \"<p>Hello from a local webhook test.</p>\",
+    \"text\": \"Hello from a local webhook test.\" 
+}"""
+
+[auth]
+type = "inherit"
+
+[scripts]
+
+[settings]
+followRedirects = true
+verifyTls = true
