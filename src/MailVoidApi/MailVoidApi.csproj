@@ -26,7 +26,7 @@
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.11" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.12" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="wwwroot\" />
