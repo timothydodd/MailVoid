@@ -4,23 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MailVoid is a developer email testing tool with two main components:
-- **Backend API**: C# .NET 10 web API that manages emails, authentication, and webhook integration
+MailVoid is a developer email testing tool with three components:
+- **Backend API**: Go service (`src/go/cmd/mailvoid-api`) that manages emails, authentication, and webhook integration
+- **SMTP server**: Go service (`src/go/cmd/mailvoid-smtp`) that receives mail and forwards it to the API webhook
 - **Frontend**: Angular 19 web application for viewing and managing test emails and webhooks
 
-The application receives webhook events from your mail server and stores emails in a MySQL database for developers to view through the web interface. It also includes a webhook capture feature for testing HTTP webhooks.
+The original .NET 10 services live in `src/legacy/` and are kept only as a fallback until the Go port is signed off. Do not add features there. The Go services must stay drop-in compatible with them: same config keys, same SQLite schema and value formats, same HTTP/JSON contract.
+
+The application receives webhook events from your mail server and stores emails in a SQLite database for developers to view through the web interface. It also includes a webhook capture feature for testing HTTP webhooks.
 
 ## Architecture
 
-### Backend (src/MailVoidApi/)
-- **Controllers**: REST API endpoints for authentication, mail management, webhook capture, and webhook management
-- **Services**: Core business logic including AuthService, MailGroupService, UserService, WebhookBucketService, and background task processing
-- **Models**: Entity classes for User, Mail, MailGroup, RefreshToken, Webhook, and WebhookBucket with RoboDodd.OrmLite annotations
-- **Data**: DatabaseService for RoboDodd.OrmLite database operations (Dapper-based)
-- **Common**: Shared utilities including pagination, caching (TimedCache), and database extensions
-- **Authentication**: JWT-based authentication with refresh token support
-- **Database**: MySQL or SQLite with RoboDodd.OrmLite (Dapper-based micro ORM)
-- **Real-time**: SignalR hub for real-time email and webhook notifications
+### Backend (src/go/)
+- **internal/config**: .NET-compatible configuration (appsettings.json → appsettings.{Env}.json → user secrets in Development → env vars with `__` → command line; case-insensitive `Section:Key` lookups)
+- **internal/api**: HTTP handlers (`handlers_*.go`), auth (Identity-compatible password hashes, JWT), SQLite access (`db.go`, `models.go`, `types.go`), mail extraction, retention cleanup, and a SignalR-protocol hub (`signalr.go`)
+- **internal/smtpd**: go-smtp listeners, mailbox filter (anti open-relay), MIME parsing (enmime), durable disk spool, webhook forwarder, certificates / Let's Encrypt (certbot)
+- **internal/ordered**: insertion-ordered string map used for mail headers
+- **Authentication**: JWT access tokens with httpOnly refresh-token cookie rotation
+- **Database**: SQLite only (pure-Go `modernc.org/sqlite`, no CGO). Only the current schema is created (`CREATE TABLE IF NOT EXISTS`); there are no migrations
+- **Real-time**: SignalR hub at `/hubs/mail` (negotiate + WebSockets + JSON protocol) for the Angular `@microsoft/signalr` client
 
 ### Frontend (src/MailVoidWeb/)
 - **Architecture**: Angular 19 standalone components with reactive forms and routing
@@ -33,13 +35,15 @@ The application receives webhook events from your mail server and stores emails 
 
 ## Development Commands
 
-### Backend (.NET API)
+### Backend (Go)
 ```bash
-# From src/MailVoidApi/
-dotnet run                    # Run API (also starts frontend via SPA proxy)
-dotnet build                  # Build the API
-dotnet test                   # Run tests (if any exist)
-# Note: Database tables are created automatically on startup (no migrations needed)
+# From src/go/
+go build ./...                # Build everything
+go vet ./...                  # Static checks
+go test ./...                 # Run tests
+cd cmd/mailvoid-api && go run .    # Run the API (http://localhost:5133 by default)
+cd cmd/mailvoid-smtp && go run .   # Run the SMTP server
+# Missing tables are created on startup; there are no migrations.
 ```
 
 ### Frontend (Angular)
@@ -60,7 +64,8 @@ npm run format                # Format code with Prettier
 ### Backend Configuration
 - **appsettings.json**: Configure database connection, JWT settings, and CORS origins
 - **JWT Settings**: Requires symmetric key, issuer, audience, and expiry configuration
-- **Database**: MySQL or SQLite connection string required in "DefaultConnection". Provider is chosen by the optional "DatabaseProvider" setting ("MySql" or "Sqlite"); if unset, a connection string containing "Data Source" selects SQLite (e.g. `Data Source=mailvoid.db`), otherwise MySQL. A MySQL database can be exported to SQLite with `dotnet run --project src/MailVoidDbExport -- "<mysql-conn>" mailvoid.db`
+- **Database**: SQLite connection string in `ConnectionStrings:DefaultConnection` (e.g. `Data Source=mailvoid.db`). MySQL is not supported by the Go services
+- **Listen address**: `ASPNETCORE_URLS` / `urls`, `Kestrel:Endpoints:*:Url`, or `ASPNETCORE_HTTP_PORTS` (the Docker image sets 8080); default `http://localhost:5133`
 - **CORS**: Configure allowed origins via "CorsOrigins" setting
 
 ### Frontend Configuration
@@ -70,15 +75,11 @@ npm run format                # Format code with Prettier
 ## Key Patterns
 
 ### Backend Patterns
-- Controllers use RoboDodd.OrmLite (Dapper-based) for database operations
-- Use `db.From<T>()` for fluent query building with `.Where()`, `.OrderBy()`, `.Limit()`
-- Use `db.SelectAsync<T>()`, `db.SingleAsync<T>()`, `db.InsertAsync()`, `db.UpdateAsync()`, `db.DeleteAsync()`
-- Use `db.CountAsync<T>()` for counting records
-- JWT authentication with refresh token rotation
-- Background task queue for async operations
-- Pagination implemented via PagedResults<T> utility
-- Custom exception handling and logging
-- DatabaseService pattern for connection management
+- Plain `database/sql` with hand-written SQL; `queryOne` / `queryAll` / `scalarInt` helpers in `models.go`. Named parameters (`@UserId` + `sql.Named`) for shared predicates like `mailVisibilityClause`
+- **Storage formats must match what .NET wrote**: GUIDs are upper-case TEXT in the DB (`GUID` type) but lower-case in JSON/JWT; datetimes are TEXT `yyyy-MM-dd HH:mm:ss.FFFFFFF` UTC (`DBTime` / `NullTime`) and JSON `yyyy-MM-ddTHH:mm:ss.fffZ`; bools are INTEGER 0/1; `Role` is stored as its integer and serialized as `"Admin"`/`"User"`
+- JSON responses are camelCase with nulls included (pointer fields), matching ASP.NET Core output
+- Routing uses Go 1.22+ `http.ServeMux` patterns in `server.go`; `requireAuth` = `[Authorize]`, `requireAPIKey` = `[ApiKey]`
+- Pagination via `pagedResults[T]` (`items`, `totalCount`)
 
 ### Frontend Patterns
 - Standalone Angular components (no NgModules)
@@ -126,19 +127,18 @@ The prod build enforces per-component style budgets in `angular.json` (`anyCompo
 - `/api/health`: Health check endpoint
 - `/api/hook/{bucket}`: Webhook capture endpoint (POST/PUT/PATCH - no auth required)
 - `/api/webhooks/*`: Webhook management API (requires auth)
-- `/webhooks/mail`: Mail server webhook endpoint
-- `/mailHub`: SignalR hub for real-time notifications
+- `/api/webhook/mail`: Mail server webhook endpoint (API key: `X-Api-Key`, `api_key` query, or `Authorization: ApiKey <key>`)
+- `/hubs/mail`: SignalR hub for real-time notifications
 
 ## Dependencies
 
-### Backend NuGet Packages
-- Microsoft.AspNetCore.Authentication.JwtBearer
-- RoboDodd.OrmLite (git submodule - Dapper-based micro ORM)
-- MySqlConnector
-- Dapper
-- Microsoft.AspNetCore.SpaProxy
-- AspNetCore.HealthChecks.MySql
-- Microsoft.Extensions.Caching.Memory
+### Backend Go Modules
+- modernc.org/sqlite - pure-Go SQLite driver
+- github.com/golang-jwt/jwt/v5 - JWT
+- github.com/gorilla/websocket - SignalR WebSocket transport
+- github.com/emersion/go-smtp - SMTP server
+- github.com/jhillyerd/enmime - MIME parsing
+- software.sslmate.com/src/go-pkcs12 - legacy .pfx certificates
 
 ### Frontend NPM Packages
 - Angular 19 (v20.1.5) - Core framework

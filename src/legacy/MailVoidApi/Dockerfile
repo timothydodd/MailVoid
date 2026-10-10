@@ -17,13 +17,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs
 
 WORKDIR /src
-COPY ["MailVoidApi/MailVoidApi.csproj", "MailVoidApi/"]
+COPY ["legacy/MailVoidApi/MailVoidApi.csproj", "legacy/MailVoidApi/"]
+COPY ["legacy/RoboDodd.OrmLite/src/RoboDodd.OrmLite/RoboDodd.OrmLite.csproj", "legacy/RoboDodd.OrmLite/src/RoboDodd.OrmLite/"]
 COPY ["MailVoidWeb/void-web.esproj", "MailVoidWeb/"]
-RUN dotnet restore "./MailVoidApi/MailVoidApi.csproj"
+RUN dotnet restore "./legacy/MailVoidApi/MailVoidApi.csproj"
 
 COPY . .
-RUN chmod +x ./MailVoidApi/replace_vars.sh
-RUN ./MailVoidApi/replace_vars.sh ./MailVoidWeb/src/environments
+RUN chmod +x ./legacy/MailVoidApi/replace_vars.sh
+RUN ./legacy/MailVoidApi/replace_vars.sh ./MailVoidWeb/src/environments
 
 # Build rd-ui library before main build
 WORKDIR "/src/MailVoidWeb"
@@ -32,7 +33,7 @@ RUN npm run lib:build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-WORKDIR "/src/MailVoidApi"
+WORKDIR "/src/legacy/MailVoidApi"
 # publish compiles the API and runs the Angular production build (esproj ProductionBuildCommand)
 RUN dotnet publish "./MailVoidApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 

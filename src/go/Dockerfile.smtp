@@ -1,0 +1,30 @@
+# Go build of the MailVoid SMTP server. Build context: src/go
+#   docker build -f Dockerfile.smtp -t mailvoid-smtp .
+
+# Cross-compile on the runner's native platform; the static binary needs no emulation.
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags="-s -w" -o /out/mailvoid-smtp ./cmd/mailvoid-smtp
+
+FROM alpine:3.22
+# certbot + Cloudflare DNS plugin for the Let's Encrypt integration (LetsEncrypt:Enabled).
+RUN apk add --no-cache ca-certificates tzdata certbot certbot-dns-cloudflare \
+    # Same UID as the .NET images' "app" user so existing volumes keep their permissions.
+    && adduser -D -H -u 1654 app
+WORKDIR /app
+COPY --from=build /out/mailvoid-smtp ./
+COPY cmd/mailvoid-smtp/appsettings*.json ./
+# Default EmailQueue:SpoolDirectory ("spool") must be writable by the non-root user.
+RUN mkdir -p /app/spool && chown app /app/spool
+# 25 = SMTP, 587 = STARTTLS submission, 465 = implicit TLS, 2580 = test/non-privileged
+EXPOSE 25 587 465 2580
+# Binding to 25/465/587 as non-root requires CAP_NET_BIND_SERVICE from the orchestrator
+# (see deploy/k3s/mailvoid-smtp.yaml).
+USER app
+ENTRYPOINT ["/app/mailvoid-smtp"]

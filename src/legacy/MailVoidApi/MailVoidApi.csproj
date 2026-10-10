@@ -7,13 +7,13 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <UserSecretsId>fa438ca5-9dd0-403b-a6d4-48e1eca84a32</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <SpaRoot>..\MailVoidWeb</SpaRoot>
+    <SpaRoot>..\..\MailVoidWeb</SpaRoot>
     <SpaProxyLaunchCommand>npm start</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>http://localhost:8200</SpaProxyServerUrl>
     <LangVersion>11</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MailVoidWeb\void-web.esproj">
+    <ProjectReference Include="..\..\MailVoidWeb\void-web.esproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <ProjectReference Include="..\RoboDodd.OrmLite\src\RoboDodd.OrmLite\RoboDodd.OrmLite.csproj" />

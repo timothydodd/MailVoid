@@ -1,0 +1,38 @@
+# Go build of the MailVoid API + Angular SPA. Build context: src/ (needs MailVoidWeb)
+#   docker build -f go/Dockerfile.api -t mailvoid .
+
+# The SPA bundle is platform-independent, so build it once on the native platform.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
+WORKDIR /src/MailVoidWeb
+COPY MailVoidWeb/package.json MailVoidWeb/package-lock.json ./
+RUN npm ci
+COPY MailVoidWeb/ ./
+# Same substitution replace_vars.sh made: an empty API_URL means "same origin".
+RUN find src/environments -name '*.ts' -exec sed -i 's,${API_URL},,g' {} \; \
+    && npm run lib:build \
+    && npm run prod
+
+# Cross-compile on the runner's native platform; the static binary needs no emulation.
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY go/go.mod go/go.sum ./
+RUN go mod download
+COPY go/ ./
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags="-s -w" -o /out/mailvoid-api ./cmd/mailvoid-api
+
+FROM alpine:3.22
+# Same UID as the .NET images' "app" user so existing volumes (e.g. the SQLite file)
+# keep their permissions.
+RUN apk add --no-cache ca-certificates tzdata && adduser -D -H -u 1654 app
+WORKDIR /app
+COPY --from=build /out/mailvoid-api ./
+COPY go/cmd/mailvoid-api/appsettings.json ./
+COPY --from=web /src/MailVoidWeb/dist/mail-void/browser ./wwwroot
+# Matches the aspnet base image, which listens on 8080.
+ENV ASPNETCORE_HTTP_PORTS=8080
+EXPOSE 8080
+USER app
+ENTRYPOINT ["/app/mailvoid-api"]

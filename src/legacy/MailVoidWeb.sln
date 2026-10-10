@@ -11,7 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "github", "github", "{EE73BC
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
-Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "void-web", "MailVoidWeb\void-web.esproj", "{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}"
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "void-web", "..\MailVoidWeb\void-web.esproj", "{7E25628A-EDC3-460E-ACD0-04E3640D4A2D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MailVoidSmtpServer", "MailVoidSmtpServer\MailVoidSmtpServer.csproj", "{B8E3F2A1-4F5C-4D2B-8A7E-1C3D5E7F9B2A}"
 EndProject

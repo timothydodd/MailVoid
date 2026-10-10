@@ -1,16 +1,8 @@
 name: Build and Deploy SMTP Server
 
+# Legacy .NET SMTP server. Main now builds the Go images (go.yml); this workflow only
+# runs on demand, e.g. to publish a rollback image.
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'src/MailVoidSmtpServer/**'
-      - '.github/workflows/smtp-server.yml'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'src/MailVoidSmtpServer/**'
-      - '.github/workflows/smtp-server.yml'
   workflow_dispatch:
 
 env:
@@ -36,18 +28,18 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Restore dependencies
-      run: dotnet restore src/MailVoidSmtpServer/MailVoidSmtpServer.csproj
+      run: dotnet restore src/legacy/MailVoidSmtpServer/MailVoidSmtpServer.csproj
 
     - name: Build
-      run: dotnet build src/MailVoidSmtpServer/MailVoidSmtpServer.csproj --configuration Release --no-restore
+      run: dotnet build src/legacy/MailVoidSmtpServer/MailVoidSmtpServer.csproj --configuration Release --no-restore
 
     - name: Publish
-      run: dotnet publish src/MailVoidSmtpServer/MailVoidSmtpServer.csproj --configuration Release --no-build --output ./publish
+      run: dotnet publish src/legacy/MailVoidSmtpServer/MailVoidSmtpServer.csproj --configuration Release --no-build --output ./publish
 
   docker-build:
     name: Build and Push SMTP Docker Image
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
     - name: Checkout repository
@@ -77,8 +69,8 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ./src/MailVoidSmtpServer
-        file: ./src/MailVoidSmtpServer/Dockerfile
+        context: ./src/legacy/MailVoidSmtpServer
+        file: ./src/legacy/MailVoidSmtpServer/Dockerfile
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}

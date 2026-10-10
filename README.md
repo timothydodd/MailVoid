@@ -16,9 +16,9 @@ A developer email testing tool that captures and organizes test emails without c
 
 ## Requirements
 
-- .NET 10 SDK
+- Go 1.27+
 - Node.js 22+ and npm
-- MySQL 8.0+
+- SQLite (embedded; no separate install)
 
 ## Getting Started
 
@@ -29,31 +29,36 @@ cd MailVoid
 
 ### Backend
 
-```bash
-cd src/MailVoidApi
-```
+The API and SMTP server are Go services in `src/go`. They read the same `appsettings.json`,
+`appsettings.{Environment}.json`, user secrets (Development) and environment variables
+(`Section__Key`) as the original .NET services, and use the existing SQLite database as-is.
 
-Configure `appsettings.json` with your MySQL connection and JWT settings:
+Configure `src/go/cmd/mailvoid-api/appsettings.json` (or environment variables) with your
+database and JWT settings:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=mailvoid;User=root;Password=yourpassword;"
+    "DefaultConnection": "Data Source=mailvoid.db"
   },
   "JwtSettings": {
-    "Secret": "your-256-bit-secret-key-here",
-    "Issuer": "MailVoidApi",
-    "Audience": "MailVoidClient",
-    "ExpiryMinutes": 15
+    "Secret": "at-least-32-characters-long-secret-key",
+    "Issuer": "mailvoid",
+    "Audience": "mailvoid",
+    "ExpiryMinutes": 30
   }
 }
 ```
 
-Start the API (database tables are created automatically):
+Start the API (missing tables are created automatically; it listens on http://localhost:5133
+unless `ASPNETCORE_URLS` / `ASPNETCORE_HTTP_PORTS` say otherwise):
 
 ```bash
-dotnet run
+cd src/go/cmd/mailvoid-api
+go run .
 ```
+
+The SMTP server runs the same way from `src/go/cmd/mailvoid-smtp`.
 
 ### Frontend
 
@@ -73,34 +78,34 @@ Update `src/environments/environment.ts` if your API is not running on the defau
 ## Docker
 
 ```bash
-docker build -f src/MailVoidApi/Dockerfile -t mailvoid .
-docker run -p 5133:80 mailvoid
+docker build -f src/go/Dockerfile.api -t mailvoid src
+docker run -p 5133:8080 mailvoid
+
+docker build -f src/go/Dockerfile.smtp -t mailvoid-smtp src/go
 ```
 
 ## Tech Stack
 
 | Layer    | Technology                                    |
 | -------- | --------------------------------------------- |
-| Backend  | .NET 10, RoboDodd.OrmLite (Dapper), SignalR   |
+| Backend  | Go (net/http, go-smtp), SignalR-compatible hub |
 | Frontend | Angular 19, RxJS, Lucide, Bootstrap            |
-| Database | MySQL 8.0+                                     |
+| Database | SQLite                                         |
 
 ## Project Structure
 
 ```
 src/
-├── MailVoidApi/           # .NET backend API
-│   ├── Controllers/       # REST endpoints
-│   ├── Services/          # Business logic
-│   ├── Models/            # Entity models
-│   └── Data/              # Database service
-├── MailVoidSmtpServer/    # SMTP server for local development
+├── go/                    # Go backend
+│   ├── cmd/mailvoid-api/  # API entrypoint (+ default appsettings)
+│   ├── cmd/mailvoid-smtp/ # SMTP server entrypoint (+ default appsettings)
+│   └── internal/          # api, smtpd, config (.NET-compatible), ordered
 ├── MailVoidWeb/           # Angular frontend
 │   └── src/app/
 │       ├── Pages/         # Page components
 │       ├── _components/   # Shared components
 │       └── _services/     # API and auth services
-└── RoboDodd.OrmLite/     # ORM submodule
+└── legacy/                # Original .NET services (kept until the Go port is signed off)
 ```
 
 ## License

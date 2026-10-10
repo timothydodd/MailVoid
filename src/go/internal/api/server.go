@@ -1,0 +1,564 @@
+package api
+
+import (
+	"bufio"
+	"compress/flate"
+	"compress/gzip"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"mailvoid/internal/config"
+)
+
+type Server struct {
+	db          *sql.DB
+	log         *slog.Logger
+	jwt         JWTSettings
+	apiKeys     []APIKey
+	corsOrigins []string
+	webRoot     string
+	isDev       bool
+	hub         *Hub
+
+	loginLimiter   *rateLimiter
+	webhookLimiter *rateLimiter
+}
+
+func NewServer(cfg *config.Config, db *sql.DB, log *slog.Logger) (*Server, error) {
+	secret := cfg.Get("JwtSettings:Secret")
+	if strings.TrimSpace(secret) == "" || len(secret) < 32 {
+		return nil, errors.New("JwtSettings:Secret must be configured and at least 32 characters long")
+	}
+	expiry := cfg.Int("JwtSettings:ExpiryMinutes", 0)
+	if expiry <= 0 {
+		return nil, errors.New("JWT ExpiryMinutes must be a positive integer")
+	}
+	s := &Server{
+		db:  db,
+		log: log,
+		jwt: JWTSettings{
+			Secret:                 secret,
+			Issuer:                 cfg.Get("JwtSettings:Issuer"),
+			Audience:               cfg.Get("JwtSettings:Audience"),
+			ExpiryMinutes:          expiry,
+			RefreshTokenExpiryDays: cfg.Int("JwtSettings:RefreshTokenExpiryDays", 30),
+			CookieSameSite:         parseSameSite(cfg.String("JwtSettings:RefreshTokenCookieSameSite", "None")),
+			CookieSecure:           cfg.Bool("JwtSettings:RefreshTokenCookieSecure", true),
+		},
+		corsOrigins:    cfg.Strings("CorsOrigins"),
+		webRoot:        cfg.String("WebRoot", filepath.Join(cfg.ContentRoot, "wwwroot")),
+		isDev:          cfg.IsDevelopment(),
+		hub:            newHub(log),
+		loginLimiter:   newRateLimiter(5, time.Minute),
+		webhookLimiter: newRateLimiter(60, time.Minute),
+	}
+	if s.jwt.Issuer == "" || s.jwt.Audience == "" {
+		return nil, errors.New("JwtSettings:Issuer and JwtSettings:Audience must be configured")
+	}
+	for _, i := range cfg.Children("ApiKeys") {
+		p := "ApiKeys:" + i + ":"
+		s.apiKeys = append(s.apiKeys, APIKey{
+			Name:    cfg.Get(p + "Name"),
+			Key:     cfg.Get(p + "Key"),
+			Enabled: cfg.Bool(p+"Enabled", true),
+			Scopes:  cfg.Strings(p + "Scopes"),
+		})
+	}
+	return s, nil
+}
+
+func parseSameSite(v string) http.SameSite {
+	switch strings.ToLower(v) {
+	case "lax":
+		return http.SameSiteLaxMode
+	case "strict":
+		return http.SameSiteStrictMode
+	case "unspecified":
+		return http.SameSiteDefaultMode
+	}
+	return http.SameSiteNoneMode
+}
+
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	auth := s.requireAuth
+
+	// Auth
+	mux.HandleFunc("POST /api/auth/login", s.rateLimit(s.loginLimiter, s.handleLogin))
+	mux.HandleFunc("GET /api/auth/user", auth(s.handleGetUser))
+	mux.HandleFunc("POST /api/auth/change-password", auth(s.handleChangePassword))
+	mux.HandleFunc("POST /api/auth/refresh", s.handleRefresh)
+	mux.HandleFunc("POST /api/auth/revoke", auth(s.handleRevoke))
+	mux.HandleFunc("POST /api/auth/logout", auth(s.handleLogout))
+
+	// Mail
+	mux.HandleFunc("GET /api/mail/{id}", auth(s.handleGetMail))
+	mux.HandleFunc("GET /api/mail/boxes", auth(s.handleGetBoxes))
+	mux.HandleFunc("POST /api/mail", auth(s.handleGetMails))
+	mux.HandleFunc("DELETE /api/mail/boxes", auth(s.handleDeleteBox))
+	mux.HandleFunc("GET /api/mail/groups", auth(s.handleGetMailGroups))
+	mux.HandleFunc("POST /api/mail/groups/{id}/hide", auth(s.handleHideMailGroup))
+	mux.HandleFunc("DELETE /api/mail/groups/{id}/hide", auth(s.handleUnhideMailGroup))
+	mux.HandleFunc("GET /api/mail/groups/all", auth(s.handleGetAllMailGroups))
+	mux.HandleFunc("POST /api/mail/groups/{id}/access", auth(s.handleGrantAccess))
+	mux.HandleFunc("DELETE /api/mail/groups/{id}/access/{userId}", auth(s.handleRevokeAccess))
+	mux.HandleFunc("PUT /api/mail/groups/{id}", auth(s.handleUpdateMailGroup))
+	mux.HandleFunc("GET /api/mail/groups/{id}/users", auth(s.handleGetMailGroupUsers))
+	mux.HandleFunc("GET /api/mail/users", auth(s.handleGetUsers))
+	mux.HandleFunc("POST /api/mail/mail-groups", auth(s.handleCreateMailGroup))
+	mux.HandleFunc("DELETE /api/mail/mail-groups/{id}", auth(s.handleDeleteMailGroup))
+	mux.HandleFunc("GET /api/mail/mailbox/{id}/retention", auth(s.handleGetRetention))
+	mux.HandleFunc("PUT /api/mail/mailbox/{id}/retention", auth(s.handleUpdateRetention))
+	mux.HandleFunc("POST /api/mail/mark-all-read", auth(s.handleMarkAllAsRead))
+
+	// Mail server webhook (SMTP server -> API)
+	mux.HandleFunc("POST /api/webhook/mail", s.requireAPIKey(s.handleMailWebhook))
+
+	// Anonymous webhook capture
+	for _, m := range []string{"POST", "PUT", "PATCH"} {
+		mux.HandleFunc(m+" /api/hook/{bucket}", s.rateLimit(s.webhookLimiter, s.handleCaptureWebhook))
+		mux.HandleFunc(m+" /api/hook/{bucket}/{path...}", s.rateLimit(s.webhookLimiter, s.handleCaptureWebhook))
+	}
+
+	// Webhook management
+	mux.HandleFunc("GET /api/webhooks/buckets", auth(s.handleGetBuckets))
+	mux.HandleFunc("GET /api/webhooks/buckets/{name}", auth(s.handleGetBucket))
+	mux.HandleFunc("GET /api/webhooks/buckets/{name}/webhooks", auth(s.handleGetWebhooks))
+	mux.HandleFunc("GET /api/webhooks/{id}", auth(s.handleGetWebhook))
+	mux.HandleFunc("DELETE /api/webhooks/{id}", auth(s.handleDeleteWebhook))
+	mux.HandleFunc("DELETE /api/webhooks/buckets/{name}", auth(s.handleDeleteBucket))
+
+	// User management. ASP.NET routing is case-insensitive and the route came from
+	// [controller], so accept both spellings.
+	for _, base := range []string{"/api/UserManagement", "/api/usermanagement"} {
+		mux.HandleFunc("GET "+base, auth(s.handleListUsers))
+		mux.HandleFunc("GET "+base+"/{id}", auth(s.handleGetUserByID))
+		mux.HandleFunc("POST "+base, auth(s.handleCreateUser))
+		mux.HandleFunc("PUT "+base+"/{id}/role", auth(s.handleUpdateUserRole))
+		mux.HandleFunc("PUT "+base+"/{id}/password", auth(s.handleUpdateUserPassword))
+		mux.HandleFunc("DELETE "+base+"/{id}", auth(s.handleDeleteUser))
+	}
+
+	mux.HandleFunc("/api/health", s.handleHealth)
+
+	// SignalR hub
+	mux.HandleFunc("POST /hubs/mail/negotiate", auth(s.hub.handleNegotiate))
+	mux.HandleFunc("/hubs/mail", auth(s.hub.handleConnect))
+
+	mux.HandleFunc("/", s.handleStatic)
+
+	var h http.Handler = mux
+	h = s.securityHeaders(h)
+	h = s.cors(h)
+	h = gzipResponses(h)
+	h = decompressRequests(h)
+	h = s.recoverPanics(h)
+	h = s.requestLogging(h)
+	return h
+}
+
+// ---- Response helpers ----
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeText(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = io.WriteString(w, msg)
+}
+
+// writeProblem matches the ProblemDetails body [ApiController] returns for bare
+// NotFound()/BadRequest()/Unauthorized() results.
+func writeProblem(w http.ResponseWriter, status int) {
+	types := map[int]string{
+		400: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+		401: "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+		404: "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+	}
+	w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"type":   types[status],
+		"title":  http.StatusText(status),
+		"status": status,
+	})
+}
+
+func writeMessage(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"message": msg})
+}
+
+// forbid is ControllerBase.Forbid(): an empty 403.
+func forbid(w http.ResponseWriter) { w.WriteHeader(http.StatusForbidden) }
+
+// decodeBody reads a JSON request body. An empty body is allowed when allowEmpty is set
+// (EmptyBodyBehavior.Allow); otherwise it is a 400 like ASP.NET model binding.
+func decodeBody(r *http.Request, v any, allowEmpty bool) error {
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		if allowEmpty {
+			return nil
+		}
+		return errors.New("request body is required")
+	}
+	return json.Unmarshal(data, v)
+}
+
+func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error) {
+	s.log.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+	writeJSON(w, http.StatusInternalServerError, map[string]any{
+		"error": map[string]any{
+			"message":   "An internal server error occurred",
+			"type":      "Exception",
+			"timestamp": Now(),
+			"path":      r.URL.Path,
+			"method":    r.Method,
+		},
+	})
+}
+
+// ---- Middleware ----
+
+func (s *Server) securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		if r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// cors reproduces the "MailVoidOrigins" policy: configured origins with credentials, or
+// any origin without credentials when none are configured. X-Total-Count is exposed.
+func (s *Server) cors(next http.Handler) http.Handler {
+	allowed := map[string]bool{}
+	for _, o := range s.corsOrigins {
+		allowed[strings.ToLower(strings.TrimRight(o, "/"))] = true
+	}
+	anyOrigin := len(allowed) == 0
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		preflight := r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != ""
+		if origin == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		h := w.Header()
+		ok := anyOrigin || allowed[strings.ToLower(origin)]
+		if ok {
+			if anyOrigin {
+				h.Set("Access-Control-Allow-Origin", "*")
+			} else {
+				h.Set("Access-Control-Allow-Origin", origin)
+				h.Set("Access-Control-Allow-Credentials", "true")
+				h.Add("Vary", "Origin")
+			}
+		}
+		if preflight {
+			if ok {
+				h.Set("Access-Control-Allow-Methods", r.Header.Get("Access-Control-Request-Method"))
+				if rh := r.Header.Get("Access-Control-Request-Headers"); rh != "" {
+					h.Set("Access-Control-Allow-Headers", rh)
+				}
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if ok {
+			h.Set("Access-Control-Expose-Headers", "X-Total-Count")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) recoverPanics(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if v := recover(); v != nil {
+				if v == http.ErrAbortHandler {
+					panic(v)
+				}
+				s.internalError(w, r, fmt.Errorf("panic: %v", v))
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+var sensitiveQuery = regexp.MustCompile(`(?i)([?&](?:api_key|access_token)=)[^&]*`)
+
+func redactQuery(rawQuery string) string {
+	if rawQuery == "" {
+		return ""
+	}
+	return sensitiveQuery.ReplaceAllString("?"+rawQuery, "${1}***")
+}
+
+func (s *Server) requestLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.ToLower(r.URL.Path)
+		if !strings.HasPrefix(p, "/api") && !strings.HasPrefix(p, "/hubs") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		start := time.Now()
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(sw, r)
+		level := slog.LevelInfo
+		if sw.status >= 400 {
+			level = slog.LevelWarn
+		}
+		s.log.Log(r.Context(), level, "HTTP request",
+			"method", r.Method, "path", r.URL.Path+redactQuery(r.URL.RawQuery),
+			"status", sw.status, "durationMs", time.Since(start).Milliseconds(), "ip", clientIP(r))
+	})
+}
+
+// clientIP is used for logging only (matches the .NET logging middleware).
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		ip, _, _ := strings.Cut(xff, ",")
+		return strings.TrimSpace(ip)
+	}
+	if xr := r.Header.Get("X-Real-IP"); xr != "" {
+		return xr
+	}
+	return remoteIP(r)
+}
+
+// remoteIP is the connection's peer address (HttpContext.Connection.RemoteIpAddress);
+// no forwarded-headers processing was configured in the .NET API.
+func remoteIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return http.NewResponseController(w.ResponseWriter).Hijack()
+}
+
+func (w *statusWriter) Flush() { _ = http.NewResponseController(w.ResponseWriter).Flush() }
+
+// ---- Rate limiting (fixed window per remote IP) ----
+
+type rateLimiter struct {
+	mu      sync.Mutex
+	limit   int
+	window  time.Duration
+	buckets map[string]*rateWindow
+}
+
+type rateWindow struct {
+	start time.Time
+	count int
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{limit: limit, window: window, buckets: map[string]*rateWindow{}}
+}
+
+func (l *rateLimiter) allow(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	if len(l.buckets) > 10000 {
+		for k, b := range l.buckets {
+			if now.Sub(b.start) >= l.window {
+				delete(l.buckets, k)
+			}
+		}
+	}
+	b := l.buckets[key]
+	if b == nil || now.Sub(b.start) >= l.window {
+		l.buckets[key] = &rateWindow{start: now, count: 1}
+		return true
+	}
+	if b.count >= l.limit {
+		return false
+	}
+	b.count++
+	return true
+}
+
+func (s *Server) rateLimit(l *rateLimiter, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !l.allow(remoteIP(r)) {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// ---- Compression ----
+
+var compressibleTypes = []string{"text/", "application/json", "application/javascript", "application/xml",
+	"application/problem+json", "image/svg+xml", "application/wasm"}
+
+type gzipWriter struct {
+	http.ResponseWriter
+	gz          *gzip.Writer
+	wroteHeader bool
+	compress    bool
+}
+
+func (g *gzipWriter) WriteHeader(code int) {
+	if g.wroteHeader {
+		return
+	}
+	g.wroteHeader = true
+	ct := g.Header().Get("Content-Type")
+	if g.Header().Get("Content-Encoding") == "" && code != http.StatusNoContent && code != http.StatusNotModified {
+		for _, t := range compressibleTypes {
+			if strings.HasPrefix(ct, t) {
+				g.compress = true
+				break
+			}
+		}
+	}
+	if g.compress {
+		g.Header().Set("Content-Encoding", "gzip")
+		g.Header().Del("Content-Length")
+		g.Header().Add("Vary", "Accept-Encoding")
+		g.gz = gzip.NewWriter(g.ResponseWriter)
+	}
+	g.ResponseWriter.WriteHeader(code)
+}
+
+func (g *gzipWriter) Write(b []byte) (int, error) {
+	if !g.wroteHeader {
+		if g.Header().Get("Content-Type") == "" {
+			g.Header().Set("Content-Type", http.DetectContentType(b))
+		}
+		g.WriteHeader(http.StatusOK)
+	}
+	if g.compress {
+		return g.gz.Write(b)
+	}
+	return g.ResponseWriter.Write(b)
+}
+
+func (g *gzipWriter) Flush() {
+	if g.gz != nil {
+		_ = g.gz.Flush()
+	}
+	_ = http.NewResponseController(g.ResponseWriter).Flush()
+}
+
+func (g *gzipWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }
+
+func gzipResponses(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/hubs") || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || r.Method == http.MethodHead {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Byte ranges would refer to the uncompressed file; serve whole responses instead.
+		r.Header.Del("Range")
+		gw := &gzipWriter{ResponseWriter: w}
+		next.ServeHTTP(gw, r)
+		if gw.gz != nil {
+			_ = gw.gz.Close()
+		}
+	})
+}
+
+// decompressRequests mirrors AddRequestDecompression for gzip/deflate bodies.
+func decompressRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch strings.ToLower(r.Header.Get("Content-Encoding")) {
+		case "gzip":
+			zr, err := gzip.NewReader(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			r.Body = zr
+		case "deflate":
+			r.Body = flate.NewReader(r.Body)
+		default:
+			next.ServeHTTP(w, r)
+			return
+		}
+		r.Header.Del("Content-Encoding")
+		r.Header.Del("Content-Length")
+		r.ContentLength = -1
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ---- Static SPA files ----
+
+// handleStatic serves wwwroot (UseDefaultFiles + UseStaticFiles) and falls back to
+// index.html for extension-less paths (MapFallbackToFile).
+func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/hubs/") {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	clean := path.Clean("/" + r.URL.Path)
+	full := filepath.Join(s.webRoot, filepath.FromSlash(clean))
+	if fi, err := os.Stat(full); err == nil {
+		if fi.IsDir() {
+			index := filepath.Join(full, "index.html")
+			if _, err := os.Stat(index); err == nil {
+				http.ServeFile(w, r, index)
+				return
+			}
+		} else {
+			http.ServeFile(w, r, full)
+			return
+		}
+	}
+	if path.Ext(clean) != "" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	index := filepath.Join(s.webRoot, "index.html")
+	if _, err := os.Stat(index); err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	http.ServeFile(w, r, index)
+}

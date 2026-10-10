@@ -1,8 +1,8 @@
 name: Build and Deploy
 
+# Legacy .NET API image. Main now builds the Go images (go.yml); the Docker job here
+# only runs on demand (e.g. to publish a rollback image). PRs still build the frontend.
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -31,13 +31,13 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Restore dependencies
-      run: dotnet restore src/MailVoidApi/MailVoidApi.csproj
+      run: dotnet restore src/legacy/MailVoidApi/MailVoidApi.csproj
 
     - name: Build
-      run: dotnet build src/MailVoidApi/MailVoidApi.csproj --configuration Release --no-restore
+      run: dotnet build src/legacy/MailVoidApi/MailVoidApi.csproj --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test src/MailVoidApi/MailVoidApi.csproj --no-restore --verbosity normal
+      run: dotnet test src/legacy/MailVoidApi/MailVoidApi.csproj --no-restore --verbosity normal
       continue-on-error: true
 
   build-frontend:
@@ -83,7 +83,7 @@ jobs:
   docker-build:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
     - name: Checkout repository
@@ -114,7 +114,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./src/
-        file: ./src/MailVoidApi/Dockerfile
+        file: ./src/legacy/MailVoidApi/Dockerfile
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}

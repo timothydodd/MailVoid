@@ -1,0 +1,120 @@
+package smtpd
+
+import (
+	"log/slog"
+	"strings"
+)
+
+// MailboxFilter keeps the server from acting as an open relay: it only accepts mail
+// addressed to the configured test domains.
+type MailboxFilter struct {
+	log            *slog.Logger
+	opts           FilterOptions
+	maxMessageSize int
+}
+
+func NewMailboxFilter(log *slog.Logger, opts FilterOptions, maxMessageSize int) *MailboxFilter {
+	return &MailboxFilter{log: log, opts: opts, maxMessageSize: maxMessageSize}
+}
+
+func (f *MailboxFilter) CanAcceptFrom(from string, size int64) bool {
+	f.log.Debug("Checking if can accept email", "from", from, "size", size)
+
+	if strings.TrimSpace(from) == "" {
+		f.log.Warn("Rejected email with empty sender address")
+		return false
+	}
+
+	domain := GetDomainFromEmail(from)
+	for _, blocked := range f.opts.BlockedDomains {
+		if strings.EqualFold(blocked, domain) {
+			f.log.Warn("Rejected email from blocked domain", "domain", domain)
+			return false
+		}
+	}
+
+	if !IsValidEmailFormat(from) {
+		f.log.Warn("Rejected email with invalid format", "email", from)
+		return false
+	}
+
+	// Advisory MAIL FROM SIZE check; go-smtp enforces the hard limit during DATA.
+	if size > int64(f.maxMessageSize) {
+		f.log.Warn("Rejected email exceeding size limit", "size", size, "max", f.maxMessageSize)
+		return false
+	}
+
+	f.log.Info("Accepted email", "from", from)
+	return true
+}
+
+func (f *MailboxFilter) CanDeliverTo(to, from string) bool {
+	f.log.Debug("Checking if can deliver", "to", to, "from", from)
+
+	if strings.TrimSpace(to) == "" {
+		f.log.Warn("Rejected delivery to empty recipient address")
+		return false
+	}
+	if !IsValidEmailFormat(to) {
+		f.log.Warn("Rejected delivery to invalid email format", "email", to)
+		return false
+	}
+
+	toDomain := GetDomainFromEmail(to)
+	if !IsAllowedDomain(toDomain, f.opts.AllowedDomains) {
+		f.log.Warn("Rejected delivery to non-test domain", "domain", toDomain,
+			"allowedDomains", strings.Join(f.opts.AllowedDomains, ", "))
+		return false
+	}
+
+	if strings.EqualFold(from, to) {
+		f.log.Warn("Rejected email loop attempt", "email", to)
+		return false
+	}
+
+	f.log.Info("Accepted delivery", "to", to)
+	return true
+}
+
+func GetDomainFromEmail(email string) string {
+	if i := strings.LastIndex(email, "@"); i >= 0 {
+		return email[i+1:]
+	}
+	return ""
+}
+
+// IsAllowedDomain matches an allowed domain exactly or as a parent domain, so
+// "sub.mailvoid.com" matches "mailvoid.com" but the lookalike "notmailvoid.com" does not.
+func IsAllowedDomain(domain string, allowed []string) bool {
+	if strings.TrimSpace(domain) == "" {
+		return false
+	}
+	lower := strings.ToLower(domain)
+	for _, a := range allowed {
+		if strings.TrimSpace(a) == "" {
+			continue
+		}
+		la := strings.ToLower(a)
+		if lower == la || strings.HasSuffix(lower, "."+la) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsValidEmailFormat(email string) bool {
+	if strings.TrimSpace(email) == "" {
+		return false
+	}
+	at := strings.Index(email, "@")
+	if at <= 0 || at == len(email)-1 {
+		return false
+	}
+	if strings.Count(email, "@") != 1 {
+		return false
+	}
+	if !strings.Contains(email[at+1:], ".") {
+		return false
+	}
+	return !strings.ContainsAny(email, " \t\n\r()[]\\,;:<>")
+}

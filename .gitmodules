@@ -1,5 +1,5 @@
 [submodule "src/RoboDodd.OrmLite"]
-	path = src/RoboDodd.OrmLite
+	path = src/legacy/RoboDodd.OrmLite
 	url = https://github.com/timothydodd/RoboDodd.OrmLite.git
 [submodule "src/MailVoidWeb/src/rd-ui"]
 	path = src/MailVoidWeb/src/rd-ui

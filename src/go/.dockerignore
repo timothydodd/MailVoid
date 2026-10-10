@@ -1,0 +1,3 @@
+# Build context for Dockerfile.smtp is src/go
+**/*.db
+spool

@@ -1,0 +1,10 @@
+# Build context for Dockerfile.api is src/
+**/node_modules
+**/bin
+**/obj
+**/.angular
+**/.vs
+**/.vscode
+legacy
+MailVoidWeb/dist
+go/**/*.db
