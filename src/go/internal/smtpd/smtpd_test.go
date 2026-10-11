@@ -220,21 +220,50 @@ func TestQueue_EnqueuePersistsBeforeReturning(t *testing.T) {
 	}
 }
 
+// loadNext pops the next entry and reads its content from the spool, as a worker does.
+func loadNext(t *testing.T, q *Queue) *QueuedEmail {
+	t.Helper()
+	select {
+	case e := <-q.Items():
+		item, err := q.Load(e)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return item
+	case <-time.After(2 * time.Second):
+		t.Fatal("no queued item")
+	}
+	return nil
+}
+
 func TestQueue_MarkFailedDeadLettersAfterMaxRetries(t *testing.T) {
 	dir := t.TempDir()
 	q := newTestQueue(t, dir, 3)
 	q.Enqueue(context.Background(), sample())
-	item := <-q.Items()
+	item := loadNext(t, q)
 
 	for i := 1; i <= 2; i++ {
 		q.MarkFailed(item, "boom")
-		if item.Attempts != i || len(q.FailedEmails()) != 0 {
-			t.Fatalf("after %d failures: attempts=%d failed=%d", i, item.Attempts, len(q.FailedEmails()))
+		if total, _ := q.DeadLetterStats(); item.Attempts != i || total != 0 {
+			t.Fatalf("after %d failures: attempts=%d dead=%d", i, item.Attempts, total)
+		}
+		// Retrying entries are counted once, not in both the pending counter and the retry map.
+		if got := q.PendingCount(); got != 1 {
+			t.Fatalf("PendingCount while retrying = %d, want 1", got)
+		}
+		// Retry timer fires; the worker reloads the message (and its attempt count) from disk.
+		q.requeueDue(time.Now().Add(time.Hour))
+		item = loadNext(t, q)
+		if item.Attempts != i {
+			t.Fatalf("reloaded attempts = %d, want %d", item.Attempts, i)
 		}
 	}
 	q.MarkFailed(item, "boom")
-	if item.Attempts != 3 || len(q.FailedEmails()) != 1 {
-		t.Fatalf("attempts=%d failed=%d", item.Attempts, len(q.FailedEmails()))
+	if total, _ := q.DeadLetterStats(); item.Attempts != 3 || total != 1 {
+		t.Fatalf("attempts=%d dead=%d", item.Attempts, total)
+	}
+	if got := q.PendingCount(); got != 0 {
+		t.Fatalf("PendingCount after dead-letter = %d", got)
 	}
 	if files, _ := filepath.Glob(filepath.Join(dir, "dead-letter", "*.json")); len(files) != 1 {
 		t.Fatalf("dead-letter files = %d", len(files))
@@ -248,9 +277,12 @@ func TestQueue_MarkProcessedDeletesSpoolFile(t *testing.T) {
 	dir := t.TempDir()
 	q := newTestQueue(t, dir, 3)
 	q.Enqueue(context.Background(), sample())
-	q.MarkProcessed(<-q.Items())
+	q.MarkProcessed(loadNext(t, q))
 	if files, _ := filepath.Glob(filepath.Join(dir, "*.json")); len(files) != 0 {
 		t.Fatalf("spool files = %d", len(files))
+	}
+	if got := q.PendingCount(); got != 0 {
+		t.Fatalf("PendingCount = %d", got)
 	}
 }
 
@@ -259,10 +291,48 @@ func TestQueue_LoadSpoolRecoversItems(t *testing.T) {
 	newTestQueue(t, dir, 3).Enqueue(context.Background(), sample())
 
 	recovered := newTestQueue(t, dir, 3)
+	recovered.ScanSpool()
 	recovered.LoadSpool(context.Background())
-	item := <-recovered.Items()
-	if item.EmailData.From != "sender@example.com" {
+	if item := loadNext(t, recovered); item.EmailData.From != "sender@example.com" {
 		t.Fatalf("From = %q", item.EmailData.From)
+	}
+}
+
+// A message accepted after the startup scan must not also be picked up by LoadSpool.
+func TestQueue_StartupScanDoesNotDoubleDeliver(t *testing.T) {
+	dir := t.TempDir()
+	newTestQueue(t, dir, 3).Enqueue(context.Background(), sample()) // left over from a previous run
+
+	q := newTestQueue(t, dir, 3)
+	q.ScanSpool()
+	q.Enqueue(context.Background(), sample()) // accepted during startup
+	q.LoadSpool(context.Background())
+
+	if n := len(q.Items()); n != 2 {
+		t.Fatalf("queued entries = %d, want 2 (one leftover + one new)", n)
+	}
+}
+
+func TestQueue_RemovesTempFilesAtStartup(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "abc.json.tmp"), []byte("{partial"), 0o644)
+	newTestQueue(t, dir, 3)
+	if files, _ := filepath.Glob(filepath.Join(dir, "*.tmp")); len(files) != 0 {
+		t.Fatalf("temp files left = %v", files)
+	}
+}
+
+// Spool files keep <, > and & unescaped so HTML mail doesn't bloat 6x on disk.
+func TestQueue_SpoolDoesNotEscapeHTML(t *testing.T) {
+	dir := t.TempDir()
+	q := newTestQueue(t, dir, 3)
+	d := sample()
+	d.Html = strPtr("<p>a & b</p>")
+	q.Enqueue(context.Background(), d)
+	files, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	b, _ := os.ReadFile(files[0])
+	if !strings.Contains(string(b), "<p>a & b</p>") {
+		t.Fatalf("spool file escaped HTML: %s", b)
 	}
 }
 
@@ -274,8 +344,9 @@ func TestQueue_LoadsDotNetSpoolFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := newTestQueue(t, dir, 3)
+	q.ScanSpool()
 	q.LoadSpool(context.Background())
-	item := <-q.Items()
+	item := loadNext(t, q)
 	if item.Attempts != 1 || !item.EmailData.ParseFailed || item.EmailData.To[0] != "b@mailvoid.com" || item.QueuedAt.Year() != 2026 {
 		t.Fatalf("unexpected item: %+v", item)
 	}

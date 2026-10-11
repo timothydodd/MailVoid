@@ -44,18 +44,27 @@ func (s *CertStore) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, erro
 }
 
 // Reload re-reads the certificate from disk and reports whether one is now available.
+// If a certificate is configured but fails to load (unreadable or half-written renewal,
+// expired file) the previous certificate stays active, so TLS isn't silently dropped.
 func (s *CertStore) Reload() bool {
-	cert := s.load()
+	cert, failed := s.load()
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if cert == nil && failed && s.cert != nil && !isExpired(s.cert) {
+		s.log.Error("Keeping the previously loaded certificate because the reload failed",
+			"notAfter", s.cert.Leaf.NotAfter.UTC())
+		return true
+	}
 	s.cert = cert
-	s.mu.Unlock()
 	return cert != nil
 }
 
-func (s *CertStore) load() *tls.Certificate {
+// load returns the configured certificate. failed reports that a certificate source was
+// configured but couldn't be used, as opposed to TLS simply not being configured.
+func (s *CertStore) load() (cert *tls.Certificate, failed bool) {
 	if !s.server.EnableSsl {
 		s.log.Info("SSL is disabled in configuration")
-		return nil
+		return nil, false
 	}
 
 	if d := strings.TrimSpace(s.server.LetsEncryptDomain); d != "" {
@@ -63,27 +72,28 @@ func (s *CertStore) load() *tls.Certificate {
 		if cert, err := loadLetsEncryptCert(s.le, d); err == nil {
 			if isExpired(cert) {
 				s.log.Error("Let's Encrypt certificate is expired; refusing to use it", "domain", d, "notAfter", cert.Leaf.NotAfter.UTC())
+				failed = true
 			} else {
 				s.log.Info("Successfully loaded Let's Encrypt certificate", "domain", d, "notAfter", cert.Leaf.NotAfter.UTC())
-				return cert
+				return cert, false
 			}
 		} else {
 			s.log.Warn("Let's Encrypt certificate not available", "domain", d, "error", err)
+			failed = true
 		}
 	}
 
 	path := strings.TrimSpace(s.server.CertificatePath)
 	if path == "" {
 		s.log.Warn("SSL is enabled but no certificate path is configured and Let's Encrypt certificate is not available")
-		return nil
+		return nil, failed
 	}
 	if _, err := os.Stat(path); err != nil {
 		s.log.Error("Certificate file not found", "path", path)
-		return nil
+		return nil, true
 	}
 
 	s.log.Info("Loading certificate", "path", path)
-	var cert *tls.Certificate
 	var err error
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".pfx", ".p12":
@@ -92,22 +102,22 @@ func (s *CertStore) load() *tls.Certificate {
 		cert, err = loadPem(path)
 	default:
 		s.log.Error("Unsupported certificate format. Supported formats: .pfx, .p12, .pem, .crt", "extension", filepath.Ext(path))
-		return nil
+		return nil, true
 	}
 	if err != nil {
 		s.log.Error("Failed to load certificate", "path", path, "error", err)
-		return nil
+		return nil, true
 	}
 
 	s.log.Info("Certificate loaded successfully", "subject", cert.Leaf.Subject.String(), "expiresUtc", cert.Leaf.NotAfter.UTC())
 	if isExpired(cert) {
 		s.log.Error("Certificate has expired; refusing to use it", "expiresUtc", cert.Leaf.NotAfter.UTC())
-		return nil
+		return nil, true
 	}
 	if time.Until(cert.Leaf.NotAfter) < 30*24*time.Hour {
 		s.log.Warn("Certificate will expire soon", "expiresUtc", cert.Leaf.NotAfter.UTC())
 	}
-	return cert
+	return cert, false
 }
 
 // loadLetsEncryptCert finds a certbot-issued certificate. The .NET service ran certbot

@@ -58,12 +58,10 @@ func extractMail(d *MailData) *Mail {
 		body = html
 	}
 
+	// CreatedOn is the receipt time. The .NET code used the sender's Date header when it
+	// could parse it, which let a sender control sort order and retention (a far-future
+	// date never expired; an old one was deleted on the next sweep).
 	createdOn := time.Now().UTC()
-	if date, ok := h.Get("Date"); ok {
-		if t, ok := parseMailDate(date); ok {
-			createdOn = t
-		}
-	}
 
 	m := &Mail{
 		From:        extractEmailAddress(d.From),
@@ -175,40 +173,6 @@ func charsetFromContentType(contentType string) *string {
 		return nil
 	}
 	return strPtr(strings.TrimSpace(m[1]))
-}
-
-// Layouts equivalent to the .NET ParseExact formats plus the common forms its general
-// DateTime.TryParse fallback accepted. Like .NET, a trailing comment such as "(UTC)" makes
-// parsing fail, in which case the receipt time is used.
-var mailDateLayouts = []string{
-	"Mon, 2 Jan 2006 15:04:05 -0700",
-	"Mon, 2 Jan 2006 15:04:05 -07:00",
-	"2 Jan 2006 15:04:05 -0700",
-	"2 Jan 2006 15:04:05 -07:00",
-	"2006-01-02 15:04:05",
-	"2006-01-02 15:04:05 -07:00",
-	"2006-01-02 15:04:05 -0700",
-	"Mon, 2 Jan 2006 15:04:05 MST",
-	time.RFC3339Nano,
-	"2006-01-02T15:04:05",
-}
-
-func parseMailDate(s string) (time.Time, bool) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return time.Time{}, false
-	}
-	for _, layout := range mailDateLayouts {
-		if t, err := time.Parse(layout, s); err == nil {
-			// Reject absurd Date headers so a spoofed value can't skew ordering/retention.
-			utc, now := t.UTC(), time.Now().UTC()
-			if utc.After(now.AddDate(0, 0, 1)) || utc.Before(now.AddDate(-10, 0, 0)) {
-				return time.Time{}, false
-			}
-			return utc, true
-		}
-	}
-	return time.Time{}, false
 }
 
 var wordDecoder = &mime.WordDecoder{

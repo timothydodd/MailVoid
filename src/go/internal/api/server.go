@@ -2,8 +2,7 @@ package api
 
 import (
 	"bufio"
-	"compress/flate"
-	"compress/gzip"
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,8 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
-	"path"
+	"net/netip"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -32,6 +30,9 @@ type Server struct {
 	webRoot     string
 	isDev       bool
 	hub         *Hub
+	static      *staticCache
+
+	trustedProxies []netip.Prefix
 
 	loginLimiter   *rateLimiter
 	webhookLimiter *rateLimiter
@@ -64,6 +65,8 @@ func NewServer(cfg *config.Config, db *sql.DB, log *slog.Logger) (*Server, error
 		hub:            newHub(log),
 		loginLimiter:   newRateLimiter(5, time.Minute),
 		webhookLimiter: newRateLimiter(60, time.Minute),
+		static:         newStaticCache(),
+		trustedProxies: loadTrustedProxies(cfg),
 	}
 	if s.jwt.Issuer == "" || s.jwt.Audience == "" {
 		return nil, errors.New("JwtSettings:Issuer and JwtSettings:Audience must be configured")
@@ -163,8 +166,9 @@ func (s *Server) Handler() http.Handler {
 	var h http.Handler = mux
 	h = s.securityHeaders(h)
 	h = s.cors(h)
-	h = gzipResponses(h)
+	h = compressResponses(h)
 	h = decompressRequests(h)
+	h = readDeadlines(h)
 	h = s.recoverPanics(h)
 	h = s.requestLogging(h)
 	return h
@@ -215,7 +219,7 @@ func decodeBody(r *http.Request, v any, allowEmpty bool) error {
 	if err != nil {
 		return err
 	}
-	if len(strings.TrimSpace(string(data))) == 0 {
+	if len(bytes.TrimSpace(data)) == 0 {
 		if allowEmpty {
 			return nil
 		}
@@ -332,30 +336,8 @@ func (s *Server) requestLogging(next http.Handler) http.Handler {
 		}
 		s.log.Log(r.Context(), level, "HTTP request",
 			"method", r.Method, "path", r.URL.Path+redactQuery(r.URL.RawQuery),
-			"status", sw.status, "durationMs", time.Since(start).Milliseconds(), "ip", clientIP(r))
+			"status", sw.status, "durationMs", time.Since(start).Milliseconds(), "ip", s.clientIP(r))
 	})
-}
-
-// clientIP is used for logging only (matches the .NET logging middleware).
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ip, _, _ := strings.Cut(xff, ",")
-		return strings.TrimSpace(ip)
-	}
-	if xr := r.Header.Get("X-Real-IP"); xr != "" {
-		return xr
-	}
-	return remoteIP(r)
-}
-
-// remoteIP is the connection's peer address (HttpContext.Connection.RemoteIpAddress);
-// no forwarded-headers processing was configured in the .NET API.
-func remoteIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
 
 type statusWriter struct {
@@ -419,146 +401,10 @@ func (l *rateLimiter) allow(key string) bool {
 
 func (s *Server) rateLimit(l *rateLimiter, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !l.allow(remoteIP(r)) {
+		if !l.allow(s.clientIP(r)) {
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
 		next(w, r)
 	}
-}
-
-// ---- Compression ----
-
-var compressibleTypes = []string{"text/", "application/json", "application/javascript", "application/xml",
-	"application/problem+json", "image/svg+xml", "application/wasm"}
-
-type gzipWriter struct {
-	http.ResponseWriter
-	gz          *gzip.Writer
-	wroteHeader bool
-	compress    bool
-}
-
-func (g *gzipWriter) WriteHeader(code int) {
-	if g.wroteHeader {
-		return
-	}
-	g.wroteHeader = true
-	ct := g.Header().Get("Content-Type")
-	if g.Header().Get("Content-Encoding") == "" && code != http.StatusNoContent && code != http.StatusNotModified {
-		for _, t := range compressibleTypes {
-			if strings.HasPrefix(ct, t) {
-				g.compress = true
-				break
-			}
-		}
-	}
-	if g.compress {
-		g.Header().Set("Content-Encoding", "gzip")
-		g.Header().Del("Content-Length")
-		g.Header().Add("Vary", "Accept-Encoding")
-		g.gz = gzip.NewWriter(g.ResponseWriter)
-	}
-	g.ResponseWriter.WriteHeader(code)
-}
-
-func (g *gzipWriter) Write(b []byte) (int, error) {
-	if !g.wroteHeader {
-		if g.Header().Get("Content-Type") == "" {
-			g.Header().Set("Content-Type", http.DetectContentType(b))
-		}
-		g.WriteHeader(http.StatusOK)
-	}
-	if g.compress {
-		return g.gz.Write(b)
-	}
-	return g.ResponseWriter.Write(b)
-}
-
-func (g *gzipWriter) Flush() {
-	if g.gz != nil {
-		_ = g.gz.Flush()
-	}
-	_ = http.NewResponseController(g.ResponseWriter).Flush()
-}
-
-func (g *gzipWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }
-
-func gzipResponses(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/hubs") || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || r.Method == http.MethodHead {
-			next.ServeHTTP(w, r)
-			return
-		}
-		// Byte ranges would refer to the uncompressed file; serve whole responses instead.
-		r.Header.Del("Range")
-		gw := &gzipWriter{ResponseWriter: w}
-		next.ServeHTTP(gw, r)
-		if gw.gz != nil {
-			_ = gw.gz.Close()
-		}
-	})
-}
-
-// decompressRequests mirrors AddRequestDecompression for gzip/deflate bodies.
-func decompressRequests(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch strings.ToLower(r.Header.Get("Content-Encoding")) {
-		case "gzip":
-			zr, err := gzip.NewReader(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			r.Body = zr
-		case "deflate":
-			r.Body = flate.NewReader(r.Body)
-		default:
-			next.ServeHTTP(w, r)
-			return
-		}
-		r.Header.Del("Content-Encoding")
-		r.Header.Del("Content-Length")
-		r.ContentLength = -1
-		next.ServeHTTP(w, r)
-	})
-}
-
-// ---- Static SPA files ----
-
-// handleStatic serves wwwroot (UseDefaultFiles + UseStaticFiles) and falls back to
-// index.html for extension-less paths (MapFallbackToFile).
-func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/hubs/") {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	clean := path.Clean("/" + r.URL.Path)
-	full := filepath.Join(s.webRoot, filepath.FromSlash(clean))
-	if fi, err := os.Stat(full); err == nil {
-		if fi.IsDir() {
-			index := filepath.Join(full, "index.html")
-			if _, err := os.Stat(index); err == nil {
-				http.ServeFile(w, r, index)
-				return
-			}
-		} else {
-			http.ServeFile(w, r, full)
-			return
-		}
-	}
-	if path.Ext(clean) != "" {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	index := filepath.Join(s.webRoot, "index.html")
-	if _, err := os.Stat(index); err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	http.ServeFile(w, r, index)
 }

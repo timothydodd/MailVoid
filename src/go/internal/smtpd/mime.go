@@ -124,42 +124,62 @@ var wordDecoder = &mime.WordDecoder{
 	},
 }
 
+// Header collection limits. Past them the remaining headers are not copied into the
+// Headers map (the raw source still has everything); this bounds the work a hostile
+// message can cause.
+const (
+	maxHeaderBlockBytes = 256 * 1024
+	maxHeaderFields     = 1000
+)
+
 // FlattenHeaders reads the top-level header block with original header-name casing.
 // Repeated headers (e.g. Received) are joined with "\n" so each stays intact. Values
 // are unfolded (CR/LF removed, continuation whitespace kept) and RFC 2047-decoded,
-// like MimeKit's Header.Value.
+// like MimeKit's Header.Value. Runs in linear time.
 func FlattenHeaders(raw []byte) ordered.Map {
-	var out ordered.Map
-	r := bufio.NewReader(bytes.NewReader(raw))
-	var name, value string
+	var order []string
+	values := map[string][]string{}
+	var name string
+	var value strings.Builder
+	fields, consumed := 0, 0
+
 	flush := func() {
 		if name == "" {
 			return
 		}
-		v := strings.TrimLeft(value, " \t")
+		v := strings.TrimLeft(value.String(), " \t")
 		if decoded, err := wordDecoder.DecodeHeader(v); err == nil {
 			v = decoded
 		}
-		if existing, ok := out.Get(name); ok {
-			v = existing + "\n" + v
+		if _, seen := values[name]; !seen {
+			order = append(order, name)
 		}
-		out.Set(name, v)
-		name, value = "", ""
+		values[name] = append(values[name], v)
+		name = ""
+		value.Reset()
 	}
+
+	r := bufio.NewReader(bytes.NewReader(raw))
 	for {
 		line, err := r.ReadString('\n')
+		consumed += len(line)
 		trimmed := strings.TrimRight(line, "\r\n")
-		if trimmed == "" {
+		if trimmed == "" || consumed > maxHeaderBlockBytes {
 			break // blank line ends the header block
 		}
 		if trimmed[0] == ' ' || trimmed[0] == '\t' {
 			if name != "" {
-				value += headerText(trimmed)
+				value.WriteString(headerText(trimmed))
 			}
 		} else {
 			flush()
+			if fields >= maxHeaderFields {
+				break
+			}
 			if k, v, ok := strings.Cut(trimmed, ":"); ok {
-				name, value = strings.TrimSpace(k), headerText(v)
+				name = strings.TrimSpace(k)
+				value.WriteString(headerText(v))
+				fields++
 			}
 		}
 		if err != nil {
@@ -167,6 +187,11 @@ func FlattenHeaders(raw []byte) ordered.Map {
 		}
 	}
 	flush()
+
+	var out ordered.Map
+	for _, n := range order {
+		out.Set(n, strings.Join(values[n], "\n"))
+	}
 	return out
 }
 

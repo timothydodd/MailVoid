@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -34,6 +35,14 @@ func visibilityArgs(p *Principal) []any {
 		admin = 1
 	}
 	return []any{sql.Named("UserId", p.UserID), sql.Named("UserSubdomain", sub), sql.Named("IsAdmin", admin)}
+}
+
+var validSubdomain = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+// canManageGroup: changing a group's sharing, settings or retention is limited to its
+// owner and admins. (The .NET API also let any user manage public groups.)
+func canManageGroup(g *MailGroup, p *Principal) bool {
+	return p.IsAdmin() || g.OwnerUserID.Equal(p.UserID)
 }
 
 func pathInt64(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
@@ -135,9 +144,12 @@ func (s *Server) handleGetBoxes(w http.ResponseWriter, r *http.Request, p *Princ
 
 	// One GROUP BY for unread counts instead of a query per mailbox.
 	unread := map[string]int{}
+	// Limited to mail the user can see, so it doesn't scan the whole table.
 	urows, err := s.db.QueryContext(ctx, `SELECT m.[To] AS ToAddress, COUNT(*) AS UnreadCount FROM Mail m
-		WHERE NOT EXISTS (SELECT 1 FROM UserMailRead umr WHERE umr.MailId = m.Id AND umr.UserId = @UserId)
-		GROUP BY m.[To]`, sql.Named("UserId", p.UserID))
+		LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path
+		WHERE `+mailVisibilityClause+`
+		AND NOT EXISTS (SELECT 1 FROM UserMailRead umr WHERE umr.MailId = m.Id AND umr.UserId = @UserId)
+		GROUP BY m.[To]`, visibilityArgs(p)...)
 	if err != nil {
 		s.internalError(w, r, err)
 		return
@@ -178,6 +190,14 @@ type mailWithReadStatus struct {
 	IsRead        bool    `json:"isRead"`
 }
 
+func scanMailListItem(row interface{ Scan(...any) error }) (*Mail, error) {
+	var m Mail
+	if err := row.Scan(&m.ID, &m.To, &m.From, &m.Subject, &m.Text, &m.IsHTML, &m.CreatedOn, &m.MailGroupPath); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 type pagedResults[T any] struct {
 	Items      []T   `json:"items"`
 	TotalCount int64 `json:"totalCount"`
@@ -186,7 +206,7 @@ type pagedResults[T any] struct {
 func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Principal) {
 	opts := filterOptions{Page: 1, PageSize: 50}
 	if err := decodeBody(r, &opts, true); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	if opts.Page < 1 {
@@ -215,7 +235,9 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 		return
 	}
 	pageArgs := append(args, sql.Named("Limit", opts.PageSize), sql.Named("Offset", (opts.Page-1)*opts.PageSize))
-	mails, err := queryAll(ctx, s.db, scanMail, `SELECT `+mailCols+` `+from+` ORDER BY m.CreatedOn DESC LIMIT @Limit OFFSET @Offset`, pageArgs...)
+	// Only the columns the list returns; raw source, headers and attachments can be large.
+	mails, err := queryAll(ctx, s.db, scanMailListItem, `SELECT m.Id, m.[To], m.[From], m.Subject, m.Text, m.IsHtml, m.CreatedOn, m.MailGroupPath `+
+		from+` ORDER BY m.CreatedOn DESC LIMIT @Limit OFFSET @Offset`, pageArgs...)
 	if err != nil {
 		s.internalError(w, r, err)
 		return
@@ -259,7 +281,7 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 func (s *Server) handleDeleteBox(w http.ResponseWriter, r *http.Request, p *Principal) {
 	var opts filterOptions
 	if err := decodeBody(r, &opts, false); err != nil || opts.To == nil || *opts.To == "" {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	ctx := r.Context()
@@ -343,6 +365,13 @@ func (s *Server) handleHideMailGroup(w http.ResponseWriter, r *http.Request, p *
 	if !ok {
 		return
 	}
+	if g, err := s.mailGroupByID(r.Context(), id); err != nil {
+		s.internalError(w, r, err)
+		return
+	} else if g == nil {
+		writeProblem(w, http.StatusNotFound)
+		return
+	}
 	if _, err := s.db.ExecContext(r.Context(), `INSERT OR IGNORE INTO HiddenMailGroup (UserId, MailGroupId, CreatedAt) VALUES (?, ?, ?)`,
 		p.UserID, id, Now()); err != nil {
 		s.internalError(w, r, err)
@@ -410,7 +439,7 @@ func (s *Server) handleGrantAccess(w http.ResponseWriter, r *http.Request, p *Pr
 		UserID GUID `json:"userId"`
 	}
 	if err := decodeBody(r, &req, false); err != nil || req.UserID == "" {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	ctx := r.Context()
@@ -423,17 +452,19 @@ func (s *Server) handleGrantAccess(w http.ResponseWriter, r *http.Request, p *Pr
 		writeProblem(w, http.StatusNotFound)
 		return
 	}
-	if !p.IsAdmin() {
-		if allowed, err := s.hasUserAccess(ctx, id, p.UserID); err != nil {
-			s.internalError(w, r, err)
-			return
-		} else if !allowed {
-			forbid(w)
-			return
-		}
+	if !canManageGroup(g, p) {
+		forbid(w)
+		return
 	}
 	if g.IsUserPrivate {
 		writeMessage(w, http.StatusBadRequest, "Private user mailboxes cannot be shared.")
+		return
+	}
+	if target, err := s.userByID(ctx, req.UserID); err != nil {
+		s.internalError(w, r, err)
+		return
+	} else if target == nil {
+		writeProblem(w, http.StatusNotFound)
 		return
 	}
 	exists, err := s.hasExplicitAccess(ctx, id, req.UserID)
@@ -471,10 +502,7 @@ func (s *Server) handleRevokeAccess(w http.ResponseWriter, r *http.Request, p *P
 		writeProblem(w, http.StatusNotFound)
 		return
 	}
-	if allowed, err := s.hasUserAccess(ctx, id, p.UserID); err != nil {
-		s.internalError(w, r, err)
-		return
-	} else if !allowed {
+	if !canManageGroup(g, p) {
 		forbid(w)
 		return
 	}
@@ -503,7 +531,7 @@ func (s *Server) handleUpdateMailGroup(w http.ResponseWriter, r *http.Request, p
 		IsPublic    bool    `json:"isPublic"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	ctx := r.Context()
@@ -516,10 +544,7 @@ func (s *Server) handleUpdateMailGroup(w http.ResponseWriter, r *http.Request, p
 		writeProblem(w, http.StatusNotFound)
 		return
 	}
-	if allowed, err := s.hasUserAccess(ctx, id, p.UserID); err != nil {
-		s.internalError(w, r, err)
-		return
-	} else if !allowed {
+	if !canManageGroup(g, p) {
 		forbid(w)
 		return
 	}
@@ -559,12 +584,17 @@ func (s *Server) handleGetMailGroupUsers(w http.ResponseWriter, r *http.Request,
 		writeProblem(w, http.StatusNotFound)
 		return
 	}
-	if allowed, err := s.hasUserAccess(ctx, id, p.UserID); err != nil {
-		s.internalError(w, r, err)
-		return
-	} else if !allowed {
-		forbid(w)
-		return
+	// Members can see who else has access; being public alone isn't enough.
+	if !canManageGroup(g, p) {
+		member, err := s.hasExplicitAccess(ctx, id, p.UserID)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		if !member {
+			forbid(w)
+			return
+		}
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT mgu.Id, mgu.MailGroupId, mgu.UserId, mgu.GrantedAt,
 			u.Id, u.UserName, u.Role, u.TimeStamp
@@ -624,11 +654,18 @@ func (s *Server) handleCreateMailGroup(w http.ResponseWriter, r *http.Request, p
 		IsPublic    bool    `json:"isPublic"`
 	}
 	if err := decodeBody(r, &req, false); err != nil || req.Subdomain == "" {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
+		return
+	}
+	// Incoming mail is routed by the lower-cased first label of the recipient domain, so
+	// store subdomains the same way or the group never receives anything.
+	req.Subdomain = strings.ToLower(strings.TrimSpace(req.Subdomain))
+	if !validSubdomain.MatchString(req.Subdomain) {
+		writeMessage(w, http.StatusBadRequest, "Subdomain may only contain letters, numbers and hyphens.")
 		return
 	}
 	ctx := r.Context()
-	n, err := scalarInt(ctx, s.db, `SELECT COUNT(*) FROM MailGroup WHERE Subdomain = ?`, req.Subdomain)
+	n, err := scalarInt(ctx, s.db, `SELECT COUNT(*) FROM MailGroup WHERE Subdomain = ? COLLATE NOCASE`, req.Subdomain)
 	if err != nil {
 		s.internalError(w, r, err)
 		return
@@ -701,8 +738,8 @@ type retentionResponse struct {
 	Path          *string `json:"path"`
 }
 
-// retentionGroup loads a group and applies the retention endpoints' access rule
-// (public, owner, or explicit grant). It writes the error response itself.
+// retentionGroup loads a group and applies the retention endpoints' read rule (admin,
+// public, owner, or explicit grant). It writes the error response itself.
 func (s *Server) retentionGroup(w http.ResponseWriter, r *http.Request, p *Principal) *MailGroup {
 	id, ok := pathInt64(w, r, "id")
 	if !ok {
@@ -718,7 +755,7 @@ func (s *Server) retentionGroup(w http.ResponseWriter, r *http.Request, p *Princ
 		writeProblem(w, http.StatusNotFound)
 		return nil
 	}
-	if !g.IsPublic && !g.OwnerUserID.Equal(p.UserID) {
+	if !g.IsPublic && !canManageGroup(g, p) {
 		explicit, err := s.hasExplicitAccess(ctx, id, p.UserID)
 		if err != nil {
 			s.internalError(w, r, err)
@@ -745,11 +782,16 @@ func (s *Server) handleUpdateRetention(w http.ResponseWriter, r *http.Request, p
 	if g == nil {
 		return
 	}
+	// Retention deletes mail, so only the owner or an admin may change it.
+	if !canManageGroup(g, p) {
+		forbid(w)
+		return
+	}
 	var req struct {
 		RetentionDays *int `json:"retentionDays"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	if req.RetentionDays != nil && (*req.RetentionDays < 0 || *req.RetentionDays > 365) {
@@ -770,7 +812,7 @@ func (s *Server) handleMarkAllAsRead(w http.ResponseWriter, r *http.Request, p *
 		MailboxPath *string `json:"mailboxPath"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	ctx := r.Context()

@@ -16,7 +16,7 @@ import (
 func (s *Server) handleMailWebhook(w http.ResponseWriter, r *http.Request) {
 	var data MailData
 	if err := decodeBody(r, &data, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	s.log.Info("received MailData", "from", data.From, "to", data.To)
@@ -140,7 +140,7 @@ func (s *Server) handleCaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	if ct := r.Header.Get("Content-Type"); ct != "" {
 		hook.ContentType = &ct
 	}
-	if ip := remoteIP(r); ip != "" {
+	if ip := s.clientIP(r); ip != "" {
 		hook.SourceIP = &ip
 	}
 
@@ -309,8 +309,12 @@ func (s *Server) handleGetWebhooks(w http.ResponseWriter, r *http.Request, p *Pr
 		s.internalError(w, r, err)
 		return
 	}
-	hooks, err := queryAll(ctx, s.db, scanWebhook, `SELECT `+webhookCols+` FROM Webhook WHERE BucketName = ? ORDER BY CreatedOn DESC LIMIT ? OFFSET ?`,
-		name, pageSize, (page-1)*pageSize)
+	// Bodies are trimmed in the list (each can be up to 5 MB, so a full page could approach
+	// 1 GB); GET /api/webhooks/{id} returns the complete body.
+	hooks, err := queryAll(ctx, s.db, scanWebhook, `SELECT Id, BucketName, HttpMethod, Path, QueryString, Headers,
+			substr(Body, 1, ?), ContentType, SourceIp, CreatedOn
+		FROM Webhook WHERE BucketName = ? ORDER BY CreatedOn DESC LIMIT ? OFFSET ?`,
+		webhookListBodyChars, name, pageSize, (page-1)*pageSize)
 	if err != nil {
 		s.internalError(w, r, err)
 		return
@@ -321,6 +325,8 @@ func (s *Server) handleGetWebhooks(w http.ResponseWriter, r *http.Request, p *Pr
 	}
 	writeJSON(w, http.StatusOK, pagedResults[Webhook]{Items: items, TotalCount: total})
 }
+
+const webhookListBodyChars = 4096
 
 // webhookWithAccess loads a webhook and its bucket; inaccessible webhooks are reported as
 // 404 so their existence isn't disclosed.

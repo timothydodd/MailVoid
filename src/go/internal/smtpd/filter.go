@@ -20,9 +20,15 @@ func NewMailboxFilter(log *slog.Logger, opts FilterOptions, maxMessageSize int) 
 func (f *MailboxFilter) CanAcceptFrom(from string, size int64) bool {
 	f.log.Debug("Checking if can accept email", "from", from, "size", size)
 
+	// The null reverse-path (MAIL FROM:<>) is how bounces and DSNs are sent (RFC 5321
+	// 4.5.5); accept it so they can be captured. Recipient checks still apply.
 	if strings.TrimSpace(from) == "" {
-		f.log.Warn("Rejected email with empty sender address")
-		return false
+		if size > int64(f.maxMessageSize) {
+			f.log.Warn("Rejected email exceeding size limit", "size", size, "max", f.maxMessageSize)
+			return false
+		}
+		f.log.Info("Accepted email with null reverse-path (bounce/DSN)")
+		return true
 	}
 
 	domain := GetDomainFromEmail(from)

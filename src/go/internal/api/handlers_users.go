@@ -80,7 +80,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request, p *Pri
 		Subdomain *string `json:"subdomain"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	if strings.TrimSpace(req.UserName) == "" || strings.TrimSpace(req.Password) == "" {
@@ -141,7 +141,7 @@ func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request, p 
 		Role Role `json:"role"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	res, err := s.db.ExecContext(r.Context(), `UPDATE [User] SET Role = ? WHERE Id = ?`, req.Role, id)
@@ -169,7 +169,7 @@ func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request
 		NewPassword string `json:"newPassword"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	if strings.TrimSpace(req.NewPassword) == "" {
@@ -183,6 +183,11 @@ func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		writeProblem(w, http.StatusNotFound)
+		return
+	}
+	// A password reset signs the user out everywhere.
+	if _, err := s.db.ExecContext(r.Context(), `UPDATE RefreshToken SET IsRevoked = 1 WHERE UserId = ? AND IsRevoked = 0`, id); err != nil {
+		s.internalError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -221,8 +226,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	var desc any
 	var n int
 	if err := s.db.QueryRowContext(r.Context(), `SELECT 1`).Scan(&n); err != nil {
+		// The endpoint is anonymous, so log the detail rather than returning it.
+		s.log.Error("health check failed", "error", err)
 		status = "Degraded"
-		desc = err.Error()
+		desc = "Database unavailable"
 	}
 	body, _ := json.MarshalIndent(map[string]any{
 		"status": status,

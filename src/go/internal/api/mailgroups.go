@@ -40,7 +40,7 @@ func (s *Server) mailGroupByID(ctx context.Context, id int64) (*MailGroup, error
 func (s *Server) setMailPath(ctx context.Context, m *Mail) error {
 	subdomain := extractSubdomain(m.To)
 	private, err := queryOne(ctx, s.db, scanMailGroup,
-		`SELECT `+mailGroupCols+` FROM MailGroup WHERE IsUserPrivate = 1 AND Subdomain = ? LIMIT 1`, subdomain)
+		`SELECT `+mailGroupCols+` FROM MailGroup WHERE IsUserPrivate = 1 AND Subdomain = ? COLLATE NOCASE LIMIT 1`, subdomain)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,8 @@ func (s *Server) setMailPath(ctx context.Context, m *Mail) error {
 }
 
 func (s *Server) getOrCreateMailGroup(ctx context.Context, subdomain string) (*MailGroup, error) {
-	existing, err := queryOne(ctx, s.db, scanMailGroup, `SELECT `+mailGroupCols+` FROM MailGroup WHERE Subdomain = ? LIMIT 1`, subdomain)
+	// NOCASE also matches groups created with mixed-case subdomains before they were normalised.
+	existing, err := queryOne(ctx, s.db, scanMailGroup, `SELECT `+mailGroupCols+` FROM MailGroup WHERE Subdomain = ? COLLATE NOCASE LIMIT 1`, subdomain)
 	if err != nil || existing != nil {
 		return existing, err
 	}
@@ -75,7 +76,7 @@ func (s *Server) getOrCreateMailGroup(ctx context.Context, subdomain string) (*M
 	}
 	if err := s.insertMailGroup(ctx, g); err != nil {
 		// Lost a race with a concurrent insert; re-fetch the winner.
-		raced, ferr := queryOne(ctx, s.db, scanMailGroup, `SELECT `+mailGroupCols+` FROM MailGroup WHERE Subdomain = ? LIMIT 1`, subdomain)
+		raced, ferr := queryOne(ctx, s.db, scanMailGroup, `SELECT `+mailGroupCols+` FROM MailGroup WHERE Subdomain = ? COLLATE NOCASE LIMIT 1`, subdomain)
 		if ferr == nil && raced != nil {
 			return raced, nil
 		}
@@ -98,18 +99,6 @@ func (s *Server) insertMailGroup(ctx context.Context, g *MailGroup) error {
 	return nil
 }
 
-// hasUserAccess: owner, public group, or explicit MailGroupUser grant.
-func (s *Server) hasUserAccess(ctx context.Context, mailGroupID int64, userID GUID) (bool, error) {
-	g, err := s.mailGroupByID(ctx, mailGroupID)
-	if err != nil || g == nil {
-		return false, err
-	}
-	if g.OwnerUserID.Equal(userID) || g.IsPublic {
-		return true, nil
-	}
-	return s.hasExplicitAccess(ctx, mailGroupID, userID)
-}
-
 func (s *Server) hasExplicitAccess(ctx context.Context, mailGroupID int64, userID GUID) (bool, error) {
 	n, err := scalarInt(ctx, s.db, `SELECT COUNT(*) FROM MailGroupUser WHERE MailGroupId = ? AND UserId = ?`, mailGroupID, userID)
 	return n > 0, err
@@ -125,7 +114,7 @@ func (s *Server) createUserPrivateMailGroup(ctx context.Context, userID GUID, is
 	}
 	g := &MailGroup{
 		Path:             strPtr(userPrivatePath(u.UserName)),
-		Subdomain:        strPtr(u.UserName),
+		Subdomain:        strPtr(strings.ToLower(u.UserName)), // matched against lower-cased recipients
 		Description:      strPtr("Private mailbox for " + u.UserName),
 		OwnerUserID:      userID,
 		IsUserPrivate:    true,

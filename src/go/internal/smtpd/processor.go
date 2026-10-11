@@ -3,6 +3,7 @@ package smtpd
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 )
 
@@ -23,11 +24,9 @@ func RunProcessor(ctx context.Context, log *slog.Logger, q *Queue, fwd *Forwarde
 				case <-ctx.Done():
 					log.Debug("Email processor worker stopped", "workerId", id)
 					return
-				case item := <-q.Items():
-					if fwd.Forward(ctx, item.EmailData) {
-						q.MarkProcessed(item)
-					} else if ctx.Err() == nil {
-						q.MarkFailed(item, "API forwarding returned failure")
+				case e := <-q.Items():
+					if item, err := q.Load(e); err == nil {
+						process(ctx, q, fwd, item)
 					}
 				}
 			}
@@ -37,4 +36,24 @@ func RunProcessor(ctx context.Context, log *slog.Logger, q *Queue, fwd *Forwarde
 	q.LoadSpool(ctx)
 	wg.Wait()
 	log.Info("Email processor service stopped")
+}
+
+func process(ctx context.Context, q *Queue, fwd *Forwarder, item *QueuedEmail) {
+	res := fwd.Forward(ctx, item)
+	item.Delivered = append(item.Delivered, res.Delivered...)
+	item.Rejected = append(item.Rejected, res.Rejected...)
+
+	switch {
+	case ctx.Err() != nil:
+		// Shutting down: keep progress so the next start only sends what's left.
+		q.SaveProgress(item)
+	case res.Transient:
+		q.MarkFailed(item, "API forwarding returned failure")
+	case len(item.Rejected) > 0:
+		// Everything retryable is done, but some deliveries were refused for good; keep
+		// the message in dead-letter/ so it can be inspected.
+		q.DeadLetter(item, "API permanently rejected delivery: "+strings.Join(item.Rejected, ", "))
+	default:
+		q.MarkProcessed(item)
+	}
 }

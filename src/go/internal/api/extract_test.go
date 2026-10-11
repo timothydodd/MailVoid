@@ -45,21 +45,9 @@ func TestExtractMail(t *testing.T) {
 	if deref(m.Attachments) != `[{"filename":"a.txt","contentType":"text/plain","sizeBytes":5,"content":"aGVsbG8="}]` {
 		t.Errorf("attachments = %s", deref(m.Attachments))
 	}
-	// A trailing "(UTC)" comment defeats parsing (as in .NET), so receipt time is used.
+	// CreatedOn is always the receipt time, never the sender-supplied Date header.
 	if time.Since(m.CreatedOn.Time) > time.Minute {
 		t.Errorf("CreatedOn = %v", m.CreatedOn)
-	}
-}
-
-func TestParseMailDate(t *testing.T) {
-	recent := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
-	in := recent.Format("Mon, 2 Jan 2006 15:04:05 -0700")
-	got, ok := parseMailDate(in)
-	if !ok || !got.Equal(recent) {
-		t.Errorf("parse %q = %v %v", in, got, ok)
-	}
-	if _, ok := parseMailDate(time.Now().AddDate(0, 0, 3).Format("2006-01-02 15:04:05")); ok {
-		t.Error("future dates beyond a day must be rejected")
 	}
 }
 

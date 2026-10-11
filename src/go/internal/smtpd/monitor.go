@@ -26,19 +26,12 @@ func RunQueueMonitor(ctx context.Context, log *slog.Logger, q *Queue, opts Monit
 
 func reportQueue(log *slog.Logger, q *Queue, opts MonitoringOptions) {
 	pending := q.PendingCount()
-	failed := q.FailedEmails()
+	dead, old := q.DeadLetterStats()
 
-	if pending > 0 || len(failed) > 0 {
-		log.Info("📊 Queue Statistics", "pending", pending, "deadLettered", len(failed))
+	if pending > 0 || dead > 0 {
+		log.Info("📊 Queue Statistics", "pending", pending, "deadLettered", dead)
 	} else if opts.LogWhenEmpty {
 		log.Debug("📊 Queue is empty")
-	}
-
-	old := 0
-	for _, f := range failed {
-		if f.LastAttemptAt != nil && time.Since(f.LastAttemptAt.Time) > time.Hour {
-			old++
-		}
 	}
 	if old > 0 {
 		log.Warn("⚠️ Emails have been dead-lettered for over 1 hour", "count", old)

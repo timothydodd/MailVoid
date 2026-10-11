@@ -23,6 +23,10 @@ type ServerOptions struct {
 	EnableSsl           bool
 	TlsProtocols        string
 	LetsEncryptDomain   string
+	// Abuse limits for the public port (new in the Go server; <= 0 means unlimited).
+	MaxRecipients       int
+	MaxConnections      int
+	MaxConnectionsPerIp int
 }
 
 type APITarget struct {
@@ -90,6 +94,9 @@ func LoadOptions(c *config.Config) Options {
 			EnableSsl:           c.Bool("SmtpServer:EnableSsl", false),
 			TlsProtocols:        c.String("SmtpServer:TlsProtocols", "Tls12,Tls13"),
 			LetsEncryptDomain:   c.Get("SmtpServer:LetsEncryptDomain"),
+			MaxRecipients:       c.Int("SmtpServer:MaxRecipients", 50),
+			MaxConnections:      c.Int("SmtpServer:MaxConnections", 100),
+			MaxConnectionsPerIp: c.Int("SmtpServer:MaxConnectionsPerIp", 10),
 		},
 		Queue: QueueOptions{
 			MaxRetryAttempts:        c.Int("EmailQueue:MaxRetryAttempts", 3),

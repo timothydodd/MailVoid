@@ -40,14 +40,37 @@ type Forwarder struct {
 }
 
 func NewForwarder(log *slog.Logger, targets []APITarget) *Forwarder {
-	return &Forwarder{log: log, targets: targets, client: &http.Client{Timeout: forwardHTTPTimeout}}
+	// Redirects are not followed so message content only ever reaches the configured target.
+	client := &http.Client{
+		Timeout:       forwardHTTPTimeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	return &Forwarder{log: log, targets: targets, client: client}
 }
+
+// ForwardResult reports what one forwarding pass achieved. Pair keys are
+// "{webhook url}|{recipient}".
+type ForwardResult struct {
+	Delivered []string // pairs accepted by the API this pass
+	Rejected  []string // pairs permanently refused (4xx other than 408/429)
+	Transient bool     // something failed that is worth retrying
+}
+
+type outcome int
+
+const (
+	outcomeDelivered outcome = iota
+	outcomeTransient
+	outcomePermanent
+)
 
 // Forward posts one webhook per envelope recipient to every enabled target, because the
 // API keys an inbox off a single recipient (so BCC/multi-recipient mail lands in every
-// inbox). A false result retries the whole message, which can duplicate deliveries that
-// already succeeded — accepted for a dev tool.
-func (f *Forwarder) Forward(ctx context.Context, email EmailWebhookData) bool {
+// inbox). Pairs already in item.Delivered or item.Rejected are skipped, so a retry only
+// re-sends what hasn't succeeded and accepted deliveries aren't duplicated.
+func (f *Forwarder) Forward(ctx context.Context, item *QueuedEmail) ForwardResult {
+	var res ForwardResult
+	email := item.EmailData
 	var targets []APITarget
 	for _, t := range f.targets {
 		if t.Enabled && strings.TrimSpace(t.BaseUrl) != "" {
@@ -56,7 +79,16 @@ func (f *Forwarder) Forward(ctx context.Context, email EmailWebhookData) bool {
 	}
 	if len(targets) == 0 {
 		f.log.Error("❌ No enabled MailVoidApi targets configured — dropping forward", "from", email.From, "to", strings.Join(email.To, ", "))
-		return false
+		res.Transient = true
+		return res
+	}
+
+	done := map[string]bool{}
+	for _, k := range item.Delivered {
+		done[k] = true
+	}
+	for _, k := range item.Rejected {
+		done[k] = true
 	}
 
 	recipients := email.To
@@ -64,41 +96,74 @@ func (f *Forwarder) Forward(ctx context.Context, email EmailWebhookData) bool {
 		recipients = []string{""}
 	}
 
-	ok := true
 	for _, rcpt := range recipients {
-		payload, err := json.Marshal(mailData{
-			From:        email.From,
-			To:          rcpt,
-			Headers:     email.Headers,
-			Html:        email.Html,
-			Text:        email.Text,
-			Attachments: email.Attachments,
-			RawEmail:    &email.RawEmail,
-			MessageId:   email.MessageId,
-		})
-		if err != nil {
-			f.log.Error("Failed to serialize webhook payload", "error", err)
-			return false
-		}
+		var payload []byte
 		for _, t := range targets {
-			if !f.forwardToTarget(ctx, t, email.From, rcpt, payload) {
-				ok = false
+			url := targetURL(t)
+			key := url + "|" + strings.ToLower(rcpt)
+			if done[key] {
+				continue
+			}
+			if payload == nil {
+				var err error
+				if payload, err = encodePayload(email, rcpt); err != nil {
+					f.log.Error("Failed to serialize webhook payload", "error", err)
+					res.Rejected = append(res.Rejected, key)
+					continue
+				}
+			}
+			switch f.forwardToTarget(ctx, t, url, email.From, rcpt, payload) {
+			case outcomeDelivered:
+				res.Delivered = append(res.Delivered, key)
+			case outcomePermanent:
+				res.Rejected = append(res.Rejected, key)
+			default:
+				res.Transient = true
+			}
+			if ctx.Err() != nil {
+				return res
 			}
 		}
 	}
-	return ok
+	return res
 }
 
-func (f *Forwarder) forwardToTarget(ctx context.Context, t APITarget, from, rcpt string, payload []byte) bool {
-	url := strings.TrimRight(t.BaseUrl, "/") + t.WebhookEndpoint
+func targetURL(t APITarget) string {
+	return strings.TrimRight(t.BaseUrl, "/") + t.WebhookEndpoint
+}
 
+func encodePayload(email EmailWebhookData, rcpt string) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	// Mail bodies are full of <, > and &; escaping them would bloat the payload.
+	enc.SetEscapeHTML(false)
+	err := enc.Encode(mailData{
+		From:        email.From,
+		To:          rcpt,
+		Headers:     email.Headers,
+		Html:        email.Html,
+		Text:        email.Text,
+		Attachments: email.Attachments,
+		RawEmail:    &email.RawEmail,
+		MessageId:   email.MessageId,
+	})
+	return buf.Bytes(), err
+}
+
+// permanentStatus is a client error that resending won't fix. 408 and 429 are
+// explicitly "try again later".
+func permanentStatus(code int) bool {
+	return code >= 400 && code < 500 && code != http.StatusRequestTimeout && code != http.StatusTooManyRequests
+}
+
+func (f *Forwarder) forwardToTarget(ctx context.Context, t APITarget, url, from, rcpt string, payload []byte) outcome {
 	for attempt := 1; attempt <= maxTransientTries; attempt++ {
 		f.log.Info("🚀 Forwarding email", "target", t.Name, "from", from, "to", rcpt, "url", url, "attempt", attempt)
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 		if err != nil {
 			f.log.Error("💥 Unexpected error", "target", t.Name, "url", url, "error", err)
-			return false
+			return outcomePermanent
 		}
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 		if t.ApiKey != "" {
@@ -110,7 +175,7 @@ func (f *Forwarder) forwardToTarget(ctx context.Context, t APITarget, from, rcpt
 		resp, err := f.client.Do(req)
 		if err != nil {
 			if ctx.Err() != nil {
-				return false
+				return outcomeTransient
 			}
 			var timeout interface{ Timeout() bool }
 			if errors.As(err, &timeout) && timeout.Timeout() {
@@ -123,25 +188,28 @@ func (f *Forwarder) forwardToTarget(ctx context.Context, t APITarget, from, rcpt
 			resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				f.log.Info("✅ Forwarded", "target", t.Name, "status", resp.StatusCode, "from", from, "to", rcpt)
-				return true
+				return outcomeDelivered
 			}
 			f.log.Error("❌ Failed", "target", t.Name, "status", resp.StatusCode, "url", url, "response", body)
-			// Only server-side failures are worth retrying.
+			if permanentStatus(resp.StatusCode) {
+				return outcomePermanent
+			}
+			// Only server-side failures (and 408/429) are retried immediately.
 			if resp.StatusCode < 500 {
-				return false
+				return outcomeTransient
 			}
 		}
 
 		if attempt == maxTransientTries {
-			return false
+			return outcomeTransient
 		}
 		select {
 		case <-time.After(time.Duration(250*attempt) * time.Millisecond):
 		case <-ctx.Done():
-			return false
+			return outcomeTransient
 		}
 	}
-	return false
+	return outcomeTransient
 }
 
 func readCapped(r io.Reader) string {

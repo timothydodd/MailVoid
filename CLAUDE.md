@@ -67,6 +67,9 @@ npm run format                # Format code with Prettier
 - **Database**: SQLite connection string in `ConnectionStrings:DefaultConnection` (e.g. `Data Source=mailvoid.db`). MySQL is not supported by the Go services
 - **Listen address**: `ASPNETCORE_URLS` / `urls`, `Kestrel:Endpoints:*:Url`, or `ASPNETCORE_HTTP_PORTS` (the Docker image sets 8080); default `http://localhost:5133`
 - **CORS**: Configure allowed origins via "CorsOrigins" setting
+- **Trusted proxies**: `ForwardedHeaders:KnownNetworks` (CIDRs) / `ForwardedHeaders:KnownProxies` (IPs) decide whose `X-Forwarded-For` is believed for rate limiting, webhook `SourceIp` and logs. Default: loopback + private ranges (covers Traefik on k3s)
+- **SMTP limits**: `SmtpServer:MaxRecipients` (50), `SmtpServer:MaxConnections` (100), `SmtpServer:MaxConnectionsPerIp` (10)
+- **Request limits (API)**: bodies capped at 30 MB (64 KB for `/api/auth/*`, 128 MB for `/api/webhook/mail`, 5 MB for `/api/hook/*`), measured after request decompression
 
 ### Frontend Configuration
 - **environment.ts**: Set API URL (default: http://localhost:5133)

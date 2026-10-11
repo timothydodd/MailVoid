@@ -33,6 +33,10 @@ type loginResponse struct {
 	ExpiresIn   int    `json:"expiresIn"`
 }
 
+// dummyPasswordHash lets failed logins for unknown users cost the same PBKDF2 work as
+// real ones, so response time doesn't reveal which usernames exist.
+var dummyPasswordHash = hashPassword("mailvoid-timing-equalizer")
+
 func (s *Server) userByID(ctx context.Context, id GUID) (*User, error) {
 	return queryOne(ctx, s.db, scanUser, `SELECT `+userCols+` FROM [User] WHERE Id = ?`, id)
 }
@@ -80,7 +84,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	u, err := s.userByName(r.Context(), req.UserName)
@@ -88,7 +92,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	if u == nil || !verifyPassword(u.PasswordHash, req.Password) {
+	if u == nil {
+		verifyPassword(dummyPasswordHash, req.Password)
+		writeText(w, http.StatusUnauthorized, "Invalid email or password.")
+		return
+	}
+	if !verifyPassword(u.PasswordHash, req.Password) {
 		writeText(w, http.StatusUnauthorized, "Invalid email or password.")
 		return
 	}
@@ -114,7 +123,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, p 
 		NewPassword string `json:"newPassword"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	u, err := s.userByID(r.Context(), p.UserID)
@@ -134,6 +143,15 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, p 
 		s.internalError(w, r, err)
 		return
 	}
+	// Sign out every other session; the one changing the password stays logged in.
+	current := ""
+	if c, err := r.Cookie(refreshCookieName); err == nil {
+		current = c.Value
+	}
+	if _, err := s.db.ExecContext(r.Context(), `UPDATE RefreshToken SET IsRevoked = 1 WHERE UserId = ? AND IsRevoked = 0 AND Token <> ?`, u.ID, current); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -143,7 +161,7 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		RefreshToken string `json:"refreshToken"`
 	}
 	if err := decodeBody(r, &req, false); err != nil {
-		writeProblem(w, http.StatusBadRequest)
+		writeBodyError(w, err)
 		return
 	}
 	p, err := s.parseJWT(req.AccessToken, false)
@@ -186,9 +204,15 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rotate: revoke the presented token and issue a new pair.
-	if _, err := s.db.ExecContext(r.Context(), `UPDATE RefreshToken SET IsRevoked = 1 WHERE Token = ?`, value); err != nil {
+	// Rotate: revoke the presented token and issue a new pair. Only the request whose
+	// UPDATE actually revoked it may continue, so a token can't be redeemed twice.
+	res, err := s.db.ExecContext(r.Context(), `UPDATE RefreshToken SET IsRevoked = 1 WHERE Token = ? AND IsRevoked = 0`, value)
+	if err != nil {
 		s.internalError(w, r, err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeText(w, http.StatusUnauthorized, "Invalid refresh token")
 		return
 	}
 	s.issueTokens(w, r, u)

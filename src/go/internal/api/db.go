@@ -48,6 +48,9 @@ func OpenDatabase(connectionString string) (*sql.DB, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(8)
+	// Keep the whole pool warm; the default of 2 idle connections means bursts of
+	// requests keep reopening the file and re-applying the pragmas.
+	db.SetMaxIdleConns(8)
 	db.SetConnMaxIdleTime(5 * time.Minute)
 	return db, db.Ping()
 }

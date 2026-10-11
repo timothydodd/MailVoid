@@ -66,13 +66,16 @@ func run() error {
 		return fmt.Errorf("seeding default data: %w", err)
 	}
 	go srv.RunCleanup(ctx)
+	go srv.WarmStaticCache()
 
 	addrs := listenAddresses(cfg, log)
 	handler := srv.Handler()
 	errCh := make(chan error, len(addrs))
 	var servers []*http.Server
 	for _, addr := range addrs {
-		hs := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 30 * time.Second}
+		// Body read deadlines are set per request (SignalR WebSockets are long-lived), and
+		// idle keep-alive connections are closed like Kestrel's 130s keep-alive timeout.
+		hs := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 30 * time.Second, IdleTimeout: 130 * time.Second}
 		servers = append(servers, hs)
 		ln, err := net.Listen("tcp", addr)
 		if err != nil {

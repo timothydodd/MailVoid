@@ -4,7 +4,8 @@
 #   kubectl apply -f mailvoid-smtp.yaml
 #
 # Before applying:
-#   1. Replace DOCKERHUB_USER with your image registry path.
+#   1. Set the image tag to the commit you want to run (images are published to
+#      ghcr.io/timothydodd/mailvoid-smtp:<short-commit-hash> by .github/workflows/go.yml).
 #   2. Edit the ConfigMap. The SMTP server can fan-out each email to multiple
 #      MailVoid API instances — add another block of
 #      MailVoidApi__Targets__N__* keys (and a matching ApiKey in the Secret)
@@ -78,9 +79,15 @@ spec:
       labels:
         app: mailvoid-smtp
     spec:
+      # Volumes are group-owned by the image's non-root "app" user (UID 1654) so the
+      # spool and certificate directories are writable.
+      securityContext:
+        fsGroup: 1654
+      # Longer than the server's 30s internal drain so in-flight DATA can finish.
+      terminationGracePeriodSeconds: 45
       containers:
         - name: smtp
-          image: DOCKERHUB_USER/mailvoid-smtp:latest
+          image: ghcr.io/timothydodd/mailvoid-smtp:8219393
           imagePullPolicy: IfNotPresent
           ports:
             - name: smtp
@@ -91,6 +98,13 @@ spec:
               containerPort: 465
             - name: smtp-test
               containerPort: 2580
+          # Bounds the damage a flood of large messages can do to the node.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 512Mi
           envFrom:
             - configMapRef:
                 name: mailvoid-smtp-config
@@ -107,6 +121,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            # The root filesystem is read-only, so the durable mail spool needs its own
+            # writable volume (EmailQueue:SpoolDirectory defaults to /app/spool). It holds
+            # accepted mail until the API takes it, so it must survive pod restarts.
+            - name: spool
+              mountPath: /app/spool
             # Persistent volume for Let's Encrypt certs managed by certbot
             # (matches LetsEncrypt:CertificateDirectory in appsettings.json).
             # Set SmtpServer__EnableSsl=true and point SmtpServer__CertificatePath
@@ -116,6 +135,9 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: spool
+          persistentVolumeClaim:
+            claimName: mailvoid-smtp-spool
         - name: letsencrypt
           persistentVolumeClaim:
             claimName: mailvoid-smtp-letsencrypt
@@ -130,6 +152,17 @@ spec:
   resources:
     requests:
       storage: 128Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mailvoid-smtp-spool
+  namespace: mailvoid
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
 ---
 # Use a LoadBalancer so k3s' built-in ServiceLB (klipper-lb) exposes the SMTP
 # ports on the node IPs. For an internal-only service, switch type to ClusterIP.

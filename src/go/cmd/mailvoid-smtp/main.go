@@ -57,6 +57,9 @@ func run() error {
 	// Let's Encrypt starts first so certificate acquisition kicks off early; it runs in the
 	// background and brings TLS endpoints up once a certificate exists.
 	goRun(func() { smtpd.NewLetsEncrypt(log, opts.LetsEncrypt, server.CertificateChanged).Run(ctx) })
+	// Snapshot leftover spool files before accepting mail, so a message accepted during
+	// startup isn't also picked up by the spool reload (and forwarded twice).
+	queue.ScanSpool()
 	server.Start()
 	goRun(func() { smtpd.RunProcessor(ctx, log, queue, forwarder, opts.Queue.MaxConcurrentProcessing) })
 	goRun(func() { smtpd.RunQueueMonitor(ctx, log, queue, opts.Monitoring) })

@@ -40,11 +40,12 @@ type hubConn struct {
 }
 
 const (
-	recordSeparator   = 0x1e
-	keepAliveInterval = 15 * time.Second
-	clientTimeout     = 30 * time.Second
-	handshakeTimeout  = 15 * time.Second
-	pendingTTL        = 2 * time.Minute
+	recordSeparator    = 0x1e
+	keepAliveInterval  = 15 * time.Second
+	clientTimeout      = 30 * time.Second
+	handshakeTimeout   = 15 * time.Second
+	pendingTTL         = 2 * time.Minute
+	maxIncomingMessage = 32 << 10
 )
 
 func newHub(log *slog.Logger) *Hub {
@@ -119,6 +120,8 @@ func (h *Hub) handleConnect(w http.ResponseWriter, r *http.Request, p *Principal
 		return // Upgrade already wrote the error response
 	}
 	defer ws.Close()
+	// ASP.NET Core SignalR's default MaximumReceiveMessageSize.
+	ws.SetReadLimit(maxIncomingMessage)
 
 	if !h.handshake(ws) {
 		return

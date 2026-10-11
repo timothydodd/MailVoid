@@ -19,9 +19,14 @@ type QueuedEmail struct {
 	LastAttemptAt *NetTime         `json:"LastAttemptAt"`
 	LastError     *string          `json:"LastError"`
 
-	// Not serialized: on-disk location and in-memory retry schedule.
-	spoolPath   string
-	nextRetryAt time.Time
+	// Per-(target, recipient) progress, keyed "{webhook url}|{recipient}", so a retry only
+	// re-sends what hasn't been accepted yet. Rejected pairs failed permanently (4xx) and
+	// are not retried. The .NET reader ignores these extra fields.
+	Delivered []string `json:"Delivered,omitempty"`
+	Rejected  []string `json:"Rejected,omitempty"`
+
+	// Not serialized: on-disk location.
+	spoolPath string
 }
 
 type EmailWebhookData struct {
