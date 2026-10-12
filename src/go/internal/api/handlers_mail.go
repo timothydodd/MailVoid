@@ -176,7 +176,38 @@ type filterOptions struct {
 	PageSize int     `json:"pageSize"`
 	To       *string `json:"to"`
 	Search   *string `json:"search"`
+	// Optional additions to the .NET contract; clients that don't send them get the
+	// original newest-first order.
+	SortBy        *string `json:"sortBy"`
+	SortDirection *string `json:"sortDirection"`
 }
+
+var mailSortColumns = map[string]string{
+	"createdon": "m.CreatedOn",
+	"from":      "m.[From]",
+	"to":        "m.[To]",
+	"subject":   "m.Subject",
+}
+
+// mailOrderBy builds a whitelisted ORDER BY; unknown values fall back to newest first.
+func mailOrderBy(o filterOptions) string {
+	col := "m.CreatedOn"
+	if o.SortBy != nil {
+		if c, ok := mailSortColumns[strings.ToLower(strings.TrimSpace(*o.SortBy))]; ok {
+			col = c
+		}
+	}
+	dir := "DESC"
+	if o.SortDirection != nil && strings.EqualFold(strings.TrimSpace(*o.SortDirection), "asc") {
+		dir = "ASC"
+	}
+	if col != "m.CreatedOn" {
+		col += " COLLATE NOCASE"
+	}
+	return col + " " + dir + ", m.Id DESC"
+}
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 type mailWithReadStatus struct {
 	ID            int64   `json:"id"`
@@ -221,8 +252,9 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 		args = append(args, sql.Named("To", *opts.To))
 	}
 	if opts.Search != nil && *opts.Search != "" {
-		where = append(where, "(m.Subject LIKE @Search OR m.[From] LIKE @Search OR m.[To] LIKE @Search OR m.Text LIKE @Search)")
-		args = append(args, sql.Named("Search", "%"+strings.TrimSpace(*opts.Search)+"%"))
+		// Escape LIKE wildcards so a search for "50%" or "a_b" is literal.
+		where = append(where, `(m.Subject LIKE @Search ESCAPE '\' OR m.[From] LIKE @Search ESCAPE '\' OR m.[To] LIKE @Search ESCAPE '\' OR m.Text LIKE @Search ESCAPE '\')`)
+		args = append(args, sql.Named("Search", "%"+likeEscaper.Replace(strings.TrimSpace(*opts.Search))+"%"))
 	}
 	where = append(where, mailVisibilityClause, notHiddenClause)
 	whereClause := "WHERE " + strings.Join(where, " AND ")
@@ -237,7 +269,7 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 	pageArgs := append(args, sql.Named("Limit", opts.PageSize), sql.Named("Offset", (opts.Page-1)*opts.PageSize))
 	// Only the columns the list returns; raw source, headers and attachments can be large.
 	mails, err := queryAll(ctx, s.db, scanMailListItem, `SELECT m.Id, m.[To], m.[From], m.Subject, m.Text, m.IsHtml, m.CreatedOn, m.MailGroupPath `+
-		from+` ORDER BY m.CreatedOn DESC LIMIT @Limit OFFSET @Offset`, pageArgs...)
+		from+` ORDER BY `+mailOrderBy(opts)+` LIMIT @Limit OFFSET @Offset`, pageArgs...)
 	if err != nil {
 		s.internalError(w, r, err)
 		return

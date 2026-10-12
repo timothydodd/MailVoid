@@ -17,6 +17,7 @@ func (s *Server) RunCleanup(ctx context.Context) {
 	for {
 		s.cleanupMail(ctx)
 		s.cleanupWebhooks(ctx)
+		s.cleanupRefreshTokens(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -80,5 +81,21 @@ func (s *Server) cleanupWebhooks(ctx context.Context) {
 		if n, _ := res.RowsAffected(); n > 0 {
 			s.log.Info("deleted expired webhooks", "count", n, "bucket", b.Name, "days", *b.RetentionDays)
 		}
+	}
+}
+
+// cleanupRefreshTokens deletes expired tokens and tokens revoked more than a day ago.
+// Every refresh rotates the token, so without this the table grows by one row per
+// access-token lifetime per signed-in browser, forever.
+func (s *Server) cleanupRefreshTokens(ctx context.Context) {
+	now := time.Now().UTC()
+	res, err := s.db.ExecContext(ctx, `DELETE FROM RefreshToken WHERE ExpiryDate < ? OR (IsRevoked = 1 AND CreatedDate < ?)`,
+		DBTime{now}, DBTime{now.AddDate(0, 0, -1)})
+	if err != nil {
+		s.log.Error("error cleaning up refresh tokens", "error", err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		s.log.Info("deleted stale refresh tokens", "count", n)
 	}
 }

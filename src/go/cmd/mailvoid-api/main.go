@@ -44,7 +44,7 @@ func run() error {
 		return fmt.Errorf("unsupported DatabaseProvider %q: only Sqlite is supported", cfg.Get("DatabaseProvider"))
 	}
 
-	db, err := api.OpenDatabase(connStr)
+	db, err := api.OpenDatabase(connStr, cfg.Get("Database:JournalMode"))
 	if err != nil {
 		return fmt.Errorf("opening database: %w", err)
 	}

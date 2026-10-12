@@ -36,6 +36,12 @@ type Server struct {
 
 	loginLimiter   *rateLimiter
 	webhookLimiter *rateLimiter
+	// webhookGlobal caps anonymous captures across all sources, so many addresses
+	// together can't fill the disk faster than retention reclaims it.
+	webhookGlobal *rateLimiter
+
+	maxWebhookBuckets    int // auto-created bucket cap
+	maxWebhooksPerBucket int // oldest captures beyond this are pruned
 }
 
 func NewServer(cfg *config.Config, db *sql.DB, log *slog.Logger) (*Server, error) {
@@ -65,8 +71,15 @@ func NewServer(cfg *config.Config, db *sql.DB, log *slog.Logger) (*Server, error
 		hub:            newHub(log),
 		loginLimiter:   newRateLimiter(5, time.Minute),
 		webhookLimiter: newRateLimiter(60, time.Minute),
-		static:         newStaticCache(),
-		trustedProxies: loadTrustedProxies(cfg),
+		webhookGlobal:  newRateLimiter(max(1, cfg.Int("Webhooks:MaxCapturesPerMinute", 300)), time.Minute),
+
+		maxWebhookBuckets:    cfg.Int("Webhooks:MaxBuckets", 100),
+		maxWebhooksPerBucket: cfg.Int("Webhooks:MaxWebhooksPerBucket", 1000),
+		static:               newStaticCache(),
+		trustedProxies:       loadTrustedProxies(cfg),
+	}
+	if len(cfg.Strings("ForwardedHeaders:KnownNetworks")) == 0 && len(cfg.Strings("ForwardedHeaders:KnownProxies")) == 0 {
+		log.Info("trusting X-Forwarded-For from loopback and private networks; set ForwardedHeaders:KnownProxies if clients can reach the API directly through NAT")
 	}
 	if s.jwt.Issuer == "" || s.jwt.Audience == "" {
 		return nil, errors.New("JwtSettings:Issuer and JwtSettings:Audience must be configured")
@@ -132,8 +145,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Anonymous webhook capture
 	for _, m := range []string{"POST", "PUT", "PATCH"} {
-		mux.HandleFunc(m+" /api/hook/{bucket}", s.rateLimit(s.webhookLimiter, s.handleCaptureWebhook))
-		mux.HandleFunc(m+" /api/hook/{bucket}/{path...}", s.rateLimit(s.webhookLimiter, s.handleCaptureWebhook))
+		capture := s.rateLimit(s.webhookLimiter, s.globalLimit(s.webhookGlobal, s.handleCaptureWebhook))
+		mux.HandleFunc(m+" /api/hook/{bucket}", capture)
+		mux.HandleFunc(m+" /api/hook/{bucket}/{path...}", capture)
 	}
 
 	// Webhook management
@@ -245,12 +259,37 @@ func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error
 
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		if r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
-			w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+			h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		} else {
+			// The SPA's own policy is a <meta> tag in index.html; frame-ancestors only works
+			// as a header, and multiple policies intersect, so this adds without loosening.
+			h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+		}
+		if s.isHTTPS(r) {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isHTTPS reports whether the client connected over TLS: directly, or via a trusted
+// proxy that says so in X-Forwarded-Proto.
+func (s *Server) isHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	peer, err := netip.ParseAddr(remoteIP(r))
+	if err != nil || !s.isTrustedProxy(peer) {
+		return false
+	}
+	proto, _, _ := strings.Cut(r.Header.Get("X-Forwarded-Proto"), ",")
+	return strings.EqualFold(strings.TrimSpace(proto), "https")
 }
 
 // cors reproduces the "MailVoidOrigins" policy: configured origins with credentials, or
@@ -397,6 +436,17 @@ func (l *rateLimiter) allow(key string) bool {
 	}
 	b.count++
 	return true
+}
+
+// globalLimit applies one shared window to every caller.
+func (s *Server) globalLimit(l *rateLimiter, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !l.allow("*") {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (s *Server) rateLimit(l *rateLimiter, next http.HandlerFunc) http.HandlerFunc {

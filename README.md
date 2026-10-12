@@ -50,6 +50,27 @@ database and JWT settings:
 }
 ```
 
+**Behind a proxy or not?** The client address used for login rate limiting, captured
+webhook source IPs and logs comes from `X-Forwarded-For` only when the direct peer is a
+trusted proxy. By default every loopback and private address is trusted, which suits an
+in-cluster ingress such as Traefik. If clients can reach the API directly through NAT
+(for example `docker run -p`, a Kubernetes NodePort, or a home router), their connections
+also arrive from a private address and could spoof the header. In that case list your real
+proxies explicitly, or a non-matching address to trust none:
+
+```json
+{
+  "ForwardedHeaders": {
+    "KnownProxies": [ "10.0.0.5" ],
+    "KnownNetworks": [ "10.42.0.0/16" ]
+  }
+}
+```
+
+**SQLite journal mode.** The API opens the database in WAL mode so the UI can read while
+mail is being written. If the database file is on a network filesystem (NFS/SMB), set
+`Database:JournalMode` to `DELETE`.
+
 Start the API (missing tables are created automatically; it listens on http://localhost:5133
 unless `ASPNETCORE_URLS` / `ASPNETCORE_HTTP_PORTS` say otherwise):
 

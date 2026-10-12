@@ -93,7 +93,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := OpenDatabase("Data Source=" + filepath.Join(dir, "test.db"))
+	db, err := OpenDatabase("Data Source="+filepath.Join(dir, "test.db"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func (e *testEnv) login(user, pass string) (token, refresh string) {
 }
 
 func (e *testEnv) createUser(adminToken, name string) GUID {
-	w := e.do("POST", "/api/UserManagement", adminToken, map[string]any{"userName": name, "password": "pw", "role": 0})
+	w := e.do("POST", "/api/UserManagement", adminToken, map[string]any{"userName": name, "password": "password1", "role": 0})
 	if w.Code != 201 {
 		e.t.Fatalf("create user: %d %s", w.Code, w.Body)
 	}
@@ -165,8 +165,8 @@ func TestPublicGroupCannotBeManagedByOthers(t *testing.T) {
 	admin, _ := e.login("admin", "admin")
 	alice := e.createUser(admin, "alice")
 	e.createUser(admin, "mallory")
-	aliceTok, _ := e.login("alice", "pw")
-	malTok, _ := e.login("mallory", "pw")
+	aliceTok, _ := e.login("alice", "password1")
+	malTok, _ := e.login("mallory", "password1")
 
 	w := e.do("POST", "/api/mail/mail-groups", aliceTok, map[string]any{"subdomain": "Team-A", "isPublic": true})
 	if w.Code != 200 {

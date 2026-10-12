@@ -15,7 +15,11 @@ import (
 // OpenDatabase opens the SQLite database described by an ADO.NET-style connection string
 // ("Data Source=mailvoid.db"), the same value the .NET API read from
 // ConnectionStrings:DefaultConnection.
-func OpenDatabase(connectionString string) (*sql.DB, error) {
+//
+// journalMode is applied to file databases (Database:JournalMode). Empty means WAL, which
+// lets readers proceed while mail is being written. Use "DELETE" when the file lives on a
+// network filesystem (NFS/SMB), where WAL's shared-memory index is unsafe.
+func OpenDatabase(connectionString, journalMode string) (*sql.DB, error) {
 	opts := parseConnectionString(connectionString)
 
 	path := firstValue(opts, "data source", "datasource", "filename")
@@ -42,6 +46,20 @@ func OpenDatabase(connectionString string) (*sql.DB, error) {
 	case "memory":
 		q.Set("mode", "memory")
 		dsn = "file:" + path
+	default:
+		mode := strings.ToUpper(strings.TrimSpace(journalMode))
+		if mode == "" {
+			mode = "WAL"
+		}
+		if !validJournalModes[mode] {
+			return nil, fmt.Errorf("unsupported Database:JournalMode %q", journalMode)
+		}
+		q.Add("_pragma", "journal_mode("+mode+")")
+		if mode == "WAL" {
+			// NORMAL is durable against application crashes in WAL mode and avoids an
+			// fsync on every commit.
+			q.Add("_pragma", "synchronous(NORMAL)")
+		}
 	}
 	db, err := sql.Open("sqlite", dsn+"?"+q.Encode())
 	if err != nil {
@@ -54,6 +72,8 @@ func OpenDatabase(connectionString string) (*sql.DB, error) {
 	db.SetConnMaxIdleTime(5 * time.Minute)
 	return db, db.Ping()
 }
+
+var validJournalModes = map[string]bool{"WAL": true, "DELETE": true, "TRUNCATE": true, "PERSIST": true}
 
 func parseConnectionString(cs string) map[string]string {
 	out := map[string]string{}
@@ -114,6 +134,10 @@ var schema = []string{
 	`CREATE INDEX IF NOT EXISTS IX_Mail_To ON [Mail] ([To])`,
 	`CREATE INDEX IF NOT EXISTS IX_Mail_From ON [Mail] ([From])`,
 	`CREATE INDEX IF NOT EXISTS IX_Mail_MailGroupPath ON [Mail] ([MailGroupPath])`,
+	// List ordering, per-mailbox retention sweeps and orphan cleanup all filter or sort
+	// on CreatedOn.
+	`CREATE INDEX IF NOT EXISTS IX_Mail_MailGroupPath_CreatedOn ON [Mail] ([MailGroupPath], [CreatedOn])`,
+	`CREATE INDEX IF NOT EXISTS IX_Mail_CreatedOn ON [Mail] ([CreatedOn])`,
 
 	`CREATE TABLE IF NOT EXISTS [Contact] (
     [Id] INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -160,6 +184,7 @@ var schema = []string{
 )`,
 	`CREATE INDEX IF NOT EXISTS IX_RefreshToken_Token ON [RefreshToken] ([Token])`,
 	`CREATE INDEX IF NOT EXISTS Token_UserId_idx ON [RefreshToken] ([Token], [UserId])`,
+	`CREATE INDEX IF NOT EXISTS IX_RefreshToken_UserId ON [RefreshToken] ([UserId])`,
 
 	`CREATE TABLE IF NOT EXISTS [UserMailRead] (
     [Id] INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,6 +195,9 @@ var schema = []string{
 ,        CONSTRAINT FK_UserMailRead_MailId FOREIGN KEY ([MailId]) REFERENCES [Mail](Id) ON DELETE CASCADE
 )`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS UserId_MailId_idx ON [UserMailRead] ([UserId], [MailId])`,
+	// ON DELETE CASCADE from Mail looks rows up by MailId; without this every deleted mail
+	// scans the whole table.
+	`CREATE INDEX IF NOT EXISTS IX_UserMailRead_MailId ON [UserMailRead] ([MailId])`,
 
 	`CREATE TABLE IF NOT EXISTS [HiddenMailGroup] (
     [Id] INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,6 +235,7 @@ var schema = []string{
 )`,
 	`CREATE INDEX IF NOT EXISTS BucketName_idx ON [Webhook] ([BucketName])`,
 	`CREATE INDEX IF NOT EXISTS CreatedOn_idx ON [Webhook] ([CreatedOn])`,
+	`CREATE INDEX IF NOT EXISTS IX_Webhook_BucketName_CreatedOn ON [Webhook] ([BucketName], [CreatedOn])`,
 }
 
 func InitSchema(ctx context.Context, db *sql.DB) error {

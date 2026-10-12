@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -17,6 +18,18 @@ type userDto struct {
 
 func toUserDto(u *User) userDto {
 	return userDto{ID: u.ID.String(), UserName: u.UserName, Role: u.Role, TimeStamp: u.TimeStamp, Subdomain: u.Subdomain}
+}
+
+// minPasswordLength applies to new passwords only; existing ones (including the seeded
+// admin/admin) keep working until they are changed.
+const minPasswordLength = 8
+
+// passwordProblem returns a user-facing message when a new password is unacceptable.
+func passwordProblem(pw string) string {
+	if len([]rune(pw)) < minPasswordLength {
+		return fmt.Sprintf("Password must be at least %d characters.", minPasswordLength)
+	}
+	return ""
 }
 
 // isUserAdmin is the controller's exact "Admin" role check.
@@ -85,6 +98,10 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request, p *Pri
 	}
 	if strings.TrimSpace(req.UserName) == "" || strings.TrimSpace(req.Password) == "" {
 		writeText(w, http.StatusBadRequest, "Username and password are required.")
+		return
+	}
+	if msg := passwordProblem(req.Password); msg != "" {
+		writeText(w, http.StatusBadRequest, msg)
 		return
 	}
 	ctx := r.Context()
@@ -174,6 +191,10 @@ func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request
 	}
 	if strings.TrimSpace(req.NewPassword) == "" {
 		writeText(w, http.StatusBadRequest, "New password is required.")
+		return
+	}
+	if msg := passwordProblem(req.NewPassword); msg != "" {
+		writeText(w, http.StatusBadRequest, msg)
 		return
 	}
 	res, err := s.db.ExecContext(r.Context(), `UPDATE [User] SET PasswordHash = ? WHERE Id = ?`, hashPassword(req.NewPassword), id)

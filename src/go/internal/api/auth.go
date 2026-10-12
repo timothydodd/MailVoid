@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
@@ -244,6 +245,19 @@ func (s *Server) authenticate(r *http.Request) *Principal {
 func (s *Server) requireAuth(next func(http.ResponseWriter, *http.Request, *Principal)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := s.authenticate(r)
+		if p != nil {
+			// The token alone isn't trusted for who the user is now: a deleted user is
+			// rejected and a role or subdomain change applies immediately rather than when
+			// the access token expires. One primary-key lookup per request.
+			ok, err := s.refreshPrincipal(r.Context(), p)
+			if err != nil {
+				s.internalError(w, r, err)
+				return
+			}
+			if !ok {
+				p = nil
+			}
+		}
 		if p == nil {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -251,6 +265,26 @@ func (s *Server) requireAuth(next func(http.ResponseWriter, *http.Request, *Prin
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)), p)
 	}
+}
+
+// refreshPrincipal overwrites the token's role and subdomain with the user's current
+// values. It reports false when the user no longer exists.
+func (s *Server) refreshPrincipal(ctx context.Context, p *Principal) (bool, error) {
+	var role Role
+	var sub *string
+	err := s.db.QueryRowContext(ctx, `SELECT Role, Subdomain FROM [User] WHERE Id = ?`, p.UserID).Scan(&role, &sub)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	p.Role = role.String()
+	p.Subdomain = ""
+	if sub != nil {
+		p.Subdomain = strings.TrimSpace(*sub)
+	}
+	return true, nil
 }
 
 type APIKey struct {

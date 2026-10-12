@@ -139,6 +139,10 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, p 
 		writeText(w, http.StatusUnauthorized, "Invalid password.")
 		return
 	}
+	if msg := passwordProblem(req.NewPassword); msg != "" {
+		writeText(w, http.StatusBadRequest, msg)
+		return
+	}
 	if _, err := s.db.ExecContext(r.Context(), `UPDATE [User] SET PasswordHash = ? WHERE Id = ?`, hashPassword(req.NewPassword), u.ID); err != nil {
 		s.internalError(w, r, err)
 		return

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,7 +16,9 @@ import (
 // handleMailWebhook receives mail forwarded by the SMTP server (WebhookController).
 func (s *Server) handleMailWebhook(w http.ResponseWriter, r *http.Request) {
 	var data MailData
-	if err := decodeBody(r, &data, false); err != nil {
+	// Decode from the stream: this body can be up to 128 MB, and reading it into a
+	// buffer first would hold it in memory twice.
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		writeBodyError(w, err)
 		return
 	}
@@ -117,6 +120,14 @@ func (s *Server) handleCaptureWebhook(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	bucket, err := s.getOrCreateBucket(ctx, bucketName)
+	if errors.Is(err, errInvalidBucketName) {
+		writeText(w, http.StatusBadRequest, "Bucket names may only contain letters, numbers, '.', '_' and '-' (max 64).")
+		return
+	}
+	if errors.Is(err, errBucketLimit) {
+		writeText(w, http.StatusForbidden, "Webhook bucket limit reached.")
+		return
+	}
 	if err != nil {
 		s.log.Error("failed to capture webhook", "bucket", bucketName, "error", err)
 		writeText(w, http.StatusInternalServerError, "Failed to capture webhook")
@@ -152,6 +163,12 @@ func (s *Server) handleCaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil {
 		_, err = s.db.ExecContext(ctx, `UPDATE WebhookBucket SET LastActivity = ? WHERE Id = ?`, NullTimeOf(time.Now()), bucket.ID)
+	}
+	if err == nil && s.maxWebhooksPerBucket > 0 {
+		// Keep only the newest captures; Id order is insertion order.
+		_, err = s.db.ExecContext(ctx, `DELETE FROM Webhook WHERE BucketName = ? AND Id <=
+			(SELECT Id FROM Webhook WHERE BucketName = ? ORDER BY Id DESC LIMIT 1 OFFSET ?)`,
+			bucketName, bucketName, s.maxWebhooksPerBucket)
 	}
 	if err != nil {
 		s.log.Error("failed to capture webhook", "bucket", bucketName, "error", err)
@@ -197,10 +214,30 @@ func (s *Server) bucketByName(ctx context.Context, name string) (*WebhookBucket,
 	return queryOne(ctx, s.db, scanBucket, `SELECT `+bucketCols+` FROM WebhookBucket WHERE Name = ? LIMIT 1`, name)
 }
 
+var (
+	validBucketName      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+	errInvalidBucketName = errors.New("invalid bucket name")
+	errBucketLimit       = errors.New("bucket limit reached")
+)
+
 func (s *Server) getOrCreateBucket(ctx context.Context, name string) (*WebhookBucket, error) {
 	b, err := s.bucketByName(ctx, name)
 	if err != nil || b != nil {
 		return b, err
+	}
+	// Existing buckets keep working whatever their name; only new ones are checked.
+	if !validBucketName.MatchString(name) {
+		return nil, errInvalidBucketName
+	}
+	if s.maxWebhookBuckets > 0 {
+		n, err := scalarInt(ctx, s.db, `SELECT COUNT(*) FROM WebhookBucket`)
+		if err != nil {
+			return nil, err
+		}
+		if n >= int64(s.maxWebhookBuckets) {
+			s.log.Warn("webhook bucket limit reached; not creating bucket", "name", name, "limit", s.maxWebhookBuckets)
+			return nil, errBucketLimit
+		}
 	}
 	admin, err := s.userByName(ctx, "admin")
 	if err != nil {
