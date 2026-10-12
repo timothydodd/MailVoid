@@ -27,6 +27,12 @@ type ServerOptions struct {
 	MaxRecipients       int
 	MaxConnections      int
 	MaxConnectionsPerIp int
+	// MaxConcurrentMessages caps DATA transactions being read, parsed and spooled at
+	// once, bounding memory (each can hold several copies of a MaxMessageSize message).
+	MaxConcurrentMessages int
+	// MaxMimeParts caps the multipart nesting estimate (boundary parameters) a message may
+	// carry before MIME parsing is skipped and the raw source is forwarded instead.
+	MaxMimeParts int
 }
 
 type APITarget struct {
@@ -43,6 +49,9 @@ type QueueOptions struct {
 	MaxConcurrentProcessing int
 	MaxQueueDepth           int
 	SpoolDirectory          string
+	// Dead-letter pruning (new in the Go server; <= 0 disables that limit).
+	DeadLetterRetentionDays int
+	MaxDeadLetterFiles      int
 }
 
 type MonitoringOptions struct {
@@ -83,20 +92,22 @@ type Options struct {
 func LoadOptions(c *config.Config) Options {
 	o := Options{
 		Server: ServerOptions{
-			Port:                c.Int("SmtpServer:Port", 25),
-			TestPort:            c.Int("SmtpServer:TestPort", 2580),
-			SslPort:             c.Int("SmtpServer:SslPort", 465),
-			StartTlsPort:        c.Int("SmtpServer:StartTlsPort", 587),
-			Name:                c.String("SmtpServer:Name", "MailVoid SMTP Server"),
-			MaxMessageSize:      c.Int("SmtpServer:MaxMessageSize", 10*1024*1024),
-			CertificatePath:     c.Get("SmtpServer:CertificatePath"),
-			CertificatePassword: c.Get("SmtpServer:CertificatePassword"),
-			EnableSsl:           c.Bool("SmtpServer:EnableSsl", false),
-			TlsProtocols:        c.String("SmtpServer:TlsProtocols", "Tls12,Tls13"),
-			LetsEncryptDomain:   c.Get("SmtpServer:LetsEncryptDomain"),
-			MaxRecipients:       c.Int("SmtpServer:MaxRecipients", 50),
-			MaxConnections:      c.Int("SmtpServer:MaxConnections", 100),
-			MaxConnectionsPerIp: c.Int("SmtpServer:MaxConnectionsPerIp", 10),
+			Port:                  c.Int("SmtpServer:Port", 25),
+			TestPort:              c.Int("SmtpServer:TestPort", 2580),
+			SslPort:               c.Int("SmtpServer:SslPort", 465),
+			StartTlsPort:          c.Int("SmtpServer:StartTlsPort", 587),
+			Name:                  c.String("SmtpServer:Name", "MailVoid SMTP Server"),
+			MaxMessageSize:        c.Int("SmtpServer:MaxMessageSize", 10*1024*1024),
+			CertificatePath:       c.Get("SmtpServer:CertificatePath"),
+			CertificatePassword:   c.Get("SmtpServer:CertificatePassword"),
+			EnableSsl:             c.Bool("SmtpServer:EnableSsl", false),
+			TlsProtocols:          c.String("SmtpServer:TlsProtocols", "Tls12,Tls13"),
+			LetsEncryptDomain:     c.Get("SmtpServer:LetsEncryptDomain"),
+			MaxRecipients:         c.Int("SmtpServer:MaxRecipients", 50),
+			MaxConnections:        c.Int("SmtpServer:MaxConnections", 100),
+			MaxConnectionsPerIp:   c.Int("SmtpServer:MaxConnectionsPerIp", 10),
+			MaxConcurrentMessages: c.Int("SmtpServer:MaxConcurrentMessages", 4),
+			MaxMimeParts:          c.Int("SmtpServer:MaxMimeParts", defaultMaxMimeParts),
 		},
 		Queue: QueueOptions{
 			MaxRetryAttempts:        c.Int("EmailQueue:MaxRetryAttempts", 3),
@@ -104,6 +115,8 @@ func LoadOptions(c *config.Config) Options {
 			MaxConcurrentProcessing: c.Int("EmailQueue:MaxConcurrentProcessing", 5),
 			MaxQueueDepth:           c.Int("EmailQueue:MaxQueueDepth", 1000),
 			SpoolDirectory:          c.String("EmailQueue:SpoolDirectory", "spool"),
+			DeadLetterRetentionDays: c.Int("EmailQueue:DeadLetterRetentionDays", 7),
+			MaxDeadLetterFiles:      c.Int("EmailQueue:MaxDeadLetterFiles", 1000),
 		},
 		Monitoring: MonitoringOptions{
 			ReportingIntervalSeconds: c.Int("QueueMonitoring:ReportingIntervalSeconds", 60),

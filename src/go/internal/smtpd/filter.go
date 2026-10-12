@@ -1,6 +1,7 @@
 package smtpd
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 )
@@ -31,12 +32,12 @@ func (f *MailboxFilter) CanAcceptFrom(from string, size int64) bool {
 		return true
 	}
 
+	// Blocked domains match subdomains too, so blocking "example.com" also blocks
+	// "mail.example.com".
 	domain := GetDomainFromEmail(from)
-	for _, blocked := range f.opts.BlockedDomains {
-		if strings.EqualFold(blocked, domain) {
-			f.log.Warn("Rejected email from blocked domain", "domain", domain)
-			return false
-		}
+	if matchesDomain(domain, f.opts.BlockedDomains) {
+		f.log.Warn("Rejected email from blocked domain", "domain", domain)
+		return false
 	}
 
 	if !IsValidEmailFormat(from) {
@@ -55,27 +56,32 @@ func (f *MailboxFilter) CanAcceptFrom(from string, size int64) bool {
 }
 
 func (f *MailboxFilter) CanDeliverTo(to, from string) bool {
-	f.log.Debug("Checking if can deliver", "to", to, "from", from)
+	return f.CanDeliverToLevel(to, from, slog.LevelWarn)
+}
 
-	if strings.TrimSpace(to) == "" {
-		f.log.Warn("Rejected delivery to empty recipient address")
+// CanDeliverToLevel is CanDeliverTo with rejections logged at rejectLevel, so a session
+// can demote repeated rejections (e.g. a dictionary attack) to Debug.
+func (f *MailboxFilter) CanDeliverToLevel(to, from string, rejectLevel slog.Level) bool {
+	f.log.Debug("Checking if can deliver", "to", to, "from", from)
+	reject := func(msg string, args ...any) bool {
+		f.log.Log(context.Background(), rejectLevel, msg, args...)
 		return false
 	}
+
+	if strings.TrimSpace(to) == "" {
+		return reject("Rejected delivery to empty recipient address")
+	}
 	if !IsValidEmailFormat(to) {
-		f.log.Warn("Rejected delivery to invalid email format", "email", to)
-		return false
+		return reject("Rejected delivery to invalid email format", "email", to)
 	}
 
 	toDomain := GetDomainFromEmail(to)
 	if !IsAllowedDomain(toDomain, f.opts.AllowedDomains) {
-		f.log.Warn("Rejected delivery to non-test domain", "domain", toDomain,
-			"allowedDomains", strings.Join(f.opts.AllowedDomains, ", "))
-		return false
+		return reject("Rejected delivery to non-test domain", "domain", toDomain)
 	}
 
 	if strings.EqualFold(from, to) {
-		f.log.Warn("Rejected email loop attempt", "email", to)
-		return false
+		return reject("Rejected email loop attempt", "email", to)
 	}
 
 	f.log.Info("Accepted delivery", "to", to)
@@ -92,15 +98,21 @@ func GetDomainFromEmail(email string) string {
 // IsAllowedDomain matches an allowed domain exactly or as a parent domain, so
 // "sub.mailvoid.com" matches "mailvoid.com" but the lookalike "notmailvoid.com" does not.
 func IsAllowedDomain(domain string, allowed []string) bool {
+	return matchesDomain(domain, allowed)
+}
+
+// matchesDomain reports whether domain equals, or is a subdomain of, any list entry.
+// Entries are trimmed and a leading dot (".mailvoid.com") is ignored.
+func matchesDomain(domain string, list []string) bool {
 	if strings.TrimSpace(domain) == "" {
 		return false
 	}
 	lower := strings.ToLower(domain)
-	for _, a := range allowed {
-		if strings.TrimSpace(a) == "" {
+	for _, a := range list {
+		la := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(a), "."))
+		if la == "" {
 			continue
 		}
-		la := strings.ToLower(a)
 		if lower == la || strings.HasSuffix(lower, "."+la) {
 			return true
 		}

@@ -34,6 +34,10 @@ type Server struct {
 	limiter *connLimiter
 	// ctx bounds Enqueue so a full queue cannot block shutdown forever.
 	ctx context.Context
+	// dataSlots limits concurrent DATA processing (nil = unlimited); dataSlotWait is how
+	// long a transaction waits for a slot before getting a temporary failure.
+	dataSlots    chan struct{}
+	dataSlotWait time.Duration
 
 	mu        sync.Mutex
 	endpoints map[int]*endpoint
@@ -42,8 +46,39 @@ type Server struct {
 }
 
 func NewServer(ctx context.Context, log *slog.Logger, opts ServerOptions, filter *MailboxFilter, queue *Queue, certs *CertStore) *Server {
-	return &Server{ctx: ctx, log: log, opts: opts, filter: filter, queue: queue, certs: certs,
-		limiter: newConnLimiter(log, opts.MaxConnections, opts.MaxConnectionsPerIp), endpoints: map[int]*endpoint{}}
+	s := &Server{ctx: ctx, log: log, opts: opts, filter: filter, queue: queue, certs: certs,
+		limiter: newConnLimiter(log, opts.MaxConnections, opts.MaxConnectionsPerIp), endpoints: map[int]*endpoint{},
+		dataSlotWait: defaultDataSlotWait}
+	if opts.MaxConcurrentMessages > 0 {
+		s.dataSlots = make(chan struct{}, opts.MaxConcurrentMessages)
+	}
+	return s
+}
+
+const defaultDataSlotWait = 30 * time.Second
+
+// errBusy is returned when no DATA slot frees up in time; senders retry later.
+var errBusy = &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 2}, Message: "Server busy, try again later"}
+
+// acquireDataSlot waits (bounded) for a DATA processing slot. The returned func releases it.
+func (s *Server) acquireDataSlot() (func(), bool) {
+	if s.dataSlots == nil {
+		return func() {}, true
+	}
+	select {
+	case s.dataSlots <- struct{}{}:
+		return func() { <-s.dataSlots }, true
+	default:
+	}
+	t := time.NewTimer(s.dataSlotWait)
+	defer t.Stop()
+	select {
+	case s.dataSlots <- struct{}{}:
+		return func() { <-s.dataSlots }, true
+	case <-t.C:
+	case <-s.ctx.Done():
+	}
+	return nil, false
 }
 
 func (s *Server) Start() {
@@ -53,7 +88,8 @@ func (s *Server) Start() {
 	cert := s.certs.Current()
 	sslEnabled := s.opts.EnableSsl && cert != nil
 	s.log.Info("SMTP Server Configuration", "enableSsl", s.opts.EnableSsl, "certificateAvailable", cert != nil,
-		"maxRecipients", s.opts.MaxRecipients, "maxConnections", s.opts.MaxConnections, "maxConnectionsPerIp", s.opts.MaxConnectionsPerIp)
+		"maxRecipients", s.opts.MaxRecipients, "maxConnections", s.opts.MaxConnections, "maxConnectionsPerIp", s.opts.MaxConnectionsPerIp,
+		"maxConcurrentMessages", s.opts.MaxConcurrentMessages, "maxMimeParts", s.opts.MaxMimeParts)
 	if cert != nil && cert.Leaf != nil {
 		s.log.Info("Certificate Details", "subject", cert.Leaf.Subject.String(), "expires", cert.Leaf.NotAfter.UTC())
 	}
@@ -357,7 +393,12 @@ type session struct {
 	remote string
 	from   string
 	rcpts  []string
+	// rejectedRcpts counts refused RCPTs over the connection; past the first few they are
+	// logged at Debug and summarised once at logout, so a dictionary attack can't flood logs.
+	rejectedRcpts int
 }
+
+const maxWarnedRcptRejections = 5
 
 func (s *Server) newSession(c *smtp.Conn, port int) *session {
 	remote := "unknown"
@@ -381,7 +422,12 @@ func (ss *session) Mail(from string, opts *smtp.MailOptions) error {
 }
 
 func (ss *session) Rcpt(to string, _ *smtp.RcptOptions) error {
-	if !ss.s.filter.CanDeliverTo(to, ss.from) {
+	level := slog.LevelWarn
+	if ss.rejectedRcpts >= maxWarnedRcptRejections {
+		level = slog.LevelDebug
+	}
+	if !ss.s.filter.CanDeliverToLevel(to, ss.from, level) {
+		ss.rejectedRcpts++
 		return &smtp.SMTPError{Code: 550, EnhancedCode: smtp.EnhancedCode{5, 1, 1}, Message: "Mailbox unavailable"}
 	}
 	ss.rcpts = append(ss.rcpts, to)
@@ -389,6 +435,17 @@ func (ss *session) Rcpt(to string, _ *smtp.RcptOptions) error {
 }
 
 func (ss *session) Data(r io.Reader) error {
+	// Bound how many messages are held in memory at once (raw bytes, the parsed copy and
+	// the JSON encoding can each be close to MaxMessageSize). go-smtp discards the unread
+	// DATA after an error, so a busy reply still leaves the session usable.
+	release, ok := ss.s.acquireDataSlot()
+	if !ok {
+		ss.s.log.Warn("Deferred message: too many messages being processed", "remote", ss.remote,
+			"maxConcurrentMessages", ss.s.opts.MaxConcurrentMessages)
+		return errBusy
+	}
+	defer release()
+
 	raw, err := io.ReadAll(r)
 	if err != nil {
 		return err // includes go-smtp's ErrDataTooLarge
@@ -399,7 +456,7 @@ func (ss *session) Data(r io.Reader) error {
 	// Envelope recipients are authoritative: BCC recipients never appear in the headers.
 	recipients := distinctFold(ss.rcpts)
 
-	data, perr := BuildEmailData(raw, ss.from, recipients)
+	data, perr := BuildEmailDataLimited(raw, ss.from, recipients, ss.s.opts.MaxMimeParts)
 	if perr != nil {
 		log.Warn("Failed to parse MIME message; forwarding raw content with parse-failed marker", "error", perr)
 	} else {
@@ -413,8 +470,9 @@ func (ss *session) Data(r io.Reader) error {
 
 	id, err := ss.s.queue.Enqueue(ss.s.ctx, data)
 	if err != nil {
+		// Spooling failed (disk full, I/O error): a temporary failure so the sender retries.
 		log.Error("Error processing email message", "error", err)
-		return &smtp.SMTPError{Code: 554, EnhancedCode: smtp.EnhancedCode{5, 3, 0}, Message: "Error processing message"}
+		return &smtp.SMTPError{Code: 451, EnhancedCode: smtp.EnhancedCode{4, 3, 0}, Message: "Error processing message, try again later"}
 	}
 	messageID := ""
 	if data.MessageId != nil {
@@ -430,6 +488,9 @@ func (ss *session) Reset() {
 }
 
 func (ss *session) Logout() error {
+	if ss.rejectedRcpts > maxWarnedRcptRejections {
+		ss.s.log.Warn("Rejected recipients in session", "remote", ss.remote, "port", ss.port, "count", ss.rejectedRcpts)
+	}
 	ss.s.log.Info("SMTP session completed", "remote", ss.remote, "port", ss.port, "security", securityInfo(ss.conn))
 	return nil
 }

@@ -247,5 +247,13 @@ func tlsVersions(log *slog.Logger, protocols string) (minV, maxV uint16) {
 		}
 		return tls.VersionTLS12, tls.VersionTLS13
 	}
+	// TLS 1.0/1.1 are deprecated (RFC 8996) and not allowed, whatever the config says.
+	if minV < tls.VersionTLS12 {
+		log.Warn("TLS 1.0/1.1 are not supported; using TLS 1.2 as the minimum version", "configured", protocols)
+		minV = tls.VersionTLS12
+		if maxV < tls.VersionTLS12 {
+			maxV = tls.VersionTLS13
+		}
+	}
 	return minV, maxV
 }

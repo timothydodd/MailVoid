@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -17,18 +18,40 @@ import (
 	"mailvoid/internal/ordered"
 )
 
+// defaultMaxMimeParts is the default cap on boundary parameters (multipart containers)
+// in one message. Real mail rarely has more than a handful.
+const defaultMaxMimeParts = 100
+
+// ErrTooManyMimeParts means the message was not MIME-parsed because it declares more
+// multipart containers than allowed.
+var ErrTooManyMimeParts = errors.New("message has too many nested MIME parts")
+
 // BuildEmailData converts a raw DATA payload plus the SMTP envelope into the webhook
 // model. Broken MIME is still captured (with ParseFailed set) because this is a
 // developer tool: the raw source is always preserved.
 func BuildEmailData(raw []byte, envelopeFrom string, recipients []string) (EmailWebhookData, error) {
+	return BuildEmailDataLimited(raw, envelopeFrom, recipients, defaultMaxMimeParts)
+}
+
+// BuildEmailDataLimited is BuildEmailData with an explicit multipart cap (<= 0 means
+// unlimited). enmime recurses once per nested multipart and every level re-scans the
+// bytes below it, so a deeply nested message costs O(size x depth); above the cap the
+// message is treated as unparseable and only the raw source is forwarded.
+func BuildEmailDataLimited(raw []byte, envelopeFrom string, recipients []string, maxParts int) (EmailWebhookData, error) {
 	data := EmailWebhookData{
 		To:          recipients,
 		Attachments: []AttachmentData{},
 		RawEmail:    latin1(raw),
 	}
 
-	parser := enmime.NewParser(enmime.DisableTextConversion(true))
-	env, err := parser.ReadEnvelope(bytes.NewReader(raw))
+	var env *enmime.Envelope
+	var err error
+	if maxParts > 0 && countBoundaryParams(raw, maxParts) > maxParts {
+		err = ErrTooManyMimeParts
+	} else {
+		parser := enmime.NewParser(enmime.DisableTextConversion(true))
+		env, err = parser.ReadEnvelope(bytes.NewReader(raw))
+	}
 	if err != nil {
 		data.From = firstNonEmpty(envelopeFrom, "unknown@unknown.com")
 		data.Subject = "[parse failed]"
@@ -68,6 +91,34 @@ func BuildEmailData(raw []byte, envelopeFrom string, recipients []string) (Email
 		data.Date = NetTime{d.UTC()}
 	}
 	return data, nil
+}
+
+// countBoundaryParams estimates the number of multipart containers by counting
+// "boundary" parameter names (case-insensitive, followed by optional whitespace and '='
+// or '*' for RFC 2231 continuations). Every nested multipart needs one, so this bounds
+// the nesting depth. It may over-count (e.g. the word in a body), which only means a
+// message is forwarded raw. Counting stops once limit is exceeded.
+var boundaryWord = []byte("boundary")
+
+func countBoundaryParams(raw []byte, limit int) int {
+	word := boundaryWord
+	n := 0
+	for i := 0; i+len(word) <= len(raw); i++ {
+		if raw[i]|0x20 != 'b' || !bytes.EqualFold(raw[i:i+len(word)], word) {
+			continue
+		}
+		j := i + len(word)
+		for j < len(raw) && (raw[j] == ' ' || raw[j] == '\t') {
+			j++
+		}
+		if j < len(raw) && (raw[j] == '=' || raw[j] == '*') {
+			if n++; n > limit {
+				return n
+			}
+		}
+		i = j - 1
+	}
+	return n
 }
 
 // bodies returns the first non-attachment text/html and text/plain parts (depth-first),

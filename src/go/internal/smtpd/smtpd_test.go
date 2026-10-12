@@ -367,7 +367,7 @@ func TestCertbotArgs(t *testing.T) {
 	l := NewLetsEncrypt(discard, LetsEncryptOptions{Email: "a@b.com", ChallengeMethod: "dns-cloudflare", CertificateDirectory: "/le", HttpPort: &p}, func() {})
 	got := l.certbotArgs("smtp.x.com", false)
 	want := []string{"certonly", "--non-interactive", "--agree-tos", "--email", "a@b.com",
-		"--dns-cloudflare", "--dns-cloudflare-credentials", "/le/cloudflare.ini", "--domains", "smtp.x.com",
+		"--dns-cloudflare", "--dns-cloudflare-credentials", filepath.Join("/le", "cloudflare.ini"), "--domains", "smtp.x.com",
 		"--work-dir", "/le/work", "--config-dir", "/le/config", "--logs-dir", "/le/logs"}
 	if len(got) != len(want) {
 		t.Fatalf("args = %v", got)

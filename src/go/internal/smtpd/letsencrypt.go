@@ -116,8 +116,7 @@ func (l *LetsEncrypt) Obtain(ctx context.Context, domain string) bool {
 		l.log.Info("Valid certificate already exists", "domain", domain)
 		return true
 	}
-	if err := os.MkdirAll(filepath.Join(l.opts.CertificateDirectory, domain), 0o755); err != nil {
-		l.log.Error("Error obtaining certificate", "domain", domain, "error", err)
+	if !l.safeArgs(domain) {
 		return false
 	}
 	if l.isCloudflare() && !l.ensureCloudflareCredentials() {
@@ -137,6 +136,9 @@ func (l *LetsEncrypt) Renew(ctx context.Context, domain string) bool {
 		return false
 	}
 	l.log.Info("Renewing Let's Encrypt certificate", "domain", domain)
+	if !l.safeArgs(domain) {
+		return false
+	}
 	if l.isCloudflare() && !l.ensureCloudflareCredentials() {
 		return false
 	}
@@ -212,6 +214,23 @@ func (l *LetsEncrypt) certbotArgs(domain string, renewal bool) []string {
 			"--logs-dir", l.opts.CertificateDirectory+"/logs")
 	}
 	return args
+}
+
+// safeArgs rejects configuration values that certbot would parse as flags (a value
+// starting with "-" passed as an argument), so config can't inject certbot options.
+func (l *LetsEncrypt) safeArgs(domain string) bool {
+	for _, v := range []struct{ name, value string }{
+		{"Domains", domain},
+		{"Email", l.opts.Email},
+		{"CertificateDirectory", l.opts.CertificateDirectory},
+		{"WebrootPath", l.opts.WebrootPath},
+	} {
+		if strings.HasPrefix(strings.TrimSpace(v.value), "-") {
+			l.log.Error("Refusing to run certbot: LetsEncrypt setting must not start with '-'", "setting", v.name, "value", v.value)
+			return false
+		}
+	}
+	return true
 }
 
 func (l *LetsEncrypt) runCertbot(ctx context.Context, args []string) bool {
