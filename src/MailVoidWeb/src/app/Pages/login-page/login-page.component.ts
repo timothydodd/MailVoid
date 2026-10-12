@@ -2,6 +2,7 @@
 import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { form, required, FormField } from '@angular/forms/signals';
 import { ActivatedRoute, Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../_services/auth-service';
 
 @Component({
@@ -34,7 +35,7 @@ export class LoginPageComponent {
 
     // Redirect if already authenticated
     if (this.authService.isAuthenticated()) {
-      this.router.navigate([this.returnUrl]);
+      this.router.navigateByUrl(this.returnUrl);
     }
   }
 
@@ -50,8 +51,9 @@ export class LoginPageComponent {
     this.error = '';
 
     try {
-      await this.authService.login(username, password).toPromise();
-      this.router.navigate([this.returnUrl]);
+      await firstValueFrom(this.authService.login(username, password));
+      // navigateByUrl so a returnUrl carrying query params/fragments round-trips intact.
+      this.router.navigateByUrl(this.returnUrl);
     } catch (error: any) {
       const status = error?.status;
       if (status === 400 || status === 401) {

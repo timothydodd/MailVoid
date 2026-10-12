@@ -157,6 +157,14 @@ body.rd-modal-open {
   border-bottom-left-radius: 8px;
 }
 
+/* Right-aligned button row for a modal footer slot (Cancel / primary action) */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  width: 100%;
+}
+
 .auto-height {
   height: auto;
 }

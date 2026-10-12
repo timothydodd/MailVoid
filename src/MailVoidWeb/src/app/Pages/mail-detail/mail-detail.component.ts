@@ -6,10 +6,9 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { catchError, filter, of, switchMap } from 'rxjs';
 import { Mail, MailAttachment, MailService } from '../../_services/api/mail.service';
+import { TRUSTED_SENDERS_KEY } from '../../_services/auth-service';
 import { ClickOutsideDirective } from '../../_services/click-outside.directive';
 import { MailAttachmentsComponent } from './mail-attachments/mail-attachments.component';
-
-const TRUSTED_SENDERS_KEY = 'mailvoid_trusted_senders';
 
 type Tab = 'preview' | 'headers' | 'raw';
 
@@ -44,6 +43,13 @@ export class MailDetailComponent {
   isSenderTrusted = computed(() => {
     const email = this.senderEmail();
     return !!email && this.trustedSenders().includes(email);
+  });
+  // The From header is trivially spoofable, so a trusted sender only auto-loads remote
+  // content when the message is authenticated (SPF or DKIM pass). Otherwise the user
+  // can still load it manually.
+  isSenderAuthenticated = computed(() => {
+    const m = this.mail();
+    return this.isPass(m?.spfResult) || this.isPass(m?.dkimResult);
   });
 
   attachments = computed<MailAttachment[]>(() => {
@@ -99,8 +105,8 @@ export class MailDetailComponent {
         this.activeTab.set('preview');
         this.remoteMenuOpen.set(false);
         this.detailsExpanded.set(false);
-        // Auto-load remote content if this sender has been trusted.
-        this.loadRemote.set(this.isSenderTrusted());
+        // Auto-load remote content only for a trusted sender whose mail authenticated.
+        this.loadRemote.set(this.isSenderTrusted() && this.isSenderAuthenticated());
       });
   }
 
@@ -194,6 +200,10 @@ export class MailDetailComponent {
 
   goBack() {
     this.router.navigate(['/mail']);
+  }
+
+  private isPass(result: string | null | undefined): boolean {
+    return result?.trim().toLowerCase() === 'pass';
   }
 
   badgeClass(result: string | null | undefined): string {

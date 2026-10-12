@@ -70,7 +70,15 @@ export class JwtInterceptor implements HttpInterceptor {
 
   private forceLogin(): void {
     this.authService.clearAuthState();
-    this.router.navigate(['/login']);
+    // Send the user back where they were after logging in again. The login page
+    // only honours local paths ("/..." but not "//..."), so pass the router URL as-is.
+    const returnUrl = this.router.url;
+    const onLoginPage = returnUrl === '/login' || returnUrl.startsWith('/login?') || returnUrl.startsWith('/login/');
+    if (onLoginPage || !returnUrl || returnUrl === '/') {
+      this.router.navigate(['/login']);
+      return;
+    }
+    this.router.navigate(['/login'], { queryParams: { returnUrl } });
   }
 
   private handleError(err: any): Observable<never> {

@@ -129,11 +129,17 @@ export class MailService {
     });
   }
 }
+export type MailSortColumn = 'createdOn' | 'from' | 'to' | 'subject';
+export type MailSortDirection = 'asc' | 'desc';
+
 export interface FilterOptions {
   to: string | null;
   search?: string | null;
   page?: number;
   pageSize?: number;
+  // Optional server-side sort (server default: createdOn desc). Unknown to the legacy API, which ignores it.
+  sortBy?: MailSortColumn;
+  sortDirection?: MailSortDirection;
 }
 export interface Mail {
   id: number;

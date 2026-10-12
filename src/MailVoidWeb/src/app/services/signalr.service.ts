@@ -24,6 +24,11 @@ export interface WebhookNotification {
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
+// Backoff for our own restart loop, used once withAutomaticReconnect() has given up
+// (or the initial start failed). Doubles from 2s up to a 60s cap.
+const RESTART_BASE_DELAY_MS = 2_000;
+const RESTART_MAX_DELAY_MS = 60_000;
+
 @Injectable({
   providedIn: 'root',
 })
@@ -36,9 +41,20 @@ export class SignalRService {
   public newWebhook$ = this.newWebhookSubject.asObservable();
   public connectionState = signal<ConnectionState>('disconnected');
 
+  // True between startConnection() and stopConnection(): the user is logged in and
+  // wants a live connection, so the restart loop should keep trying.
+  private shouldRun = false;
+  private restartTimer?: ReturnType<typeof setTimeout>;
+  private restartAttempt = 0;
+
   constructor(private authService: AuthService) {}
 
   public async startConnection(): Promise<void> {
+    if (!this.authService.getToken()) {
+      return;
+    }
+    this.shouldRun = true;
+
     const state = this.hubConnection?.state;
     // Already connected or in the middle of (re)connecting - don't spin up a duplicate.
     if (
@@ -52,22 +68,21 @@ export class SignalRService {
       return this.startPromise;
     }
 
-    if (!this.authService.getToken()) {
-      return;
-    }
-
     if (!this.hubConnection) {
       this.buildConnection();
     }
 
+    this.clearRestartTimer();
     this.connectionState.set('connecting');
     this.startPromise = this.hubConnection!.start()
       .then(() => {
+        this.restartAttempt = 0;
         this.connectionState.set('connected');
       })
       .catch((err) => {
         console.error('Error starting SignalR connection:', err);
         this.connectionState.set('disconnected');
+        this.scheduleRestart();
         throw err;
       })
       .finally(() => {
@@ -81,8 +96,9 @@ export class SignalRService {
     const baseUrl = environment.apiUrl || '';
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${baseUrl}/hubs/mail`, {
-        // Resolve the token lazily so reconnects always use a fresh access token.
-        accessTokenFactory: () => this.authService.getToken() ?? '',
+        // Resolved on every (re)connect. Refreshes first (through AuthService's shared
+        // single-flight refresh) when the stored access token is expired or about to be.
+        accessTokenFactory: async () => (await this.authService.getFreshToken()) ?? '',
       })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Warning)
@@ -101,15 +117,46 @@ export class SignalRService {
     });
 
     this.hubConnection.onreconnected(() => {
+      this.restartAttempt = 0;
       this.connectionState.set('connected');
     });
 
+    // Fires after withAutomaticReconnect() exhausts its retries (or on stop()).
+    // Keep trying with our own backoff while the user is still logged in.
     this.hubConnection.onclose(() => {
       this.connectionState.set('disconnected');
+      this.scheduleRestart();
     });
   }
 
+  private scheduleRestart(): void {
+    if (!this.shouldRun || this.restartTimer) return;
+    if (!this.authService.isLoggedIn.value || !this.authService.getToken()) {
+      this.shouldRun = false;
+      return;
+    }
+    const delay = Math.min(RESTART_BASE_DELAY_MS * 2 ** this.restartAttempt, RESTART_MAX_DELAY_MS);
+    this.restartAttempt++;
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = undefined;
+      if (!this.shouldRun) return;
+      // Failures are logged and rescheduled inside startConnection().
+      this.startConnection().catch(() => undefined);
+    }, delay);
+  }
+
+  private clearRestartTimer(): void {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = undefined;
+    }
+  }
+
   public async stopConnection(): Promise<void> {
+    // Stop the restart loop first so the onclose triggered by stop() doesn't re-arm it.
+    this.shouldRun = false;
+    this.restartAttempt = 0;
+    this.clearRestartTimer();
     if (this.hubConnection) {
       try {
         await this.hubConnection.stop();

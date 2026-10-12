@@ -25,3 +25,7 @@ export interface UpdateUserRoleRequest {
 export interface UpdateUserPasswordRequest {
   newPassword: string;
 }
+
+// Minimum length for new passwords; matches the API's check (create user, change
+// password, admin reset), which returns 400 for anything shorter.
+export const MIN_PASSWORD_LENGTH = 8;

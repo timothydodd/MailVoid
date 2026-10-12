@@ -3,7 +3,19 @@ import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@a
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { combineLatest, debounceTime, distinctUntilChanged } from 'rxjs';
+import {
+  auditTime,
+  catchError,
+  combineLatest,
+  debounceTime,
+  distinctUntilChanged,
+  filter,
+  forkJoin,
+  map,
+  of,
+  Subject,
+  switchMap,
+} from 'rxjs';
 import { MailSettingsModalComponent } from '../../_components/mail-settings-modal/mail-settings-modal.component';
 import { ModalContainerService } from '@rd-ui';
 import {
@@ -12,16 +24,21 @@ import {
   MailBoxGroups,
   MailGroup,
   MailService,
+  MailSortColumn,
+  MailSortDirection,
   MailWithReadStatus,
 } from '../../_services/api/mail.service';
 import { LastSeenService } from '../../_services/last-seen.service';
 import { MailSearchService } from '../../_services/mail-search.service';
 import { MobileMenuService } from '../../_services/mobile-menu.service';
-import { SignalRService } from '../../services/signalr.service';
+import { MailNotification, SignalRService } from '../../services/signalr.service';
 import { BoxListComponent } from './box-list/box-list.component';
 
-type SortColumn = 'from' | 'to' | 'subject' | 'createdOn';
-type SortDirection = 'asc' | 'desc';
+type SortColumn = MailSortColumn;
+type SortDirection = MailSortDirection;
+
+// Minimum gap between live (SignalR-driven) refreshes of the list and sidebar.
+const LIVE_REFRESH_INTERVAL_MS = 1000;
 
 @Component({
   selector: 'app-mail',
@@ -184,7 +201,7 @@ export class MailComponent {
   loading = signal(false);
   error = signal(false);
 
-  // Sorting (applied to the current server page)
+  // Sorting (sent to the server; also applied to the current page as a fallback)
   sortColumn = signal<SortColumn>('createdOn');
   sortDirection = signal<SortDirection>('desc');
 
@@ -222,7 +239,55 @@ export class MailComponent {
     });
   });
 
+  // Every list fetch goes through this stream; switchMap cancels any in-flight
+  // request so only the latest (box, search, page, sort) can render.
+  // background = true skips the "Loading..." placeholder (used for live refreshes).
+  private fetchRequests = new Subject<{ background: boolean }>();
+  // Same latest-wins treatment for the sidebar (mailboxes + groups).
+  private refreshRequests = new Subject<void>();
+
   constructor() {
+    this.fetchRequests
+      .pipe(
+        switchMap(({ background }) => {
+          if (!background) {
+            this.loading.set(true);
+          }
+          this.error.set(false);
+          // The filter is captured now, so a superseded request can never apply.
+          return this.mailService.getEmails(this.buildFilter()).pipe(
+            map((result) => ({ ok: true as const, result })),
+            catchError(() => of({ ok: false as const, result: null }))
+          );
+        }),
+        takeUntilDestroyed()
+      )
+      .subscribe(({ ok, result }) => {
+        this.emails.set(ok ? (result?.items ?? null) : null);
+        this.totalCount.set(ok ? (result?.totalCount ?? 0) : 0);
+        this.loading.set(false);
+        this.error.set(!ok);
+      });
+
+    this.refreshRequests
+      .pipe(
+        switchMap(() =>
+          forkJoin([this.mailService.getMailboxes(), this.mailService.getMailGroups()]).pipe(
+            catchError((err) => {
+              console.error('Failed to refresh mailboxes:', err);
+              return of(null);
+            })
+          )
+        ),
+        takeUntilDestroyed()
+      )
+      .subscribe((result) => {
+        if (!result) return;
+        const [mailboxes, mailGroups] = result;
+        this.mailboxes.set(mailboxes);
+        this.mailGroups.set(mailGroups);
+      });
+
     // Refetch (page 1) whenever the selected box or search term changes.
     combineLatest([
       toObservable(this.selectedBox),
@@ -239,49 +304,47 @@ export class MailComponent {
       this.toggleMobileMenu();
     });
 
-    // Subscribe to new mail notifications
-    this.signalRService.newMail$.pipe(takeUntilDestroyed()).subscribe((mail) => {
-      const currentBox = this.selectedBox();
-      if (!currentBox || mail.to === currentBox || (mail.mailGroupPath && currentBox.includes(mail.mailGroupPath))) {
-        this.fetchEmails();
-      }
-      // Always refresh mailboxes to update counts
-      this.refreshMail();
-    });
+    // Live updates. A burst of incoming mail is throttled to at most one list
+    // refresh and one sidebar refresh per second instead of one per message.
+    this.signalRService.newMail$
+      .pipe(
+        filter((mail) => this.isInCurrentView(mail)),
+        auditTime(LIVE_REFRESH_INTERVAL_MS),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => this.fetchEmails(true));
+
+    // Always refresh mailboxes to update counts.
+    this.signalRService.newMail$
+      .pipe(auditTime(LIVE_REFRESH_INTERVAL_MS), takeUntilDestroyed())
+      .subscribe(() => this.refreshMail());
   }
 
-  private fetchEmails() {
-    this.loading.set(true);
-    this.error.set(false);
-    this.mailService
-      .getEmails(this.buildFilter(this.selectedBox(), this.mailSearchService.searchText(), this.currentPage()))
-      .subscribe({
-        next: (result) => {
-          this.emails.set(result?.items ?? null);
-          this.totalCount.set(result?.totalCount ?? 0);
-          this.loading.set(false);
-        },
-        error: () => {
-          this.emails.set(null);
-          this.totalCount.set(0);
-          this.loading.set(false);
-          this.error.set(true);
-        },
-      });
+  private isInCurrentView(mail: MailNotification): boolean {
+    const currentBox = this.selectedBox();
+    return !currentBox || mail.to === currentBox || (!!mail.mailGroupPath && currentBox.includes(mail.mailGroupPath));
   }
 
-  private buildFilter(box: string | null, search: string, page: number): FilterOptions {
-    const trimmed = search.trim();
-    return { to: box, search: trimmed || null, page, pageSize: this.pageSize };
+  private fetchEmails(background = false) {
+    this.fetchRequests.next({ background });
+  }
+
+  private buildFilter(): FilterOptions {
+    const trimmed = this.mailSearchService.searchText().trim();
+    return {
+      to: this.selectedBox(),
+      search: trimmed || null,
+      page: this.currentPage(),
+      pageSize: this.pageSize,
+      // Server-side sort across all pages (Go API). The legacy API ignores these and
+      // returns newest-first; sortedEmails() still orders the current page client-side.
+      sortBy: this.sortColumn(),
+      sortDirection: this.sortDirection(),
+    };
   }
 
   refreshMail() {
-    combineLatest([this.mailService.getMailboxes(), this.mailService.getMailGroups()]).subscribe(
-      ([mailboxes, mailGroups]) => {
-        this.mailboxes.set(mailboxes);
-        this.mailGroups.set(mailGroups);
-      }
-    );
+    this.refreshRequests.next();
   }
   clickBox(box: string | null) {
     this.selectedBox.set(box);
@@ -330,6 +393,9 @@ export class MailComponent {
       this.sortColumn.set(column);
       this.sortDirection.set(column === 'createdOn' ? 'desc' : 'asc');
     }
+    // Re-sort across the whole mailbox on the server, starting again from page 1.
+    this.currentPage.set(1);
+    this.fetchEmails();
   }
 
   nextPage() {

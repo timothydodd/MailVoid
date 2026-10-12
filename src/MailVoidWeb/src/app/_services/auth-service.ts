@@ -1,10 +1,18 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, firstValueFrom, Observable, shareReplay, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { LastSeenService } from './last-seen.service';
 import { MailSearchService } from './mail-search.service';
+
+// Per-user list of senders whose remote content is auto-loaded (see mail-detail).
+// Cleared on logout so it doesn't carry over to the next user on a shared machine.
+export const TRUSTED_SENDERS_KEY = 'mailvoid_trusted_senders';
+
+// Refresh responses that mean the session is genuinely gone (bad/expired/revoked
+// refresh token, unknown user). Anything else (network, 5xx) is treated as transient.
+const AUTH_FAILURE_STATUSES = [400, 401, 403, 404];
 
 // The refresh token is held server-side as an httpOnly cookie (set by /api/auth on
 // login/refresh), so it is never exposed to JavaScript. Only the short-lived access
@@ -131,7 +139,8 @@ export class AuthService {
     }
   }
 
-  isTokenExpired(): boolean {
+  // leewaySeconds > 0 treats a token that expires within that window as already expired.
+  isTokenExpired(leewaySeconds = 0): boolean {
     const token = this.getToken();
     if (!token) return true;
 
@@ -140,7 +149,7 @@ export class AuthService {
       if (!payload?.exp) return true;
 
       const currentTime = Math.floor(Date.now() / 1000);
-      return payload.exp < currentTime;
+      return payload.exp < currentTime + leewaySeconds;
     } catch (error) {
       console.error('Error parsing token:', error);
       return true;
@@ -206,6 +215,7 @@ export class AuthService {
     this.refreshInFlight = undefined;
     this.lastSeenService.clearLastSeenData();
     this.mailSearchService.clear();
+    localStorage.removeItem(TRUSTED_SENDERS_KEY);
     this.isLoggedIn.next(false);
     this.currentUserSubject.next(null);
   }
@@ -246,6 +256,17 @@ export class AuthService {
     return this.refreshInFlight;
   }
 
+  // Returns a usable access token, refreshing first (via the shared single-flight
+  // refresh) when the stored one is expired or about to expire. Used by long-lived
+  // connections (SignalR) that can't rely on the HTTP interceptor's 401 handling.
+  // Rejects on transient refresh failures; resolves null when the session is gone.
+  async getFreshToken(leewaySeconds = 30): Promise<string | null> {
+    const token = this.getToken();
+    if (!token) return null;
+    if (!this.isTokenExpired(leewaySeconds)) return token;
+    return this.refreshToken();
+  }
+
   private async doRefresh(accessToken: string): Promise<string | null> {
     try {
       // The refresh token rides along as an httpOnly cookie (withCredentials); only
@@ -265,9 +286,15 @@ export class AuthService {
       this.clearAuthState();
       return null;
     } catch (error) {
-      console.error('Token refresh failed:', error);
-      this.clearAuthState();
-      return null;
+      if (error instanceof HttpErrorResponse && AUTH_FAILURE_STATUSES.includes(error.status)) {
+        // The refresh token was rejected - the session is over.
+        console.warn('Token refresh rejected; logging out.', error.status);
+        this.clearAuthState();
+        return null;
+      }
+      // Network error (status 0), 5xx, timeout, etc. - keep the session and let the
+      // caller surface the failure; a later request can retry the refresh.
+      throw error;
     }
   }
 }

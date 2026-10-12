@@ -10,7 +10,7 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
   template: `
     <div class="box-list-container">
       @if (mailboxes(); as mb) {
-        @for (group of mb; track $index) {
+        @for (group of mb; track group.groupName) {
           <div class="group-section">
             <div class="group-header">
               <h3 class="group-title">{{ group.groupName }}</h3>
@@ -26,7 +26,7 @@ import { BoxMenuComponent } from './box-menu/box-menu.component';
               </div>
             </div>
             <div class="mailbox-list">
-              @for (item of group.mailBoxes; track $index) {
+              @for (item of group.mailBoxes; track (item.path ?? '') + '|' + item.name) {
                 <div class="mailbox-item" [class.selected]="selectedBox() === item.name">
                   <button class="mailbox-button" (click)="clickBox(item.name)" [title]="item.name">
                     <span class="mailbox-name">

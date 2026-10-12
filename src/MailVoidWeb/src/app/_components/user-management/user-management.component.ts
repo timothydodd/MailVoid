@@ -1,10 +1,11 @@
 
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { form, required, minLength, pattern, FormField } from '@angular/forms/signals';
-import { ConfirmDialogService } from '@rd-ui';
-import { CreateUserRequest, Role, UpdateUserRoleRequest, User } from '../../_models/user.model';
+import { ConfirmDialogService, ModalContainerService } from '@rd-ui';
+import { CreateUserRequest, MIN_PASSWORD_LENGTH, Role, UpdateUserRoleRequest, User } from '../../_models/user.model';
 import { AuthService } from '../../_services/auth-service';
 import { UserManagementService } from '../../_services/user-management.service';
+import { ResetPasswordDialogComponent } from './reset-password-dialog/reset-password-dialog.component';
 
 @Component({
   selector: 'app-user-management',
@@ -25,6 +26,13 @@ import { UserManagementService } from '../../_services/user-management.service';
                 class="form-control"
                 placeholder="Enter username"
               />
+              @if (createUserForm.username().touched() && createUserForm.username().invalid()) {
+                <div class="text-danger">
+                  @for (error of createUserForm.username().errors(); track error.kind) {
+                    <div>{{ error.message }}</div>
+                  }
+                </div>
+              }
             </div>
             <div class="form-group">
               <label for="password">Password</label>
@@ -33,8 +41,16 @@ import { UserManagementService } from '../../_services/user-management.service';
                 type="password"
                 [formField]="createUserForm.password"
                 class="form-control"
-                placeholder="Enter password"
+                autocomplete="new-password"
+                placeholder="At least 8 characters"
               />
+              @if (createUserForm.password().touched() && createUserForm.password().invalid()) {
+                <div class="text-danger">
+                  @for (error of createUserForm.password().errors(); track error.kind) {
+                    <div>{{ error.message }}</div>
+                  }
+                </div>
+              }
             </div>
             <div class="form-group">
               <label for="subdomain">Subdomain</label>
@@ -112,7 +128,7 @@ import { UserManagementService } from '../../_services/user-management.service';
                     <button class="btn btn-sm btn-outline" (click)="editRole(user.id)">Edit Role</button>
                     <button
                       class="btn btn-sm btn-outline"
-                      (click)="resetPassword(user.id)"
+                      (click)="resetPassword(user)"
                       [disabled]="isResettingPassword() === user.id"
                     >
                       {{ isResettingPassword() === user.id ? 'Resetting...' : 'Reset Password' }}
@@ -150,6 +166,7 @@ export class UserManagementComponent {
   private userManagementService = inject(UserManagementService);
   private authService = inject(AuthService);
   private confirmDialog = inject(ConfirmDialogService);
+  private modalContainerService = inject(ModalContainerService);
 
   users = signal<User[]>([]);
   isLoading = signal(false);
@@ -171,7 +188,9 @@ export class UserManagementComponent {
     required(path.username, { message: 'Username is required' });
     minLength(path.username, 3, { message: 'Username must be at least 3 characters' });
     required(path.password, { message: 'Password is required' });
-    minLength(path.password, 6, { message: 'Password must be at least 6 characters' });
+    minLength(path.password, MIN_PASSWORD_LENGTH, {
+      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    });
     pattern(path.subdomain, /^[a-z0-9-]*$/, { message: 'Subdomain has an invalid format' });
     required(path.role, { message: 'Role is required' });
   });
@@ -258,13 +277,16 @@ export class UserManagementComponent {
     }
   }
 
-  async resetPassword(userId: string) {
-    const newPassword = prompt('Enter new password for this user:');
-    if (!newPassword || newPassword.length < 6) {
-      this.errorMessage.set('Password must be at least 6 characters long');
-      return;
-    }
+  resetPassword(user: User) {
+    // Masked password + confirmation in a modal; the dialog enforces the minimum length.
+    ResetPasswordDialogComponent.show(this.modalContainerService, user.userName).subscribe((newPassword) => {
+      if (newPassword) {
+        this.applyPasswordReset(user.id, newPassword);
+      }
+    });
+  }
 
+  private async applyPasswordReset(userId: string, newPassword: string) {
     this.isResettingPassword.set(userId);
     this.clearMessages();
 

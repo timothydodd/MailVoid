@@ -211,6 +211,12 @@
   color: var(--comment) !important;
 }
 
+/* Inline validation / error text under form fields */
+.text-danger {
+  color: var(--danger);
+  font-size: 0.875rem;
+}
+
 /* List Groups */
 .group-section {
   .group-header {

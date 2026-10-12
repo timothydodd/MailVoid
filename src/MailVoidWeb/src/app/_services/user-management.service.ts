@@ -62,6 +62,10 @@ export class UserManagementService {
       if (error.status === 404) {
         throw new Error('User not found');
       }
+      if (error.status === 400) {
+        // e.g. "Password must be at least 8 characters." (plain-text body)
+        throw new Error(typeof error.error === 'string' && error.error ? error.error : 'Invalid password');
+      }
       throw new Error(error.error?.message || 'Failed to update password');
     }
   }

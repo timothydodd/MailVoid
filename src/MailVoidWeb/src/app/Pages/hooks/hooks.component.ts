@@ -3,7 +3,7 @@ import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@a
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { catchError, forkJoin, map, of } from 'rxjs';
+import { auditTime, catchError, filter, forkJoin, map, Observable, of, Subject, switchMap } from 'rxjs';
 import { WebhookBucket, WebhookListItem, WebhookService } from '../../_services/api/webhook.service';
 import { SignalRService } from '../../services/signalr.service';
 
@@ -12,6 +12,17 @@ type SortDirection = 'asc' | 'desc';
 
 // Large page used to pull a bucket's full history when aggregating the "All" view.
 const AGGREGATE_PAGE_SIZE = 500;
+
+// Minimum gap between live (SignalR-driven) refreshes of the list and sidebar.
+const LIVE_REFRESH_INTERVAL_MS = 1000;
+
+interface FetchResult {
+  ok: boolean;
+  items: WebhookListItem[];
+  totalCount: number;
+  // Set when the fetch also loaded the bucket list (the aggregated "All" view).
+  buckets?: WebhookBucket[];
+}
 
 @Component({
   selector: 'app-hooks',
@@ -251,10 +262,46 @@ export class HooksComponent {
     return sorted.slice(start, start + this.pageSize);
   });
 
-  constructor() {
-    this.refreshBuckets();
+  // Every list fetch goes through this stream; switchMap cancels any in-flight
+  // request so only the latest (bucket, page) can render.
+  // background = true skips the "Loading..." placeholder (used for live refreshes).
+  private fetchRequests = new Subject<{ background: boolean }>();
+  private bucketRefreshRequests = new Subject<void>();
 
-    // Load webhooks when the selected bucket changes.
+  constructor() {
+    this.fetchRequests
+      .pipe(
+        switchMap(({ background }) => {
+          if (!background) {
+            this.loading.set(true);
+          }
+          this.error.set(false);
+          // Bucket and page are captured now, so a superseded request can never apply.
+          return this.loadWebhooks(this.selectedBucket(), this.currentPage());
+        }),
+        takeUntilDestroyed()
+      )
+      .subscribe((result) => {
+        if (result.buckets) {
+          this.buckets.set(result.buckets);
+        }
+        this.webhooks.set(result.items);
+        this.totalCount.set(result.totalCount);
+        this.loading.set(false);
+        this.error.set(!result.ok);
+      });
+
+    this.bucketRefreshRequests
+      .pipe(
+        switchMap(() => this.webhookService.getBuckets().pipe(catchError(() => of(null)))),
+        takeUntilDestroyed()
+      )
+      .subscribe((buckets) => {
+        if (buckets) this.buckets.set(buckets);
+      });
+
+    // Load webhooks when the selected bucket changes. The initial "All" view fetch
+    // also loads the bucket list, so no separate bucket request is needed on init.
     toObservable(this.selectedBucket)
       .pipe(takeUntilDestroyed())
       .subscribe(() => {
@@ -262,82 +309,71 @@ export class HooksComponent {
         this.fetchWebhooks();
       });
 
-    // Subscribe to new webhook notifications
-    this.signalRService.newWebhook$.pipe(takeUntilDestroyed()).subscribe((webhook) => {
-      const currentBucket = this.selectedBucket();
-      // Refresh whenever we're in the All view or the webhook belongs to the open bucket.
-      if (!currentBucket || webhook.bucketName === currentBucket) {
-        this.fetchWebhooks();
-      }
-      // Always refresh buckets to update counts/activity
-      this.refreshBuckets();
-    });
+    // Live updates, throttled so a burst of webhooks causes at most one refresh per
+    // second. Refresh the list in the All view or when the webhook hit the open bucket;
+    // in the All view that fetch reloads the bucket list too.
+    this.signalRService.newWebhook$
+      .pipe(
+        filter((webhook) => {
+          const currentBucket = this.selectedBucket();
+          return !currentBucket || webhook.bucketName === currentBucket;
+        }),
+        auditTime(LIVE_REFRESH_INTERVAL_MS),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => this.fetchWebhooks(true));
+
+    // With a single bucket open, the sidebar (counts/activity/new buckets) needs its own refresh.
+    this.signalRService.newWebhook$
+      .pipe(
+        auditTime(LIVE_REFRESH_INTERVAL_MS),
+        filter(() => this.selectedBucket() !== null),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => this.refreshBuckets());
   }
 
-  private fetchWebhooks() {
-    const bucket = this.selectedBucket();
-    this.loading.set(true);
-    this.error.set(false);
+  private fetchWebhooks(background = false) {
+    this.fetchRequests.next({ background });
+  }
+
+  private loadWebhooks(bucket: string | null, page: number): Observable<FetchResult> {
+    const failed: FetchResult = { ok: false, items: [], totalCount: 0 };
 
     if (bucket) {
-      this.webhookService.getWebhooks(bucket, this.currentPage(), this.pageSize).subscribe({
-        next: (result) => {
-          this.webhooks.set(result?.items ?? []);
-          this.totalCount.set(result?.totalCount ?? 0);
-          this.loading.set(false);
-        },
-        error: () => this.onFetchError(),
-      });
-      return;
+      return this.webhookService.getWebhooks(bucket, page, this.pageSize).pipe(
+        map((result): FetchResult => ({ ok: true, items: result?.items ?? [], totalCount: result?.totalCount ?? 0 })),
+        catchError(() => of(failed))
+      );
     }
 
     // "All" view - aggregate webhooks across every bucket.
-    this.webhookService
-      .getBuckets()
-      .pipe(
-        map((buckets) => buckets ?? []),
-        catchError(() => of([] as WebhookBucket[]))
-      )
-      .subscribe({
-        next: (buckets) => {
-          if (buckets.length === 0) {
-            this.webhooks.set([]);
-            this.totalCount.set(0);
-            this.loading.set(false);
-            return;
-          }
-          forkJoin(
-            buckets.map((b) =>
-              this.webhookService.getWebhooks(b.name, 1, AGGREGATE_PAGE_SIZE).pipe(
-                map((r) => r?.items ?? []),
-                catchError(() => of([] as WebhookListItem[]))
-              )
+    return this.webhookService.getBuckets().pipe(
+      switchMap((buckets) => {
+        const list = buckets ?? [];
+        if (list.length === 0) {
+          return of<FetchResult>({ ok: true, items: [], totalCount: 0, buckets: list });
+        }
+        return forkJoin(
+          list.map((b) =>
+            this.webhookService.getWebhooks(b.name, 1, AGGREGATE_PAGE_SIZE).pipe(
+              map((r) => r?.items ?? []),
+              catchError(() => of([] as WebhookListItem[]))
             )
-          ).subscribe({
-            next: (lists) => {
-              const all = lists.flat();
-              this.webhooks.set(all);
-              this.totalCount.set(all.length);
-              this.loading.set(false);
-            },
-            error: () => this.onFetchError(),
-          });
-        },
-        error: () => this.onFetchError(),
-      });
-  }
-
-  private onFetchError() {
-    this.webhooks.set([]);
-    this.totalCount.set(0);
-    this.loading.set(false);
-    this.error.set(true);
+          )
+        ).pipe(
+          map((lists): FetchResult => {
+            const all = lists.flat();
+            return { ok: true, items: all, totalCount: all.length, buckets: list };
+          })
+        );
+      }),
+      catchError(() => of(failed))
+    );
   }
 
   refreshBuckets() {
-    this.webhookService.getBuckets().subscribe((buckets) => {
-      this.buckets.set(buckets);
-    });
+    this.bucketRefreshRequests.next();
   }
 
   selectBucket(name: string | null) {

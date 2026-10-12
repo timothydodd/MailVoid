@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
-import { form, required, validate, FormField } from '@angular/forms/signals';
+import { form, minLength, required, validate, FormField } from '@angular/forms/signals';
 import { ToastService } from '@rd-ui';
+import { MIN_PASSWORD_LENGTH } from '../../../_models/user.model';
 import { AuthService } from '../../../_services/auth-service';
 
 interface ChangePasswordModel {
@@ -28,7 +29,7 @@ interface ChangePasswordModel {
       </div>
       <div class="form-group">
         <label for="np">New Password</label>
-        <input [formField]="changePasswordForm.newPassword" type="password" class="form-control" id="np" />
+        <input [formField]="changePasswordForm.newPassword" type="password" class="form-control" id="np" autocomplete="new-password" />
         @if ((submitted() || changePasswordForm.newPassword().touched()) && changePasswordForm.newPassword().invalid()) {
           <div class="text-danger">
             @for (error of changePasswordForm.newPassword().errors(); track error.kind) {
@@ -39,7 +40,7 @@ interface ChangePasswordModel {
       </div>
       <div class="form-group">
         <label for="np2">Confirm New Password</label>
-        <input [formField]="changePasswordForm.newPassword2" type="password" class="form-control" id="np2" />
+        <input [formField]="changePasswordForm.newPassword2" type="password" class="form-control" id="np2" autocomplete="new-password" />
         @if ((submitted() || changePasswordForm.newPassword2().touched()) && changePasswordForm.newPassword2().invalid()) {
           <div class="text-danger">
             @for (error of changePasswordForm.newPassword2().errors(); track error.kind) {
@@ -68,6 +69,9 @@ export class ChangePasswordComponent {
   changePasswordForm = form(this.model, (path) => {
     required(path.oldPassword, { message: 'Old Password is required' });
     required(path.newPassword, { message: 'New Password is required' });
+    minLength(path.newPassword, MIN_PASSWORD_LENGTH, {
+      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    });
     required(path.newPassword2, { message: 'Confirm New Password is required' });
     validate(path.newPassword2, ({ value, valueOf }) => {
       if (value() !== valueOf(path.newPassword)) {
@@ -96,7 +100,12 @@ export class ChangePasswordComponent {
         },
         error: (error) => {
           this.toastr.error('Password changed Failed');
-          const message = error.status == 401 ? 'Invalid UserName or Password' : 'An error occurred';
+          const message =
+            error.status == 401
+              ? 'Invalid UserName or Password'
+              : error.status == 400 && typeof error.error === 'string' && error.error
+                ? error.error // server-side password rule, e.g. minimum length
+                : 'An error occurred';
           this.errorMessage.update(() => message);
         },
       });
