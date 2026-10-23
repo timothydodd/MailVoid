@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
+import { ConfirmDialogService, ToastService } from '@rd-ui';
 import { auditTime, catchError, filter, forkJoin, map, Observable, of, Subject, switchMap } from 'rxjs';
 import { WebhookBucket, WebhookListItem, WebhookService } from '../../_services/api/webhook.service';
 import { SignalRService } from '../../services/signalr.service';
+import { HookDetailComponent } from './hook-detail/hook-detail.component';
 
 type SortColumn = 'httpMethod' | 'path' | 'contentType' | 'createdOn';
 type SortDirection = 'asc' | 'desc';
@@ -27,9 +29,14 @@ interface FetchResult {
 @Component({
   selector: 'app-hooks',
   standalone: true,
-  imports: [CommonModule, LucideDynamicIcon],
+  imports: [CommonModule, LucideDynamicIcon, HookDetailComponent],
+  host: {
+    '(document:keydown.arrowdown)': 'onArrow($event, 1)',
+    '(document:keydown.arrowup)': 'onArrow($event, -1)',
+    '(document:keydown.escape)': 'selectWebhook(null)',
+  },
   template: `
-    <div class="hooks-container">
+    <div class="hooks-container" [class.has-detail]="selectedId() !== null">
       <!-- Left Sidebar -->
       <div class="hooks-sidebar">
         <div class="sidebar-card">
@@ -45,7 +52,7 @@ interface FetchResult {
             </button>
           </div>
           <div class="sidebar-body">
-            @if (buckets()) {
+            @if (buckets()?.length) {
               <ul class="bucket-list">
                 @for (bucket of buckets(); track bucket.id) {
                   <li
@@ -72,98 +79,84 @@ interface FetchResult {
         </div>
       </div>
 
-      <!-- Main Content Area -->
+      <!-- List -->
       <div class="hooks-content">
-        @if (selectedBucket()) {
-          <div class="content-header">
-            <h2>{{ selectedBucket() }}</h2>
-            <div class="endpoint-row">
-              <code class="endpoint-url">{{ endpointUrl() }}</code>
-              <button class="btn btn-icon btn-copy" (click)="copyEndpointUrl()" [title]="copyTooltip()">
-                <svg [lucideIcon]="copyIcon()" size="14"></svg>
-              </button>
-            </div>
+        <div class="content-header">
+          <div class="content-title">
+            <h2>{{ selectedBucket() ?? 'All Webhooks' }}</h2>
+            @if (selectedBucket()) {
+              <div class="endpoint-row">
+                <code class="endpoint-url">{{ endpointUrl() }}</code>
+                <button class="copy-btn" (click)="copyEndpointUrl()" [title]="copyTooltip()">
+                  <svg lucideIcon="copy" size="14"></svg>
+                </button>
+              </div>
+            }
           </div>
-        } @else {
-          <div class="content-header">
-            <h2>All Webhooks</h2>
+          <div class="content-actions">
+            @if (totalCount() > 0) {
+              <span class="count-label">{{ totalCount() }} captured</span>
+            }
+            <button class="btn btn-outline btn-sm btn-purge" (click)="purge()" [disabled]="totalCount() === 0">
+              <svg lucideIcon="trash-2" size="14"></svg>
+              Purge history
+            </button>
           </div>
-        }
+        </div>
 
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th class="sortable" (click)="toggleSort('httpMethod')">
-                  Method
-                  @if (sortColumn() === 'httpMethod') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
-                <th class="sortable" (click)="toggleSort('path')">
-                  Path
-                  @if (sortColumn() === 'path') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
-                <th class="sortable" (click)="toggleSort('contentType')">
-                  Content-Type
-                  @if (sortColumn() === 'contentType') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
-                <th class="sortable" (click)="toggleSort('createdOn')">
-                  Received
-                  @if (sortColumn() === 'createdOn') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
+                @for (col of columns; track col.key) {
+                  <th class="sortable" [class.optional]="col.optional" (click)="toggleSort(col.key)">
+                    {{ col.label }}
+                    @if (sortColumn() === col.key) {
+                      <svg [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></svg>
+                    }
+                  </th>
+                }
               </tr>
             </thead>
             <tbody>
               @if (loading()) {
-                <tr>
+                <tr class="read">
                   <td colspan="4" class="table-status">Loading webhooks...</td>
                 </tr>
               } @else if (error()) {
-                <tr>
+                <tr class="read">
                   <td colspan="4" class="table-status table-status-error">
                     Failed to load webhooks. Please try again.
                   </td>
                 </tr>
-              } @else if (paginatedWebhooks() && paginatedWebhooks()!.length > 0) {
+              } @else if (paginatedWebhooks()?.length) {
                 @for (webhook of paginatedWebhooks(); track webhook.id) {
                   <tr
+                    class="read"
                     role="button"
                     tabindex="0"
-                    (click)="clickWebhook(webhook)"
-                    (keydown.enter)="clickWebhook(webhook)"
-                    (keydown.space)="$event.preventDefault(); clickWebhook(webhook)"
+                    [class.selected]="webhook.id === selectedId()"
+                    (click)="selectWebhook(webhook.id)"
+                    (keydown.enter)="selectWebhook(webhook.id)"
+                    (keydown.space)="$event.preventDefault(); selectWebhook(webhook.id)"
                   >
                     <td>
-                      <span class="method-badge method-{{ webhook.httpMethod.toLowerCase() }}">
-                        {{ webhook.httpMethod }}
-                      </span>
+                      <span class="method-badge method-{{ webhook.httpMethod.toLowerCase() }}">{{
+                        webhook.httpMethod
+                      }}</span>
                     </td>
-                    <td class="path-cell">{{ webhook.path }}{{ webhook.queryString || '' }}</td>
-                    <td>{{ webhook.contentType || '-' }}</td>
-                    <td>{{ webhook.createdOn | date: 'short' }}</td>
+                    <td class="path-cell">
+                      {{ webhook.path }}{{ webhook.queryString || '' }}
+                      @if (!selectedBucket()) {
+                        <span class="row-bucket">{{ webhook.bucketName }}</span>
+                      }
+                    </td>
+                    <td class="optional">{{ webhook.contentType || '-' }}</td>
+                    <td class="date-cell">{{ webhook.createdOn | date: 'short' }}</td>
                   </tr>
                 }
               } @else {
-                <tr>
+                <tr class="read">
                   <td colspan="4" class="table-status">No webhooks captured yet</td>
                 </tr>
               }
@@ -187,21 +180,46 @@ interface FetchResult {
           </div>
         }
       </div>
+
+      <!-- Detail panel -->
+      @if (selectedId(); as id) {
+        <app-hook-detail
+          class="hooks-detail"
+          [webhookId]="id"
+          [hasPrevious]="hasPrevious()"
+          [hasNext]="hasNext()"
+          (previous)="step(-1)"
+          (next)="step(1)"
+          (close)="selectWebhook(null)"
+          (deleted)="onDeleted($event)"
+        />
+      }
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './hooks.component.scss',
 })
 export class HooksComponent {
-  router = inject(Router);
-  webhookService = inject(WebhookService);
-  signalRService = inject(SignalRService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private webhookService = inject(WebhookService);
+  private signalRService = inject(SignalRService);
+  private confirmDialog = inject(ConfirmDialogService);
+  private toast = inject(ToastService);
+
+  readonly columns: { key: SortColumn; label: string; optional?: boolean }[] = [
+    { key: 'httpMethod', label: 'Method' },
+    { key: 'path', label: 'Path' },
+    { key: 'contentType', label: 'Content-Type', optional: true },
+    { key: 'createdOn', label: 'Received' },
+  ];
 
   buckets = signal<WebhookBucket[] | null>(null);
   // Full dataset for the current view (a bucket's page, or all buckets aggregated).
   webhooks = signal<WebhookListItem[] | null>(null);
+  // Both are driven by the URL (?bucket=…&id=…) so selection survives reloads and the back button.
   selectedBucket = signal<string | null>(null);
-  copyIcon = signal<string>('copy');
+  selectedId = signal<number | null>(null);
   copyTooltip = signal<string>('Copy URL');
   loading = signal(false);
   error = signal(false);
@@ -210,10 +228,7 @@ export class HooksComponent {
   // total number of aggregated items.
   totalCount = signal(0);
 
-  endpointUrl = computed(() => {
-    const origin = window.location.origin;
-    return `${origin}/api/hook/${this.selectedBucket()}`;
-  });
+  endpointUrl = computed(() => `${window.location.origin}/api/hook/${this.selectedBucket()}`);
 
   // Sorting
   sortColumn = signal<SortColumn>('createdOn');
@@ -262,6 +277,21 @@ export class HooksComponent {
     return sorted.slice(start, start + this.pageSize);
   });
 
+  // Position of the open webhook in the visible page; -1 when it isn't on this page.
+  private selectedIndex = computed(() => {
+    const id = this.selectedId();
+    return id === null ? -1 : (this.paginatedWebhooks() ?? []).findIndex((w) => w.id === id);
+  });
+  hasPrevious = computed(() => this.selectedIndex() > 0 || (this.selectedIndex() === 0 && this.currentPage() > 1));
+  hasNext = computed(() => {
+    const index = this.selectedIndex();
+    const page = this.paginatedWebhooks() ?? [];
+    return index >= 0 && (index < page.length - 1 || this.currentPage() < this.totalPages());
+  });
+
+  // When stepping past a page edge, the next fetch selects this end of the new page.
+  private selectAfterLoad: 'first' | 'last' | null = null;
+
   // Every list fetch goes through this stream; switchMap cancels any in-flight
   // request so only the latest (bucket, page) can render.
   // background = true skips the "Loading..." placeholder (used for live refreshes).
@@ -289,6 +319,13 @@ export class HooksComponent {
         this.totalCount.set(result.totalCount);
         this.loading.set(false);
         this.error.set(!result.ok);
+
+        const edge = this.selectAfterLoad;
+        this.selectAfterLoad = null;
+        const page = this.paginatedWebhooks() ?? [];
+        if (edge && page.length) {
+          this.selectWebhook(page[edge === 'first' ? 0 : page.length - 1].id);
+        }
       });
 
     this.bucketRefreshRequests
@@ -299,6 +336,13 @@ export class HooksComponent {
       .subscribe((buckets) => {
         if (buckets) this.buckets.set(buckets);
       });
+
+    // The URL is the source of truth for bucket + selection.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const id = Number(params.get('id'));
+      this.selectedBucket.set(params.get('bucket') || null);
+      this.selectedId.set(Number.isInteger(id) && id > 0 ? id : null);
+    });
 
     // Load webhooks when the selected bucket changes. The initial "All" view fetch
     // also loads the bucket list, so no separate bucket request is needed on init.
@@ -377,11 +421,82 @@ export class HooksComponent {
   }
 
   selectBucket(name: string | null) {
-    this.selectedBucket.set(name);
+    if (name === this.selectedBucket()) return;
+    // Switching bucket also drops the open webhook.
+    this.router.navigate([], { relativeTo: this.route, queryParams: { bucket: name, id: null } });
   }
 
-  clickWebhook(webhook: WebhookListItem) {
-    this.router.navigate(['hooks', webhook.bucketName, webhook.id]);
+  selectWebhook(id: number | null) {
+    if (id === this.selectedId()) return;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { id },
+      queryParamsHandling: 'merge',
+      replaceUrl: this.selectedId() !== null,
+    });
+  }
+
+  /** Moves the selection by one row, crossing page boundaries when needed. */
+  step(direction: 1 | -1) {
+    const page = this.paginatedWebhooks() ?? [];
+    const index = this.selectedIndex();
+    if (index < 0) return;
+    const target = index + direction;
+    if (target >= 0 && target < page.length) {
+      this.selectWebhook(page[target].id);
+    } else if (direction === 1 && this.currentPage() < this.totalPages()) {
+      this.selectAfterLoad = 'first';
+      this.nextPage();
+    } else if (direction === -1 && this.currentPage() > 1) {
+      this.selectAfterLoad = 'last';
+      this.previousPage();
+    }
+  }
+
+  onArrow(event: Event, direction: 1 | -1) {
+    if (this.selectedId() === null) return;
+    event.preventDefault();
+    this.step(direction);
+  }
+
+  onDeleted(id: number) {
+    // Jump to the neighbour so the panel stays useful, then drop the row.
+    const page = this.paginatedWebhooks() ?? [];
+    const index = page.findIndex((w) => w.id === id);
+    const neighbour = page[index + 1] ?? page[index - 1] ?? null;
+    this.selectWebhook(neighbour?.id ?? null);
+    this.webhooks.update((list) => list?.filter((w) => w.id !== id) ?? null);
+    this.totalCount.update((n) => Math.max(0, n - 1));
+    this.toast.success('Webhook deleted');
+    // Background refetch keeps server paging in step without flashing the list.
+    this.fetchWebhooks(true);
+  }
+
+  purge() {
+    const bucket = this.selectedBucket();
+    const count = this.totalCount();
+    this.confirmDialog
+      .confirm({
+        title: 'Purge webhook history',
+        message: bucket
+          ? `Delete all ${count} captured webhooks in "${bucket}"? The bucket and its URL are kept.`
+          : `Delete all ${count} captured webhooks in every bucket? The buckets and their URLs are kept.`,
+        confirmText: 'Purge',
+      })
+      .pipe(
+        filter(Boolean),
+        switchMap(() => (bucket ? this.webhookService.purgeBucket(bucket) : this.webhookService.purgeAll()))
+      )
+      .subscribe({
+        next: (result) => {
+          this.toast.success(`Deleted ${result.deleted} webhook${result.deleted === 1 ? '' : 's'}`);
+          this.selectWebhook(null);
+          this.currentPage.set(1);
+          this.fetchWebhooks();
+          this.refreshBuckets();
+        },
+        error: () => this.toast.error('Failed to purge webhook history'),
+      });
   }
 
   toggleSort(column: SortColumn) {
@@ -396,15 +511,29 @@ export class HooksComponent {
   nextPage() {
     if (this.currentPage() < this.totalPages()) {
       this.currentPage.update((page) => page + 1);
-      // Server-paged bucket needs a refetch; aggregated view re-slices reactively.
-      if (this.selectedBucket()) this.fetchWebhooks();
+      this.afterPageChange();
     }
   }
 
   previousPage() {
     if (this.currentPage() > 1) {
       this.currentPage.update((page) => page - 1);
-      if (this.selectedBucket()) this.fetchWebhooks();
+      this.afterPageChange();
+    }
+  }
+
+  private afterPageChange() {
+    // Server-paged bucket needs a refetch; the aggregated view re-slices reactively,
+    // so it applies any pending edge selection itself.
+    if (this.selectedBucket()) {
+      this.fetchWebhooks();
+      return;
+    }
+    const edge = this.selectAfterLoad;
+    this.selectAfterLoad = null;
+    const page = this.paginatedWebhooks() ?? [];
+    if (edge && page.length) {
+      this.selectWebhook(page[edge === 'first' ? 0 : page.length - 1].id);
     }
   }
 

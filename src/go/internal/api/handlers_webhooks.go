@@ -438,3 +438,56 @@ func (s *Server) handleDeleteBucket(w http.ResponseWriter, r *http.Request, p *P
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// handlePurgeBucket deletes every capture in a bucket but keeps the bucket itself.
+func (s *Server) handlePurgeBucket(w http.ResponseWriter, r *http.Request, p *Principal) {
+	ctx := r.Context()
+	name := r.PathValue("name")
+	b, err := s.bucketByName(ctx, name)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if b == nil {
+		writeProblem(w, http.StatusNotFound)
+		return
+	}
+	if !s.canAccessBucket(p, b) {
+		forbid(w)
+		return
+	}
+	res, err := s.db.ExecContext(ctx, `DELETE FROM Webhook WHERE BucketName = ?`, name)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	n, _ := res.RowsAffected()
+	s.log.Info("purged webhook bucket", "bucket", name, "deleted", n)
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": n})
+}
+
+// handlePurgeAll deletes the captures of every bucket the caller can access; the
+// buckets themselves are kept.
+func (s *Server) handlePurgeAll(w http.ResponseWriter, r *http.Request, p *Principal) {
+	ctx := r.Context()
+	buckets, err := queryAll(ctx, s.db, scanBucket, `SELECT `+bucketCols+` FROM WebhookBucket`)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	var deleted int64
+	for _, b := range buckets {
+		if !s.canAccessBucket(p, b) {
+			continue
+		}
+		res, err := s.db.ExecContext(ctx, `DELETE FROM Webhook WHERE BucketName = ?`, b.Name)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		n, _ := res.RowsAffected()
+		deleted += n
+	}
+	s.log.Info("purged webhook history", "deleted", deleted)
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": deleted})
+}

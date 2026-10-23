@@ -31,6 +31,16 @@ export class WebhookService {
   deleteBucket(name: string) {
     return this.http.delete(`${environment.apiUrl}/api/webhooks/buckets/${name}`);
   }
+
+  /** Deletes every captured webhook in a bucket; the bucket itself is kept. */
+  purgeBucket(name: string) {
+    return this.http.delete<PurgeResult>(`${environment.apiUrl}/api/webhooks/buckets/${name}/webhooks`);
+  }
+
+  /** Deletes every captured webhook in every bucket the user can access. */
+  purgeAll() {
+    return this.http.delete<PurgeResult>(`${environment.apiUrl}/api/webhooks`);
+  }
 }
 
 export interface WebhookBucket {
@@ -65,6 +75,10 @@ export interface WebhookDetail {
   contentType: string | null;
   sourceIp: string | null;
   createdOn: string;
+}
+
+export interface PurgeResult {
+  deleted: number;
 }
 
 export interface PagedWebhooks {

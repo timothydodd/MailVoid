@@ -55,6 +55,18 @@ tbody tr:hover td {
     color: var(--foreground);
 }
 
+/* Row whose detail is open beside the list (hooks). */
+tbody tr.selected,
+tbody tr.selected:hover {
+    background-color: rgba(var(--primary-rgb), 0.12);
+    border-left: 3px solid var(--primary);
+    transform: none;
+}
+
+tbody tr.selected td {
+    color: var(--foreground);
+}
+
 
 td {
     padding: 1rem;

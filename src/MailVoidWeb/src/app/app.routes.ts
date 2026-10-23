@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
 import { adminGuard, authGuard } from './_services/auth.guard';
 
 export const routes: Routes = [
@@ -27,9 +28,10 @@ export const routes: Routes = [
     canActivate: [adminGuard],
   },
   {
+    // Old deep links: the detail now opens beside the list.
     path: 'hooks/:bucket/:id',
-    loadComponent: () => import('./Pages/hook-detail/hook-detail.component').then((m) => m.HookDetailComponent),
-    canActivate: [adminGuard],
+    redirectTo: ({ params }) =>
+      inject(Router).createUrlTree(['/hooks'], { queryParams: { bucket: params['bucket'], id: params['id'] } }),
   },
   {
     path: 'error/:errorCode',

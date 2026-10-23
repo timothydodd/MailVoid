@@ -157,6 +157,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/webhooks/{id}", auth(s.handleGetWebhook))
 	mux.HandleFunc("DELETE /api/webhooks/{id}", auth(s.handleDeleteWebhook))
 	mux.HandleFunc("DELETE /api/webhooks/buckets/{name}", auth(s.handleDeleteBucket))
+	mux.HandleFunc("DELETE /api/webhooks/buckets/{name}/webhooks", auth(s.handlePurgeBucket))
+	mux.HandleFunc("DELETE /api/webhooks", auth(s.handlePurgeAll))
 
 	// User management. ASP.NET routing is case-insensitive and the route came from
 	// [controller], so accept both spellings.

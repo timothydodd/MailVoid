@@ -12,11 +12,15 @@
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
+
+  // With a webhook open the page widens so list + detail both get room.
+  &.has-detail {
+    max-width: none;
+  }
 }
 
 .hooks-sidebar {
-  width: 280px;
-  min-width: 240px;
+  width: 260px;
   flex-shrink: 0;
 
   .sidebar-card {
@@ -101,7 +105,19 @@
   min-width: 0;
 }
 
+.hooks-detail {
+  flex: 1.2;
+  min-width: 0;
+  max-height: calc(100vh - 120px);
+  position: sticky;
+  top: 1rem;
+}
+
 .content-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1rem;
 
   h2 {
@@ -116,7 +132,6 @@
   }
 
   .endpoint-url {
-    display: inline-block;
     padding: 0.25rem 0.5rem;
     background: var(--bGLight);
     border: 1px solid var(--border-color);
@@ -127,52 +142,29 @@
     user-select: all;
   }
 
-  .btn-copy {
-    padding: 0.25rem;
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
+  .content-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
 
-    &:hover {
-      opacity: 1;
+  .count-label {
+    font-size: 0.8rem;
+    color: var(--comment);
+  }
+
+  .btn-purge {
+    gap: 0.3rem;
+
+    &:hover:not(:disabled) {
+      color: var(--red);
+      border-color: var(--red);
     }
   }
 }
 
-/* Use global table styles from table.css */
-
-.method-badge {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-
-  &.method-post {
-    background-color: rgba(80, 200, 120, 0.2);
-    color: #50c878;
-  }
-
-  &.method-put {
-    background-color: rgba(255, 165, 0, 0.2);
-    color: #ffa500;
-  }
-
-  &.method-patch {
-    background-color: rgba(100, 149, 237, 0.2);
-    color: #6495ed;
-  }
-
-  &.method-get {
-    background-color: rgba(189, 147, 249, 0.2);
-    color: var(--primary);
-  }
-
-  &.method-delete {
-    background-color: rgba(255, 99, 71, 0.2);
-    color: #ff6347;
-  }
-}
+/* Table layout uses the global table.css */
 
 .path-cell {
   font-family: monospace;
@@ -181,12 +173,22 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  .row-bucket {
+    display: block;
+    font-family: "Roboto", sans-serif;
+    font-size: 0.7rem;
+    color: var(--comment);
+  }
 }
 
-.no-data {
-  text-align: center;
-  color: var(--comment);
-  padding: 2rem !important;
+.date-cell {
+  white-space: nowrap;
+}
+
+// Content-Type is dropped once the detail panel is taking the width.
+.has-detail .optional {
+  display: none;
 }
 
 .pagination-controls {
@@ -211,6 +213,18 @@
 }
 
 /* Responsive */
+@media (max-width: 1100px) {
+  .hooks-container.has-detail {
+    flex-wrap: wrap;
+  }
+
+  .hooks-detail {
+    flex-basis: 100%;
+    position: static;
+    max-height: 80vh;
+  }
+}
+
 @media (max-width: 768px) {
   .hooks-container {
     flex-direction: column;

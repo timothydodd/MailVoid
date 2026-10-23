@@ -297,6 +297,47 @@ func TestWebhookListTrimsBodies(t *testing.T) {
 	}
 }
 
+func TestWebhookPurge(t *testing.T) {
+	e := newTestEnv(t)
+	admin, _ := e.login("admin", "admin")
+	for _, b := range []string{"p1", "p1", "p2"} {
+		if w := e.do("POST", "/api/hook/"+b, "", []byte("{}")); w.Code != 200 {
+			t.Fatalf("capture: %d %s", w.Code, w.Body)
+		}
+	}
+	count := func(bucket string) int64 {
+		var page pagedResults[Webhook]
+		_ = json.Unmarshal(e.do("GET", "/api/webhooks/buckets/"+bucket+"/webhooks", admin, nil).Body.Bytes(), &page)
+		return page.TotalCount
+	}
+
+	if w := e.do("DELETE", "/api/webhooks/buckets/p1/webhooks", "", nil); w.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous purge: got %d, want 401", w.Code)
+	}
+	w := e.do("DELETE", "/api/webhooks/buckets/p1/webhooks", admin, nil)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"deleted":2`) {
+		t.Fatalf("purge bucket: %d %s", w.Code, w.Body)
+	}
+	if count("p1") != 0 || count("p2") != 1 {
+		t.Errorf("purge should only empty p1: p1=%d p2=%d", count("p1"), count("p2"))
+	}
+	// The bucket survives a purge.
+	if w := e.do("GET", "/api/webhooks/buckets/p1", admin, nil); w.Code != 200 {
+		t.Errorf("bucket should still exist after purge: %d", w.Code)
+	}
+	if w := e.do("DELETE", "/api/webhooks/buckets/missing/webhooks", admin, nil); w.Code != 404 {
+		t.Errorf("purge missing bucket: got %d, want 404", w.Code)
+	}
+
+	w = e.do("DELETE", "/api/webhooks", admin, nil)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"deleted":1`) {
+		t.Fatalf("purge all: %d %s", w.Code, w.Body)
+	}
+	if count("p2") != 0 {
+		t.Errorf("purge all should empty p2, got %d", count("p2"))
+	}
+}
+
 func TestStaticFilesPrecompressedAndCached(t *testing.T) {
 	e := newTestEnv(t)
 	js := strings.Repeat("console.log('mailvoid');\n", 2000)

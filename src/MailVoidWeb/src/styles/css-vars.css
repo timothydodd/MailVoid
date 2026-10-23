@@ -76,7 +76,9 @@
   --bGLight: #3f435a;
   --bGDark: #3a3c4e;
   --bGDarker: #191A21;
-  --primary: #4c91e1;;
+  --primary: #4c91e1;
+  --primary-rgb: 76, 145, 225;
+  --comment-rgb: 184, 184, 172;
   --secondary: var(--orange);
   --header-bg: var(--bGLight);
   --border-color: #4a567b;
@@ -137,6 +139,8 @@
   --bGDark: #e5e6e9;
   --bGDarker: #949495;
   --primary: #3783ff;
+  --primary-rgb: 55, 131, 255;
+  --comment-rgb: 55, 65, 81;
   --secondary: var(--orange);
   --header-bg: #f8f9fa;
   --border-color: #d5d6d7;
