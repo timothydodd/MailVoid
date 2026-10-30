@@ -10,6 +10,7 @@ A developer email testing tool that captures and organizes test emails without c
 - Receive and store emails via mail server webhooks
 - Organize emails into groups with configurable retention policies
 - Capture and inspect arbitrary HTTP webhooks
+- Read-only `/api/v1` API with per-user API keys for test automation
 - Real-time notifications via SignalR
 - JWT authentication with refresh token rotation
 - Responsive Angular SPA with dark theme
@@ -95,6 +96,28 @@ Update `src/environments/environment.ts` if your API is not running on the defau
 
 - Username: `admin`
 - Password: `admin`
+
+### Read-only API for tests and scripts
+
+Each user can generate personal API keys under **User Settings → Account → API Keys**.
+A key returns exactly what that user sees in the web app (same mail visibility and
+webhook bucket rules) and can only read. Send it as `X-Api-Key: <key>` or
+`Authorization: Bearer <key>`:
+
+```bash
+KEY=mv_...
+curl -H "X-Api-Key: $KEY" "http://localhost:5133/api/v1/mail?to=someone@example.test&pageSize=10"
+curl -H "X-Api-Key: $KEY"  http://localhost:5133/api/v1/mail/{id}
+curl -H "X-Api-Key: $KEY"  http://localhost:5133/api/v1/mail/boxes
+curl -H "X-Api-Key: $KEY"  http://localhost:5133/api/v1/webhooks/buckets
+curl -H "X-Api-Key: $KEY"  http://localhost:5133/api/v1/webhooks/buckets/{bucket}/webhooks?page=1&pageSize=50
+curl -H "X-Api-Key: $KEY"  http://localhost:5133/api/v1/webhooks/{id}
+```
+
+`GET /api/v1/mail` accepts `to`, `search`, `page`, `pageSize` (max 200), `sortBy`
+(`createdOn`, `from`, `to`, `subject`) and `sortDirection`, and returns `{ items, totalCount }`.
+Webhook list bodies are trimmed to 4 KB; the single-webhook endpoint returns the full body.
+Only a hash of each key is stored, so the plaintext is shown once when it is created.
 
 ## Docker
 

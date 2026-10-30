@@ -140,6 +140,23 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/mail/mailbox/{id}/retention", auth(s.handleUpdateRetention))
 	mux.HandleFunc("POST /api/mail/mark-all-read", auth(s.handleMarkAllAsRead))
 
+	// Personal API keys (managed from the web app with a session token)
+	mux.HandleFunc("GET /api/apikeys", auth(s.handleListAPIKeys))
+	mux.HandleFunc("POST /api/apikeys", auth(s.handleCreateAPIKey))
+	mux.HandleFunc("DELETE /api/apikeys/{id}", auth(s.handleDeleteAPIKey))
+
+	// Read-only API for scripts and test suites, authenticated with a personal API key.
+	// Each handler is the same one the web app uses, so a key sees exactly what its owner
+	// sees. Only GETs are exposed; nothing here can modify or delete data.
+	v1 := s.requireUserAPIKey
+	mux.HandleFunc("GET /api/v1/mail", v1(s.handleV1GetMails))
+	mux.HandleFunc("GET /api/v1/mail/boxes", v1(s.handleGetBoxes))
+	mux.HandleFunc("GET /api/v1/mail/{id}", v1(s.handleGetMail))
+	mux.HandleFunc("GET /api/v1/webhooks/buckets", v1(s.handleGetBuckets))
+	mux.HandleFunc("GET /api/v1/webhooks/buckets/{name}", v1(s.handleGetBucket))
+	mux.HandleFunc("GET /api/v1/webhooks/buckets/{name}/webhooks", v1(s.handleGetWebhooks))
+	mux.HandleFunc("GET /api/v1/webhooks/{id}", v1(s.handleGetWebhook))
+
 	// Mail server webhook (SMTP server -> API)
 	mux.HandleFunc("POST /api/webhook/mail", s.requireAPIKey(s.handleMailWebhook))
 

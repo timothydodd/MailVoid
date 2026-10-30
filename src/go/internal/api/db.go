@@ -236,6 +236,21 @@ var schema = []string{
 	`CREATE INDEX IF NOT EXISTS BucketName_idx ON [Webhook] ([BucketName])`,
 	`CREATE INDEX IF NOT EXISTS CreatedOn_idx ON [Webhook] ([CreatedOn])`,
 	`CREATE INDEX IF NOT EXISTS IX_Webhook_BucketName_CreatedOn ON [Webhook] ([BucketName], [CreatedOn])`,
+
+	// Personal API keys for the read-only /api/v1 endpoints. Only a SHA-256 hash of the
+	// key is stored; Prefix is the first characters, shown in the UI to tell keys apart.
+	`CREATE TABLE IF NOT EXISTS [UserApiKey] (
+    [Id] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [UserId] TEXT NOT NULL,
+    [Name] VARCHAR(100) NOT NULL,
+    [KeyHash] TEXT NOT NULL,
+    [Prefix] VARCHAR(16) NOT NULL,
+    [CreatedAt] TEXT NOT NULL,
+    [LastUsedAt] TEXT
+,        CONSTRAINT FK_UserApiKey_UserId FOREIGN KEY ([UserId]) REFERENCES [User](Id) ON DELETE CASCADE
+)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS IX_UserApiKey_KeyHash ON [UserApiKey] ([KeyHash])`,
+	`CREATE INDEX IF NOT EXISTS IX_UserApiKey_UserId ON [UserApiKey] ([UserId])`,
 }
 
 func InitSchema(ctx context.Context, db *sql.DB) error {

@@ -117,6 +117,7 @@ The prod build enforces per-component style budgets in `angular.json` (`anyCompo
 - **UserMailRead**: Tracking read status for emails per user
 - **Webhook**: Captured HTTP webhook requests
 - **WebhookBucket**: Organization for webhook captures with retention policies
+- **UserApiKey**: Per-user API keys (hashed) for the read-only `/api/v1` API
 
 ## Default Credentials
 - Username: admin
@@ -131,6 +132,8 @@ The prod build enforces per-component style budgets in `angular.json` (`anyCompo
 - `/api/hook/{bucket}`: Webhook capture endpoint (POST/PUT/PATCH - no auth required)
 - `/api/webhooks/*`: Webhook management API (requires auth)
 - `/api/webhook/mail`: Mail server webhook endpoint (API key: `X-Api-Key`, `api_key` query, or `Authorization: ApiKey <key>`)
+- `/api/apikeys`: Personal API key management (requires auth; keys stored as SHA-256 in `UserApiKey`)
+- `/api/v1/*`: Read-only mail + webhook endpoints for scripts, authenticated with a personal API key (`X-Api-Key` or `Authorization: Bearer mv_...`); `requireUserAPIKey` maps the key to its owner and reuses the normal handlers
 - `/hubs/mail`: SignalR hub for real-time notifications
 
 ## Dependencies

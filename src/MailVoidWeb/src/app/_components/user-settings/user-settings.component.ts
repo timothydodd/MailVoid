@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../_services/auth-service';
 import { ModalContainerService, ModalLayoutComponent } from '@rd-ui';
 import { UserManagementComponent } from '../user-management/user-management.component';
+import { ApiKeysComponent } from './api-keys/api-keys.component';
 import { ChangePasswordComponent } from './change-password/change-password.component';
 
 @Component({
   selector: 'app-user-settings',
   standalone: true,
-  imports: [FormsModule, ChangePasswordComponent, UserManagementComponent, ModalLayoutComponent],
+  imports: [FormsModule, ChangePasswordComponent, ApiKeysComponent, UserManagementComponent, ModalLayoutComponent],
   template: ` <rd-modal-layout>
     <div slot="header" class="settings-header">
       <h3 class="settings-title">User Settings</h3>
@@ -40,6 +41,10 @@ import { ChangePasswordComponent } from './change-password/change-password.compo
             } @else {
               <button class="btn btn-primary" (click)="changePassword.set(true)">Change Password</button>
             }
+          </div>
+          <div class="account-section">
+            <h4>API Keys</h4>
+            <app-api-keys></app-api-keys>
           </div>
         }
         @if (activeTab() === 'users' && isAdmin()) {

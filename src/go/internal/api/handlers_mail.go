@@ -240,6 +240,16 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 		writeBodyError(w, err)
 		return
 	}
+	result, err := s.listMails(r.Context(), p, opts)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// listMails is the shared implementation of POST /api/mail and GET /api/v1/mail.
+func (s *Server) listMails(ctx context.Context, p *Principal, opts filterOptions) (*pagedResults[mailWithReadStatus], error) {
 	if opts.Page < 1 {
 		opts.Page = 1
 	}
@@ -260,19 +270,16 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 	whereClause := "WHERE " + strings.Join(where, " AND ")
 	from := `FROM Mail m LEFT JOIN MailGroup mg ON m.MailGroupPath = mg.Path ` + whereClause
 
-	ctx := r.Context()
 	total, err := scalarInt(ctx, s.db, `SELECT COUNT(*) `+from, args...)
 	if err != nil {
-		s.internalError(w, r, err)
-		return
+		return nil, err
 	}
 	pageArgs := append(args, sql.Named("Limit", opts.PageSize), sql.Named("Offset", (opts.Page-1)*opts.PageSize))
 	// Only the columns the list returns; raw source, headers and attachments can be large.
 	mails, err := queryAll(ctx, s.db, scanMailListItem, `SELECT m.Id, m.[To], m.[From], m.Subject, m.Text, m.IsHtml, m.CreatedOn, m.MailGroupPath `+
 		from+` ORDER BY `+mailOrderBy(opts)+` LIMIT @Limit OFFSET @Offset`, pageArgs...)
 	if err != nil {
-		s.internalError(w, r, err)
-		return
+		return nil, err
 	}
 
 	read := map[int64]bool{}
@@ -283,8 +290,7 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 		}
 		rows, err := s.db.QueryContext(ctx, `SELECT MailId FROM UserMailRead WHERE UserId = ? AND MailId IN (`+strings.Join(ids, ",")+`)`, p.UserID)
 		if err != nil {
-			s.internalError(w, r, err)
-			return
+			return nil, err
 		}
 		for rows.Next() {
 			var id int64
@@ -307,7 +313,7 @@ func (s *Server) handleGetMails(w http.ResponseWriter, r *http.Request, p *Princ
 		}
 		items = append(items, item)
 	}
-	writeJSON(w, http.StatusOK, pagedResults[mailWithReadStatus]{Items: items, TotalCount: total})
+	return &pagedResults[mailWithReadStatus]{Items: items, TotalCount: total}, nil
 }
 
 func (s *Server) handleDeleteBox(w http.ResponseWriter, r *http.Request, p *Principal) {
