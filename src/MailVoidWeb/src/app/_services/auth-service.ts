@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, firstValueFrom, Observable, shareReplay, tap } from 'rxjs';
+import { BehaviorSubject, catchError, firstValueFrom, map, Observable, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { LastSeenService } from './last-seen.service';
 import { MailSearchService } from './mail-search.service';
@@ -184,6 +184,15 @@ export class AuthService {
     }
   }
 
+  /** Resolves whether the current user may use the Hooks page (admins always can). */
+  canUseHooks(): Observable<boolean> {
+    if (this.isAdmin()) return of(true);
+    return this.getUser().pipe(
+      map((user) => !!user?.webhooksEnabled),
+      catchError(() => of(false))
+    );
+  }
+
   getSubdomain(): string | null {
     const token = this.getToken();
     if (!token) return null;
@@ -300,8 +309,11 @@ export class AuthService {
 }
 
 export interface User {
-  id: number;
+  id: string;
   userName: string;
+  role: 'Admin' | 'User';
+  // True for admins and for users an admin has enabled the Hooks page for.
+  webhooksEnabled: boolean;
 }
 
 export interface ChangePasswordRequest {

@@ -12,11 +12,6 @@
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
-
-  // With a webhook open the page widens so list + detail both get room.
-  &.has-detail {
-    max-width: none;
-  }
 }
 
 .hooks-sidebar {
@@ -105,12 +100,13 @@
   min-width: 0;
 }
 
+// The detail reuses the global slide-over (.slide-panel); webhook bodies need more
+// room than its default width, and the component brings its own card border/radius.
 .hooks-detail {
-  flex: 1.2;
-  min-width: 0;
-  max-height: calc(100vh - 120px);
-  position: sticky;
-  top: 1rem;
+  width: min(720px, 90vw);
+  max-width: none;
+  border-radius: 0;
+  border-left: 1px solid var(--border-color);
 }
 
 .content-header {
@@ -186,11 +182,6 @@
   white-space: nowrap;
 }
 
-// Content-Type is dropped once the detail panel is taking the width.
-.has-detail .optional {
-  display: none;
-}
-
 .pagination-controls {
   display: flex;
   justify-content: center;
@@ -213,18 +204,6 @@
 }
 
 /* Responsive */
-@media (max-width: 1100px) {
-  .hooks-container.has-detail {
-    flex-wrap: wrap;
-  }
-
-  .hooks-detail {
-    flex-basis: 100%;
-    position: static;
-    max-height: 80vh;
-  }
-}
-
 @media (max-width: 768px) {
   .hooks-container {
     flex-direction: column;
@@ -237,5 +216,9 @@
 
   .path-cell {
     max-width: 150px;
+  }
+
+  .optional {
+    display: none;
   }
 }

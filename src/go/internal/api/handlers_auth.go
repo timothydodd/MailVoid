@@ -114,7 +114,9 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request, p *Princi
 		writeProblem(w, http.StatusNotFound)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"id": u.ID, "userName": u.UserName})
+	// role / webhooksEnabled are additions to the .NET contract so the SPA can show the
+	// Hooks page to non-admins who have been enabled (p is fresh: requireAuth reloads it).
+	writeJSON(w, http.StatusOK, map[string]any{"id": u.ID, "userName": u.UserName, "role": u.Role, "webhooksEnabled": p.CanUseWebhooks()})
 }
 
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, p *Principal) {

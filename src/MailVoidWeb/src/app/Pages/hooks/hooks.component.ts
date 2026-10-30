@@ -36,7 +36,7 @@ interface FetchResult {
     '(document:keydown.escape)': 'selectWebhook(null)',
   },
   template: `
-    <div class="hooks-container" [class.has-detail]="selectedId() !== null">
+    <div class="hooks-container">
       <!-- Left Sidebar -->
       <div class="hooks-sidebar">
         <div class="sidebar-card">
@@ -180,21 +180,22 @@ interface FetchResult {
           </div>
         }
       </div>
-
-      <!-- Detail panel -->
-      @if (selectedId(); as id) {
-        <app-hook-detail
-          class="hooks-detail"
-          [webhookId]="id"
-          [hasPrevious]="hasPrevious()"
-          [hasNext]="hasNext()"
-          (previous)="step(-1)"
-          (next)="step(1)"
-          (close)="selectWebhook(null)"
-          (deleted)="onDeleted($event)"
-        />
-      }
     </div>
+
+    <!-- Detail: slide-over panel above the list; click outside or Esc closes it. -->
+    @if (selectedId(); as id) {
+      <div class="slide-panel-overlay" (click)="selectWebhook(null)"></div>
+      <app-hook-detail
+        class="hooks-detail slide-panel"
+        [webhookId]="id"
+        [hasPrevious]="hasPrevious()"
+        [hasNext]="hasNext()"
+        (previous)="step(-1)"
+        (next)="step(1)"
+        (close)="selectWebhook(null)"
+        (deleted)="onDeleted($event)"
+      />
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './hooks.component.scss',

@@ -251,6 +251,13 @@ var schema = []string{
 )`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS IX_UserApiKey_KeyHash ON [UserApiKey] ([KeyHash])`,
 	`CREATE INDEX IF NOT EXISTS IX_UserApiKey_UserId ON [UserApiKey] ([UserId])`,
+
+	// Non-admin users listed here may use the webhook capture UI/API. Admins always can.
+	`CREATE TABLE IF NOT EXISTS [UserWebhookAccess] (
+    [UserId] TEXT PRIMARY KEY,
+    [GrantedAt] TEXT NOT NULL
+,        CONSTRAINT FK_UserWebhookAccess_UserId FOREIGN KEY ([UserId]) REFERENCES [User](Id) ON DELETE CASCADE
+)`,
 }
 
 func InitSchema(ctx context.Context, db *sql.DB) error {

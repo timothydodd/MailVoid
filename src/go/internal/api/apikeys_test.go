@@ -85,9 +85,39 @@ func TestPersonalAPIKeys(t *testing.T) {
 		t.Errorf("v1 boxes: %d %s", w.Code, w.Body)
 	}
 
-	// Webhooks: auto-created buckets are public, so alice's key can read them.
+	// Webhooks: a normal user needs an admin to enable the feature first (403 until then,
+	// for both the session and the key), then public auto-created buckets are readable.
 	if w := e.do("POST", "/api/hook/ci-bucket", "", []byte(`{"ok":true}`)); w.Code != 200 {
 		t.Fatalf("capture: %d %s", w.Code, w.Body)
+	}
+	aliceID := e.userID("alice")
+	for name, tok := range map[string]string{"session": alice, "key": ""} {
+		hdr := []string{}
+		if tok == "" {
+			hdr = []string{"X-Api-Key", created.Key}
+		}
+		path := "/api/webhooks/buckets"
+		if tok == "" {
+			path = "/api/v1/webhooks/buckets"
+		}
+		if w := e.do("GET", path, tok, nil, hdr...); w.Code != http.StatusForbidden {
+			t.Errorf("%s webhooks before enabling: got %d, want 403", name, w.Code)
+		}
+	}
+	if w := e.do("PUT", "/api/UserManagement/"+aliceID.String()+"/webhooks", alice, map[string]bool{"enabled": true}); w.Code != http.StatusForbidden {
+		t.Errorf("non-admin enabling webhooks: got %d, want 403", w.Code)
+	}
+	if w := e.do("PUT", "/api/UserManagement/"+aliceID.String()+"/webhooks", admin, map[string]bool{"enabled": true}); w.Code != http.StatusNoContent {
+		t.Fatalf("enable webhooks: %d %s", w.Code, w.Body)
+	}
+	if w := e.do("GET", "/api/auth/user", alice, nil); w.Code != 200 || !strings.Contains(w.Body.String(), `"webhooksEnabled":true`) {
+		t.Errorf("auth/user should report webhooksEnabled: %d %s", w.Code, w.Body)
+	}
+	if w := e.do("GET", "/api/UserManagement", admin, nil); !strings.Contains(w.Body.String(), `"webhooksEnabled":true`) {
+		t.Errorf("user list should report webhooksEnabled: %s", w.Body)
+	}
+	if w := e.do("GET", "/api/webhooks/buckets", alice, nil); w.Code != 200 {
+		t.Errorf("session webhooks after enabling: %d %s", w.Code, w.Body)
 	}
 	w = e.do("GET", "/api/v1/webhooks/buckets/ci-bucket/webhooks", "", nil, "X-Api-Key", created.Key)
 	var hooks pagedResults[Webhook]
@@ -109,6 +139,14 @@ func TestPersonalAPIKeys(t *testing.T) {
 	}
 	if w := e.do("DELETE", "/api/webhooks/"+itoa64(hooks.Items[0].ID), "", nil, "X-Api-Key", created.Key); w.Code != http.StatusUnauthorized {
 		t.Errorf("api key on session route: got %d, want 401", w.Code)
+	}
+
+	// Disabling takes effect immediately.
+	if w := e.do("PUT", "/api/UserManagement/"+aliceID.String()+"/webhooks", admin, map[string]bool{"enabled": false}); w.Code != http.StatusNoContent {
+		t.Fatalf("disable webhooks: %d %s", w.Code, w.Body)
+	}
+	if w := e.do("GET", "/api/webhooks/buckets", alice, nil); w.Code != http.StatusForbidden {
+		t.Errorf("session webhooks after disabling: got %d, want 403", w.Code)
 	}
 
 	// LastUsedAt is recorded.
@@ -142,4 +180,13 @@ func (e *testEnv) insertMailInGroup(to, groupSubdomain, subject string, created 
 	if err != nil {
 		e.t.Fatal(err)
 	}
+}
+
+func (e *testEnv) userID(name string) GUID {
+	e.t.Helper()
+	var id GUID
+	if err := e.srv.db.QueryRow(`SELECT Id FROM [User] WHERE UserName = ?`, name).Scan(&id); err != nil {
+		e.t.Fatal(err)
+	}
+	return id
 }

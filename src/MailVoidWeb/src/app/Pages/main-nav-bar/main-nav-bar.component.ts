@@ -26,7 +26,7 @@ import { ThemeService } from '../../_services/theme.service';
               <svg lucideIcon="mail" size="18"></svg>
               <span>Mail</span>
             </a>
-            @if (authService.isAdmin()) {
+            @if (authService.isAdmin() || user()?.webhooksEnabled) {
               <a routerLink="/hooks" routerLinkActive="active" class="nav-link">
                 <svg lucideIcon="webhook" size="18"></svg>
                 <span>Hooks</span>
@@ -63,15 +63,12 @@ import { ThemeService } from '../../_services/theme.service';
             <button class="btn btn-icon mobile-menu-btn" (click)="onMobileMenuClick()" title="Mailboxes">
               <svg lucideIcon="inbox" size="20"></svg>
             </button>
-            <button 
-              class="btn btn-icon theme-toggle" 
-              (click)="toggleTheme()" 
+            <button
+              class="btn btn-icon theme-toggle"
+              (click)="toggleTheme()"
               [title]="themeService.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
             >
-              <svg 
-                [lucideIcon]="themeService.theme() === 'dark' ? 'sun' : 'moon'" 
-                size="20"
-              ></svg>
+              <svg [lucideIcon]="themeService.theme() === 'dark' ? 'sun' : 'moon'" size="20"></svg>
             </button>
             <app-user-menu></app-user-menu>
           }

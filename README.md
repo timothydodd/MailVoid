@@ -97,6 +97,12 @@ Update `src/environments/environment.ts` if your API is not running on the defau
 - Username: `admin`
 - Password: `admin`
 
+### Webhook capture for non-admin users
+
+The Hooks page is admin-only by default. An admin can enable it per user from
+**User Settings → Manage Users → Enable Hooks**; the same switch controls the
+`/api/webhooks/*` and `/api/v1/webhooks/*` endpoints for that user.
+
 ### Read-only API for tests and scripts
 
 Each user can generate personal API keys under **User Settings → Account → API Keys**.

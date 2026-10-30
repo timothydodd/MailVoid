@@ -52,6 +52,20 @@ export class UserManagementService {
     }
   }
 
+  async updateUserWebhooks(id: string, enabled: boolean): Promise<void> {
+    try {
+      await firstValueFrom(this.http.put<void>(`${this.baseUrl}/${id}/webhooks`, { enabled }));
+    } catch (error: any) {
+      if (error.status === 403) {
+        throw new Error('You do not have permission to change webhook access');
+      }
+      if (error.status === 404) {
+        throw new Error('User not found');
+      }
+      throw new Error(error.error?.message || 'Failed to update webhook access');
+    }
+  }
+
   async updateUserPassword(id: string, request: UpdateUserPasswordRequest): Promise<void> {
     try {
       await firstValueFrom(this.http.put<void>(`${this.baseUrl}/${id}/password`, request));

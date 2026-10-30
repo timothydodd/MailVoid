@@ -172,9 +172,9 @@ func (s *Server) authenticateAPIKey(ctx context.Context, key string) (*Principal
 	var role Role
 	var keyID int64
 	var lastUsed NullTime
-	err := s.db.QueryRowContext(ctx, `SELECT k.Id, k.LastUsedAt, u.Id, u.UserName, u.Role, u.Subdomain
+	err := s.db.QueryRowContext(ctx, `SELECT k.Id, k.LastUsedAt, u.Id, u.UserName, u.Role, u.Subdomain, `+webhookAccessExpr+`
 		FROM UserApiKey k JOIN [User] u ON u.Id = k.UserId WHERE k.KeyHash = ?`, hashAPIKey(key)).
-		Scan(&keyID, &lastUsed, &p.UserID, &p.UserName, &role, &sub)
+		Scan(&keyID, &lastUsed, &p.UserID, &p.UserName, &role, &sub, &p.WebhooksEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

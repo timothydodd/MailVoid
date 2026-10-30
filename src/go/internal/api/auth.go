@@ -110,10 +110,18 @@ type Principal struct {
 	UserName  string
 	Role      string
 	Subdomain string
+	// WebhooksEnabled is set for non-admins an admin has granted webhook access.
+	WebhooksEnabled bool
 }
 
 // IsAdmin mirrors UserService.IsAdmin (case-insensitive role check).
 func (p *Principal) IsAdmin() bool { return strings.EqualFold(p.Role, "admin") }
+
+// CanUseWebhooks: admins always; other users only once an admin enables it for them.
+func (p *Principal) CanUseWebhooks() bool { return p.IsAdmin() || p.WebhooksEnabled }
+
+// webhookAccessExpr is the SQL for Principal.WebhooksEnabled given a [User] alias u.
+const webhookAccessExpr = `EXISTS (SELECT 1 FROM UserWebhookAccess wa WHERE wa.UserId = u.Id)`
 
 func (s *Server) generateJWT(u *User) (string, error) {
 	now := time.Now().UTC()
@@ -272,7 +280,8 @@ func (s *Server) requireAuth(next func(http.ResponseWriter, *http.Request, *Prin
 func (s *Server) refreshPrincipal(ctx context.Context, p *Principal) (bool, error) {
 	var role Role
 	var sub *string
-	err := s.db.QueryRowContext(ctx, `SELECT Role, Subdomain FROM [User] WHERE Id = ?`, p.UserID).Scan(&role, &sub)
+	err := s.db.QueryRowContext(ctx, `SELECT u.Role, u.Subdomain, `+webhookAccessExpr+` FROM [User] u WHERE u.Id = ?`, p.UserID).
+		Scan(&role, &sub, &p.WebhooksEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -292,6 +301,18 @@ type APIKey struct {
 	Key     string
 	Enabled bool
 	Scopes  []string
+}
+
+// requireWebhooks guards the webhook capture UI/API: admins, or users an admin has
+// enabled webhooks for. Wrap it inside requireAuth / requireUserAPIKey.
+func requireWebhooks(next func(http.ResponseWriter, *http.Request, *Principal)) func(http.ResponseWriter, *http.Request, *Principal) {
+	return func(w http.ResponseWriter, r *http.Request, p *Principal) {
+		if !p.CanUseWebhooks() {
+			forbid(w)
+			return
+		}
+		next(w, r, p)
+	}
 }
 
 // requireAPIKey is the equivalent of the [ApiKey] policy: the key may arrive in the

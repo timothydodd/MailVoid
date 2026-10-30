@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,10 +15,31 @@ type userDto struct {
 	Role      Role    `json:"role"`
 	TimeStamp DBTime  `json:"timeStamp"`
 	Subdomain *string `json:"subdomain"`
+	// WebhooksEnabled reports whether the user may use webhook capture (always true for admins).
+	WebhooksEnabled bool `json:"webhooksEnabled"`
 }
 
-func toUserDto(u *User) userDto {
-	return userDto{ID: u.ID.String(), UserName: u.UserName, Role: u.Role, TimeStamp: u.TimeStamp, Subdomain: u.Subdomain}
+func toUserDto(u *User, webhooksEnabled bool) userDto {
+	return userDto{ID: u.ID.String(), UserName: u.UserName, Role: u.Role, TimeStamp: u.TimeStamp, Subdomain: u.Subdomain,
+		WebhooksEnabled: u.Role == RoleAdmin || webhooksEnabled}
+}
+
+// webhookAccessSet returns the ids of users explicitly granted webhook access.
+func (s *Server) webhookAccessSet(ctx context.Context) (map[GUID]bool, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT UserId FROM UserWebhookAccess`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	set := map[GUID]bool{}
+	for rows.Next() {
+		var id GUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		set[id] = true
+	}
+	return set, rows.Err()
 }
 
 // minPasswordLength applies to new passwords only; existing ones (including the seeded
@@ -45,9 +67,14 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request, p *Prin
 		s.internalError(w, r, err)
 		return
 	}
+	access, err := s.webhookAccessSet(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	out := make([]userDto, 0, len(users))
 	for _, u := range users {
-		out = append(out, toUserDto(u))
+		out = append(out, toUserDto(u, access[u.ID]))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -78,7 +105,12 @@ func (s *Server) handleGetUserByID(w http.ResponseWriter, r *http.Request, p *Pr
 		writeProblem(w, http.StatusNotFound)
 		return
 	}
-	writeJSON(w, http.StatusOK, toUserDto(u))
+	access, err := s.webhookAccessSet(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toUserDto(u, access[u.ID]))
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request, p *Principal) {
@@ -142,7 +174,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request, p *Pri
 		return
 	}
 	w.Header().Set("Location", "/api/UserManagement/"+u.ID.String())
-	writeJSON(w, http.StatusCreated, toUserDto(u))
+	writeJSON(w, http.StatusCreated, toUserDto(u, false))
 }
 
 func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request, p *Principal) {
@@ -170,6 +202,47 @@ func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request, p 
 		writeProblem(w, http.StatusNotFound)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleUpdateUserWebhooks lets an admin enable or disable the webhook capture feature
+// for a non-admin user. Admins always have it, so toggling one is a no-op.
+func (s *Server) handleUpdateUserWebhooks(w http.ResponseWriter, r *http.Request, p *Principal) {
+	if !isUserAdmin(p) {
+		forbid(w)
+		return
+	}
+	id, ok := s.pathUserID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := decodeBody(r, &req, false); err != nil {
+		writeBodyError(w, err)
+		return
+	}
+	ctx := r.Context()
+	u, err := s.userByID(ctx, id)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if u == nil {
+		writeProblem(w, http.StatusNotFound)
+		return
+	}
+	if req.Enabled {
+		_, err = s.db.ExecContext(ctx, `INSERT OR IGNORE INTO UserWebhookAccess (UserId, GrantedAt) VALUES (?, ?)`, id, Now())
+	} else {
+		_, err = s.db.ExecContext(ctx, `DELETE FROM UserWebhookAccess WHERE UserId = ?`, id)
+	}
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	s.log.Info("updated webhook access", "user", u.UserName, "enabled", req.Enabled, "by", p.UserName)
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -1,4 +1,3 @@
-
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { form, required, minLength, pattern, FormField } from '@angular/forms/signals';
 import { ConfirmDialogService, ModalContainerService } from '@rd-ui';
@@ -118,6 +117,9 @@ import { ResetPasswordDialogComponent } from './reset-password-dialog/reset-pass
                     <span class="role-badge" [class]="getRoleClass(user.role)">
                       {{ getRoleDisplayName(user.role) }}
                     </span>
+                    @if (user.role !== Role.Admin && user.webhooksEnabled) {
+                      <span class="badge badge-primary" title="Can use the Hooks page">Hooks</span>
+                    }
                   }
                 </div>
                 <div class="cell timestamp" data-label="Created">{{ formatDate(user.timeStamp) }}</div>
@@ -126,6 +128,20 @@ import { ResetPasswordDialogComponent } from './reset-password-dialog/reset-pass
                     <button class="btn btn-sm btn-secondary" (click)="cancelRoleEdit()">Cancel</button>
                   } @else {
                     <button class="btn btn-sm btn-outline" (click)="editRole(user.id)">Edit Role</button>
+                    @if (user.role !== Role.Admin) {
+                      <button
+                        class="btn btn-sm btn-outline"
+                        (click)="toggleWebhooks(user)"
+                        [disabled]="isTogglingWebhooks() === user.id"
+                        [title]="
+                          user.webhooksEnabled
+                            ? 'Hide the Hooks page from this user'
+                            : 'Let this user see the Hooks page'
+                        "
+                      >
+                        {{ user.webhooksEnabled ? 'Disable Hooks' : 'Enable Hooks' }}
+                      </button>
+                    }
                     <button
                       class="btn btn-sm btn-outline"
                       (click)="resetPassword(user)"
@@ -174,6 +190,8 @@ export class UserManagementComponent {
   editingRoleUserId = signal<string | null>(null);
   isResettingPassword = signal<string | null>(null);
   isDeletingUser = signal<string | null>(null);
+  isTogglingWebhooks = signal<string | null>(null);
+  readonly Role = Role;
   errorMessage = signal('');
   successMessage = signal('');
   currentUserId = signal<string | null>(null);
@@ -274,6 +292,20 @@ export class UserManagementComponent {
       await this.loadUsers();
     } catch (error: any) {
       this.errorMessage.set(error.message || 'Failed to update user role');
+    }
+  }
+
+  async toggleWebhooks(user: User) {
+    this.isTogglingWebhooks.set(user.id);
+    this.clearMessages();
+    try {
+      await this.userManagementService.updateUserWebhooks(user.id, !user.webhooksEnabled);
+      this.successMessage.set(user.webhooksEnabled ? 'Hooks disabled for user' : 'Hooks enabled for user');
+      await this.loadUsers();
+    } catch (error: any) {
+      this.errorMessage.set(error.message || 'Failed to update webhook access');
+    } finally {
+      this.isTogglingWebhooks.set(null);
     }
   }
 

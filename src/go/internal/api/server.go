@@ -152,10 +152,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/mail", v1(s.handleV1GetMails))
 	mux.HandleFunc("GET /api/v1/mail/boxes", v1(s.handleGetBoxes))
 	mux.HandleFunc("GET /api/v1/mail/{id}", v1(s.handleGetMail))
-	mux.HandleFunc("GET /api/v1/webhooks/buckets", v1(s.handleGetBuckets))
-	mux.HandleFunc("GET /api/v1/webhooks/buckets/{name}", v1(s.handleGetBucket))
-	mux.HandleFunc("GET /api/v1/webhooks/buckets/{name}/webhooks", v1(s.handleGetWebhooks))
-	mux.HandleFunc("GET /api/v1/webhooks/{id}", v1(s.handleGetWebhook))
+	mux.HandleFunc("GET /api/v1/webhooks/buckets", v1(requireWebhooks(s.handleGetBuckets)))
+	mux.HandleFunc("GET /api/v1/webhooks/buckets/{name}", v1(requireWebhooks(s.handleGetBucket)))
+	mux.HandleFunc("GET /api/v1/webhooks/buckets/{name}/webhooks", v1(requireWebhooks(s.handleGetWebhooks)))
+	mux.HandleFunc("GET /api/v1/webhooks/{id}", v1(requireWebhooks(s.handleGetWebhook)))
 
 	// Mail server webhook (SMTP server -> API)
 	mux.HandleFunc("POST /api/webhook/mail", s.requireAPIKey(s.handleMailWebhook))
@@ -167,15 +167,18 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc(m+" /api/hook/{bucket}/{path...}", capture)
 	}
 
-	// Webhook management
-	mux.HandleFunc("GET /api/webhooks/buckets", auth(s.handleGetBuckets))
-	mux.HandleFunc("GET /api/webhooks/buckets/{name}", auth(s.handleGetBucket))
-	mux.HandleFunc("GET /api/webhooks/buckets/{name}/webhooks", auth(s.handleGetWebhooks))
-	mux.HandleFunc("GET /api/webhooks/{id}", auth(s.handleGetWebhook))
-	mux.HandleFunc("DELETE /api/webhooks/{id}", auth(s.handleDeleteWebhook))
-	mux.HandleFunc("DELETE /api/webhooks/buckets/{name}", auth(s.handleDeleteBucket))
-	mux.HandleFunc("DELETE /api/webhooks/buckets/{name}/webhooks", auth(s.handlePurgeBucket))
-	mux.HandleFunc("DELETE /api/webhooks", auth(s.handlePurgeAll))
+	// Webhook management: admins, plus users an admin has enabled webhooks for.
+	hooks := func(h func(http.ResponseWriter, *http.Request, *Principal)) http.HandlerFunc {
+		return auth(requireWebhooks(h))
+	}
+	mux.HandleFunc("GET /api/webhooks/buckets", hooks(s.handleGetBuckets))
+	mux.HandleFunc("GET /api/webhooks/buckets/{name}", hooks(s.handleGetBucket))
+	mux.HandleFunc("GET /api/webhooks/buckets/{name}/webhooks", hooks(s.handleGetWebhooks))
+	mux.HandleFunc("GET /api/webhooks/{id}", hooks(s.handleGetWebhook))
+	mux.HandleFunc("DELETE /api/webhooks/{id}", hooks(s.handleDeleteWebhook))
+	mux.HandleFunc("DELETE /api/webhooks/buckets/{name}", hooks(s.handleDeleteBucket))
+	mux.HandleFunc("DELETE /api/webhooks/buckets/{name}/webhooks", hooks(s.handlePurgeBucket))
+	mux.HandleFunc("DELETE /api/webhooks", hooks(s.handlePurgeAll))
 
 	// User management. ASP.NET routing is case-insensitive and the route came from
 	// [controller], so accept both spellings.
@@ -184,6 +187,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET "+base+"/{id}", auth(s.handleGetUserByID))
 		mux.HandleFunc("POST "+base, auth(s.handleCreateUser))
 		mux.HandleFunc("PUT "+base+"/{id}/role", auth(s.handleUpdateUserRole))
+		mux.HandleFunc("PUT "+base+"/{id}/webhooks", auth(s.handleUpdateUserWebhooks))
 		mux.HandleFunc("PUT "+base+"/{id}/password", auth(s.handleUpdateUserPassword))
 		mux.HandleFunc("DELETE "+base+"/{id}", auth(s.handleDeleteUser))
 	}

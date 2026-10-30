@@ -118,6 +118,7 @@ The prod build enforces per-component style budgets in `angular.json` (`anyCompo
 - **Webhook**: Captured HTTP webhook requests
 - **WebhookBucket**: Organization for webhook captures with retention policies
 - **UserApiKey**: Per-user API keys (hashed) for the read-only `/api/v1` API
+- **UserWebhookAccess**: Non-admin users allowed to use webhook capture (`Principal.CanUseWebhooks`, `requireWebhooks`; toggled via `PUT /api/UserManagement/{id}/webhooks`)
 
 ## Default Credentials
 - Username: admin

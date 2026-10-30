@@ -4,6 +4,8 @@ export interface User {
   role: Role;
   timeStamp: string;
   subdomain: string | null;
+  // Whether the user may use the Hooks page; always true for admins.
+  webhooksEnabled: boolean;
 }
 
 export enum Role {
