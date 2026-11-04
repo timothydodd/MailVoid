@@ -150,12 +150,11 @@ src/
 │   ├── cmd/mailvoid-api/  # API entrypoint (+ default appsettings)
 │   ├── cmd/mailvoid-smtp/ # SMTP server entrypoint (+ default appsettings)
 │   └── internal/          # api, smtpd, config (.NET-compatible), ordered
-├── MailVoidWeb/           # Angular frontend
-│   └── src/app/
-│       ├── Pages/         # Page components
-│       ├── _components/   # Shared components
-│       └── _services/     # API and auth services
-└── legacy/                # Original .NET services (kept until the Go port is signed off)
+└── MailVoidWeb/           # Angular frontend
+    └── src/app/
+        ├── Pages/         # Page components
+        ├── _components/   # Shared components
+        └── _services/     # API and auth services
 ```
 
 ## License

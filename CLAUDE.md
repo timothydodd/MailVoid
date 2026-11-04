@@ -9,7 +9,7 @@ MailVoid is a developer email testing tool with three components:
 - **SMTP server**: Go service (`src/go/cmd/mailvoid-smtp`) that receives mail and forwards it to the API webhook
 - **Frontend**: Angular 19 web application for viewing and managing test emails and webhooks
 
-The original .NET 10 services live in `src/legacy/` and are kept only as a fallback until the Go port is signed off. Do not add features there. The Go services must stay drop-in compatible with them: same config keys, same SQLite schema and value formats, same HTTP/JSON contract.
+The Go services replaced the original .NET 10 services (since removed). Keep them compatible with existing deployments: same config keys, same SQLite schema and value formats, same HTTP/JSON contract.
 
 The application receives webhook events from your mail server and stores emails in a SQLite database for developers to view through the web interface. It also includes a webhook capture feature for testing HTTP webhooks.
 

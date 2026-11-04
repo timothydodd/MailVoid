@@ -11,7 +11,7 @@
   font-weight: 500;
   color: var(--foreground);
   font-size: 0.875rem;
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* Form rows and layouts */
@@ -33,7 +33,7 @@
   background-color: var(--background);
   color: var(--foreground);
   font-size: 0.75rem;
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-sans);
 }
 
 .form-control {
@@ -43,7 +43,7 @@
   font-size: 1rem;
   background-color: var(--bGLighter);
   color: var(--foreground);
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-sans);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, background-color 0.15s ease-in-out;
 }
 

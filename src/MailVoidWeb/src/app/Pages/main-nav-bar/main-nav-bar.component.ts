@@ -1,7 +1,5 @@
-import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterModule } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { filter, map, startWith } from 'rxjs';
@@ -14,66 +12,78 @@ import { ThemeService } from '../../_services/theme.service';
 @Component({
   selector: 'app-main-nav',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideDynamicIcon, RouterModule, UserMenuComponent],
+  imports: [LucideDynamicIcon, RouterModule, UserMenuComponent],
   template: `
-    <nav class="navbar">
-      <div class="navbar-container">
-        <img src="logo-s.png" width="32" alt="Logo" class="navbar-logo" />
+    <nav class="navbar" aria-label="Main">
+      @if (user() !== null) {
+        <button
+          type="button"
+          class="icon-btn mobile-menu-btn"
+          (click)="onMobileMenuClick()"
+          aria-label="Mailboxes"
+          title="Mailboxes"
+        >
+          <svg lucideIcon="menu" size="20"></svg>
+        </button>
+      }
+      <a routerLink="/mail" class="brand">
+        <img src="logo-s.png" width="28" height="28" alt="" />
+        <span>MailVoid</span>
+      </a>
 
-        @if (user() !== null) {
-          <div class="navbar-nav">
-            <a routerLink="/mail" routerLinkActive="active" class="nav-link">
-              <svg lucideIcon="mail" size="18"></svg>
-              <span>Mail</span>
+      @if (user() !== null) {
+        <div class="nav-links">
+          <a routerLink="/mail" routerLinkActive="active" class="nav-link">
+            <svg lucideIcon="mail" size="16"></svg>
+            <span>Mail</span>
+          </a>
+          @if (authService.isAdmin() || user()?.webhooksEnabled) {
+            <a routerLink="/hooks" routerLinkActive="active" class="nav-link">
+              <svg lucideIcon="webhook" size="16"></svg>
+              <span>Hooks</span>
             </a>
-            @if (authService.isAdmin() || user()?.webhooksEnabled) {
-              <a routerLink="/hooks" routerLinkActive="active" class="nav-link">
-                <svg lucideIcon="webhook" size="18"></svg>
-                <span>Hooks</span>
-              </a>
-            }
-          </div>
-        }
-
-        @if (templateRef()) {
-          <div class="navbar-toolbar">
-            <ng-container *ngTemplateOutlet="templateRef()"></ng-container>
-          </div>
-        }
-
-        @if (showMailSearch() && user() !== null) {
-          <div class="navbar-search">
-            <svg lucideIcon="search" size="16"></svg>
-            <input
-              type="search"
-              placeholder="Search mail..."
-              [value]="mailSearchService.searchText()"
-              (input)="onSearchInput($event)"
-            />
-            @if (mailSearchService.searchText()) {
-              <button class="btn btn-icon search-clear" (click)="clearSearch()" title="Clear search">
-                <svg lucideIcon="x" size="14"></svg>
-              </button>
-            }
-          </div>
-        }
-
-        <div class="navbar-actions">
-          @if (user() !== null) {
-            <button class="btn btn-icon mobile-menu-btn" (click)="onMobileMenuClick()" title="Mailboxes">
-              <svg lucideIcon="inbox" size="20"></svg>
-            </button>
-            <button
-              class="btn btn-icon theme-toggle"
-              (click)="toggleTheme()"
-              [title]="themeService.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
-            >
-              <svg [lucideIcon]="themeService.theme() === 'dark' ? 'sun' : 'moon'" size="20"></svg>
-            </button>
-            <app-user-menu></app-user-menu>
           }
         </div>
-      </div>
+      }
+
+      @if (showMailSearch() && user() !== null) {
+        <label class="nav-search">
+          <svg lucideIcon="search" size="16"></svg>
+          <input
+            #searchInput
+            type="search"
+            placeholder="Search sender, recipient or subject"
+            aria-label="Search mail"
+            [value]="mailSearchService.searchText()"
+            (input)="onSearchInput($event)"
+            (keydown.escape)="clearSearch(); searchInput.blur()"
+          />
+          @if (mailSearchService.searchText()) {
+            <button type="button" class="icon-btn icon-btn-sm" (click)="clearSearch()" aria-label="Clear search">
+              <svg lucideIcon="x" size="14"></svg>
+            </button>
+          } @else {
+            <kbd>/</kbd>
+          }
+        </label>
+      } @else {
+        <span class="nav-spacer"></span>
+      }
+
+      @if (user() !== null) {
+        <div class="nav-actions">
+          <button
+            type="button"
+            class="icon-btn"
+            (click)="toggleTheme()"
+            [attr.aria-label]="themeService.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+            [title]="themeService.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+          >
+            <svg [lucideIcon]="themeService.theme() === 'dark' ? 'sun' : 'moon'" size="18"></svg>
+          </button>
+          <app-user-menu></app-user-menu>
+        </div>
+      }
     </nav>
   `,
   styleUrl: './main-nav-bar.component.css',
@@ -86,7 +96,7 @@ export class MainNavBarComponent {
   mailSearchService = inject(MailSearchService);
   private router = inject(Router);
 
-  templateRef = signal<TemplateRef<any> | null>(null);
+  private searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   user = signal<User | null>(null);
 
   showMailSearch = toSignal(
@@ -105,6 +115,18 @@ export class MainNavBarComponent {
       .subscribe((x) => {
         this.user.set(x);
       });
+  }
+
+  // "/" jumps to the mail search box unless the user is already typing somewhere.
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent) {
+    if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const input = this.searchInput()?.nativeElement;
+    if (!input) return;
+    event.preventDefault();
+    input.focus();
   }
 
   onMobileMenuClick() {

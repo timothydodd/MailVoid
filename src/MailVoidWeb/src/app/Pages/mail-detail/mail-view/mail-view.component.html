@@ -1,0 +1,141 @@
+@if (mail(); as m) {
+  <header class="mv-header">
+    <h2 class="mv-subject">{{ m.subject || '(no subject)' }}</h2>
+    <div class="mv-meta">
+      <span class="avatar-initials avatar-initials-lg">{{ initials() }}</span>
+      <div class="mv-people">
+        <div class="mv-from">
+          @if (m.fromName) {
+            <strong>{{ m.fromName }}</strong>
+            <span class="mv-muted">&lt;{{ m.from }}&gt;</span>
+          } @else {
+            <strong>{{ m.from }}</strong>
+          }
+        </div>
+        <div class="mv-to">
+          <span class="mv-muted">to</span>
+          <span class="mv-ellipsis">{{ m.to }}</span>
+          <button
+            type="button"
+            class="icon-btn icon-btn-sm"
+            (click)="copyEmail(m.to)"
+            [attr.aria-label]="copied() ? 'Copied' : 'Copy recipient address'"
+            [title]="copied() ? 'Copied!' : 'Copy address'"
+          >
+            <svg [lucideIcon]="copied() ? 'circle-check' : 'copy'" size="14"></svg>
+          </button>
+        </div>
+      </div>
+      <div class="mv-side">
+        <time class="mv-muted" [attr.datetime]="m.createdOn">{{ m.createdOn | date: 'medium' }}</time>
+        @if (m.spfResult || m.dkimResult) {
+          <div class="mv-badges">
+            @if (m.spfResult) {
+              <span class="badge" [class]="badgeClass(m.spfResult)">SPF {{ m.spfResult }}</span>
+            }
+            @if (m.dkimResult) {
+              <span class="badge" [class]="badgeClass(m.dkimResult)">DKIM {{ m.dkimResult }}</span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="tab-bar" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        class="tab-bar-item"
+        [class.active]="activeTab() === 'preview'"
+        [attr.aria-selected]="activeTab() === 'preview'"
+        (click)="setTab('preview')"
+      >
+        Message
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab-bar-item"
+        [class.active]="activeTab() === 'headers'"
+        [attr.aria-selected]="activeTab() === 'headers'"
+        [disabled]="headers().length === 0"
+        (click)="setTab('headers')"
+      >
+        Headers
+        @if (headers().length > 0) {
+          <span class="count-pill count-pill-muted">{{ headers().length }}</span>
+        }
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab-bar-item"
+        [class.active]="activeTab() === 'raw'"
+        [attr.aria-selected]="activeTab() === 'raw'"
+        [disabled]="!hasRawSource()"
+        (click)="setTab('raw')"
+      >
+        Raw
+      </button>
+    </div>
+  </header>
+
+  <div class="mv-body">
+    @switch (activeTab()) {
+      @case ('preview') {
+        @if (m.isHtml) {
+          <div class="notice-bar">
+            <svg [lucideIcon]="loadRemote() ? 'eye' : 'eye-off'" size="14"></svg>
+            <span class="notice-bar-text">
+              @if (!loadRemote()) {
+                Remote images are blocked.
+              } @else if (isSenderTrusted()) {
+                Remote content always loads for this sender.
+              } @else {
+                Remote content is loaded.
+              }
+            </span>
+            <button type="button" class="link-btn" (click)="toggleRemote()">
+              {{ loadRemote() ? 'Block images' : 'Load images' }}
+            </button>
+            @if (senderEmail()) {
+              <button type="button" class="link-btn" (click)="toggleAlwaysAllowSender()">
+                {{ isSenderTrusted() ? 'Stop trusting sender' : 'Always for this sender' }}
+              </button>
+            }
+          </div>
+          <iframe
+            class="mv-html"
+            title="Message content"
+            [srcdoc]="srcDoc()"
+            sandbox="allow-popups allow-popups-to-escape-sandbox"
+            referrerpolicy="no-referrer"
+          ></iframe>
+        } @else {
+          <div class="mv-text">{{ m.text }}</div>
+        }
+        <app-mail-attachments [attachments]="attachments()" />
+      }
+      @case ('headers') {
+        <div class="mv-headers">
+          @for (h of headers(); track $index) {
+            <div class="mv-header-row">
+              <span class="mv-muted">{{ h.name }}</span>
+              <span>{{ h.value }}</span>
+            </div>
+          }
+        </div>
+      }
+      @case ('raw') {
+        <pre class="mv-raw">{{ m.rawSource }}</pre>
+      }
+    }
+  </div>
+} @else if (loading()) {
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading message…</p>
+  </div>
+} @else if (failed()) {
+  <div class="list-status list-status-error">This message could not be loaded.</div>
+}

@@ -303,7 +303,7 @@ button.btn-no-border {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 6px;
-  font: 500 0.875rem "Roboto", sans-serif;
+  font: 500 0.875rem var(--font-sans);
   cursor: pointer;
   transition: all 0.2s ease;
   text-decoration: none;

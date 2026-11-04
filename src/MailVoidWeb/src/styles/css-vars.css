@@ -56,50 +56,83 @@
   --rd-ti-font-sm: 0.75rem;
 }
 
+/* Shared, theme-independent tokens */
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --nav-height: 56px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --panel-shadow: -24px 0 48px rgba(0, 0, 0, 0.22);
+  --overlay-bg: rgba(8, 10, 14, 0.32);
+}
+
 /* Dark Theme (default) */
 :root,
 :root[data-theme="dark"] {
-  --background: #282a36;
-  --current-line: #44475a;
-  --foreground: #f8f8f2;
-  --comment: #b8b8ac;
-  --cyan: #8be9fd;
-  --green: #50fa7b;
-  --blue: #70bbf9;
-  --orange: #ecb478;
-  --pink: #ff79c6;
-  --purple: #bd93f9;
-  --red: #ff5555;
-  --danger:var(--red);
-  --yellow: #f1fa8c;
-  --bGLighter: #424450;
-  --bGLight: #3f435a;
-  --bGDark: #3a3c4e;
-  --bGDarker: #191A21;
-  --primary: #4c91e1;
-  --primary-rgb: 76, 145, 225;
-  --comment-rgb: 184, 184, 172;
-  --secondary: var(--orange);
-  --header-bg: var(--bGLight);
-  --border-color: #4a567b;
-  
-  /* Additional theme-specific variables */
-  --text-primary: #f8f8f2;
-  --text-secondary: #a0a4b8;
-  --bg-gradient-start: #2a2f42;
-  --bg-gradient-mid: #282a36;
-  --bg-gradient-mid2: #252a3a;
-  --bg-gradient-end: #1e2132;
-  --card-bg: var(--bGDark);
-  --input-bg: var(--bGLighter);
-  --input-border: var(--border-color);
-  --hover-bg: var(--bGLight);
+  /* Core palette: soft neutral grays, one calm accent. Everything else maps to these. */
+  --bg: #14161b;
+  --surface: #1a1d23;
+  --surface-2: #20242c;
+  --hover: #232832;
+  --border: #2a2f38;
+  --text: #e6e8ec;
+  --text-2: #b4bbc7;
+  --muted: #8a93a3;
+  --accent: #7aa5ff;
+  --accent-rgb: 122, 165, 255;
+  --accent-soft: rgba(122, 165, 255, 0.14);
+  --on-accent: #0d1220;
+  --ok: #5fcf9a;
+  --ok-soft: rgba(95, 207, 154, 0.14);
+  --bad: #f07178;
+  --bad-soft: rgba(240, 113, 120, 0.14);
+  --warn: #e5c07b;
+  --warn-soft: rgba(229, 192, 123, 0.14);
+
+  /* Named colors (toned down) */
+  --cyan: #6cc7d9;
+  --green: var(--ok);
+  --blue: var(--accent);
+  --orange: #f0a35e;
+  --pink: #e88bc4;
+  --purple: #b39cf0;
+  --red: var(--bad);
+  --danger: var(--bad);
+  --yellow: var(--warn);
+
+  /* Legacy names, mapped onto the core palette */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --comment: var(--muted);
+  --current-line: var(--surface-2);
+  --bGLighter: var(--hover);
+  --bGLight: var(--surface-2);
+  --bGDark: var(--surface);
+  --bGDarker: #101216;
+  --primary: var(--accent);
+  --primary-rgb: var(--accent-rgb);
+  --comment-rgb: 138, 147, 163;
+  --secondary: var(--accent);
+  --header-bg: var(--surface);
+  --border-color: var(--border);
+  --text-primary: var(--text);
+  --text-secondary: var(--muted);
+  --bg-gradient-start: var(--bg);
+  --bg-gradient-mid: var(--bg);
+  --bg-gradient-mid2: var(--bg);
+  --bg-gradient-end: var(--bg);
+  --card-bg: var(--surface);
+  --input-bg: var(--surface-2);
+  --input-border: var(--border);
+  --hover-bg: var(--hover);
   --shadow-color: transparent;
-  --dropdown-shadow: rgba(0, 0, 0, 0.3);
-  --table-row-border: rgba(98, 115, 164, 0.15);
-  --table-row-hover-bg: rgba(111, 131, 190, 0.5);
+  --dropdown-shadow: rgba(0, 0, 0, 0.35);
+  --table-row-border: var(--border);
+  --table-row-hover-bg: var(--hover);
   --table-hover-shadow: transparent;
-  
+
   /* Button gradient colors */
   --btn-gradient-1: #ec4899;
   --btn-gradient-2: #8b5cf6;
@@ -121,47 +154,67 @@
 
 /* Light Theme */
 :root[data-theme="light"] {
-  --background: #f3f3f3;
-  --current-line: #f0f0f0;
-  --foreground: #1d232e;
-  --comment: #374151;
-  --cyan: #0891b2;
-  --green: #16a34a;
-  --orange: #ea580c;
-  --blue: #2b9af4;
-  --pink: #db2777;
-  --purple: #7c3aed;
-  --red: #dc2626;
-  --danger: var(--red);
-  --yellow: #eab308;
-  --bGLighter: #f9fafb;
-  --bGLight: #f3f4f6;
-  --bGDark: #e5e6e9;
-  --bGDarker: #949495;
-  --primary: #3783ff;
-  --primary-rgb: 55, 131, 255;
-  --comment-rgb: 55, 65, 81;
-  --secondary: var(--orange);
-  --header-bg: #f8f9fa;
-  --border-color: #d5d6d7;
-  
-  /* Additional theme-specific variables */
-  --text-primary: #1a202c;
-  --text-secondary: #718096;
-  --bg-gradient-start: #f8f9fa;
-  --bg-gradient-mid: #ffffff;
-  --bg-gradient-mid2: #f8f9fa;
-  --bg-gradient-end: #f3f4f6;
-  --card-bg: #ffffff;
-  --input-bg: var(--border-color);
-  --input-border: #d1d5db;
-  --hover-bg: #f3f4f6;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --hover: #eef1f5;
+  --border: #e3e6eb;
+  --text: #1b1f27;
+  --text-2: #3f4756;
+  --muted: #626b7c;
+  --accent: #2f62d6;
+  --accent-rgb: 47, 98, 214;
+  --accent-soft: rgba(47, 98, 214, 0.1);
+  --on-accent: #ffffff;
+  --ok: #16794a;
+  --ok-soft: rgba(22, 121, 74, 0.1);
+  --bad: #c93838;
+  --bad-soft: rgba(201, 56, 56, 0.1);
+  --warn: #a16207;
+  --warn-soft: rgba(161, 98, 7, 0.1);
+  --panel-shadow: -24px 0 48px rgba(15, 23, 42, 0.12);
+  --overlay-bg: rgba(15, 23, 42, 0.18);
+
+  --cyan: #0e7490;
+  --green: var(--ok);
+  --blue: var(--accent);
+  --orange: #c2410c;
+  --pink: #be185d;
+  --purple: #6d28d9;
+  --red: var(--bad);
+  --danger: var(--bad);
+  --yellow: var(--warn);
+
+  --background: var(--bg);
+  --foreground: var(--text);
+  --comment: var(--muted);
+  --current-line: var(--surface-2);
+  --bGLighter: var(--hover);
+  --bGLight: var(--surface-2);
+  --bGDark: var(--surface);
+  --bGDarker: #94979e;
+  --primary: var(--accent);
+  --primary-rgb: var(--accent-rgb);
+  --comment-rgb: 98, 107, 124;
+  --secondary: var(--accent);
+  --header-bg: var(--surface);
+  --border-color: var(--border);
+  --text-primary: var(--text);
+  --text-secondary: var(--muted);
+  --bg-gradient-start: var(--bg);
+  --bg-gradient-mid: var(--bg);
+  --bg-gradient-mid2: var(--bg);
+  --bg-gradient-end: var(--bg);
+  --card-bg: var(--surface);
+  --input-bg: var(--surface);
+  --input-border: var(--border);
+  --hover-bg: var(--hover);
   --shadow-color: transparent;
-  --dropdown-shadow: rgba(0, 0, 0, 0.1);
-  --table-row-border: rgba(229, 231, 235, 0.5);
-  --table-row-hover-bg: rgb(203, 221, 252);
-  --table-hover-shadow: 0 2px 12px rgba(59, 130, 246, 0);
-  
+  --dropdown-shadow: rgba(15, 23, 42, 0.12);
+  --table-row-border: var(--border);
+  --table-row-hover-bg: var(--hover);
+  --table-hover-shadow: transparent;
+
   /* Button gradient colors - adjusted for light theme */
   --btn-gradient-1: #f472b6;
   --btn-gradient-2: #a78bfa;

@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { LucideDynamicIcon } from '@lucide/angular';
 import { take } from 'rxjs';
 import { AuthService, User } from '../../_services/auth-service';
 import { ClickOutsideDirective } from '../../_services/click-outside.directive';
+import { initialsFor } from '../../_services/mail-format';
 import { ModalContainerService } from '@rd-ui';
 import { UserSettingsComponent } from '../user-settings/user-settings.component';
 
@@ -13,11 +14,24 @@ import { UserSettingsComponent } from '../user-settings/user-settings.component'
   imports: [LucideDynamicIcon, ClickOutsideDirective],
   template: `
     @if (user()) {
-      <button type="button" class="btn btn-icon user-menu-btn" (click)="isOpen.set(!isOpen())" title="User menu">
-        <svg lucideIcon="user" size="20"></svg>
+      <button
+        type="button"
+        class="avatar-initials user-menu-btn"
+        (click)="isOpen.set(!isOpen())"
+        [attr.aria-expanded]="isOpen()"
+        aria-label="Account menu"
+        [title]="user()?.userName ?? 'Account'"
+      >
+        {{ initials() }}
       </button>
       @if (isOpen()) {
-        <div class="menu" appClickOutside (clickOutside)="isOpen.set(false)" (document:keydown.escape)="isOpen.set(false)" [delayTime]="200">
+        <div
+          class="menu"
+          appClickOutside
+          (clickOutside)="isOpen.set(false)"
+          (document:keydown.escape)="isOpen.set(false)"
+          [delayTime]="200"
+        >
           <div class="user-menu-info">
             <div class="avatar-spacer">
               <div class="avatar-wrap">
@@ -47,6 +61,7 @@ export class UserMenuComponent {
   modalContainerService = inject(ModalContainerService);
   user = signal<User | null>(null);
   isOpen = signal(false);
+  initials = computed(() => initialsFor(this.user()?.userName));
   constructor() {
     this.authService
       .getUser()
