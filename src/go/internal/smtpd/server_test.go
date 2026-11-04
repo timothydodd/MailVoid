@@ -101,3 +101,55 @@ func TestServer_CertificateAppearingEnablesTLS(t *testing.T) {
 		t.Fatal("listener restarted after Stop")
 	}
 }
+
+// SMTPUTF8 must be advertised and accepted, or senders bounce mail for non-ASCII
+// recipients such as peña.qa5546@sub.mailvoid.com before it reaches us.
+func TestServer_AcceptsSMTPUTF8Recipient(t *testing.T) {
+	opts := ServerOptions{Port: freePort(t), Name: "test", MaxMessageSize: 1 << 20,
+		MaxRecipients: 50, MaxConnections: 100, MaxConnectionsPerIp: 10}
+	certs := NewCertStore(discard, opts, LetsEncryptOptions{})
+	q := newTestQueue(t, t.TempDir(), 3)
+	s := NewServer(context.Background(), discard, opts, NewMailboxFilter(discard, FilterOptions{AllowedDomains: []string{"mailvoid.com"}}, 1<<20), q, certs)
+	s.Start()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		s.Stop(ctx)
+	}()
+
+	if !strings.Contains(ehlo(t, opts.Port, false), "SMTPUTF8") {
+		t.Fatal("SMTPUTF8 not advertised")
+	}
+
+	c, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(opts.Port), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	_ = c.SetDeadline(time.Now().Add(5 * time.Second))
+	r := bufio.NewReader(c)
+	readReply := func() string {
+		var last string
+		for {
+			line, err := r.ReadString('\n')
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			last = line
+			if len(line) >= 4 && line[3] == ' ' {
+				return last
+			}
+		}
+	}
+	readReply() // greeting
+	for _, step := range []struct{ cmd, code string }{
+		{"EHLO test", "250"},
+		{"MAIL FROM:<sender@example.org> SMTPUTF8", "250"},
+		{"RCPT TO:<peña.qa5546@sub.mailvoid.com>", "250"},
+	} {
+		c.Write([]byte(step.cmd + "\r\n"))
+		if reply := readReply(); !strings.HasPrefix(reply, step.code) {
+			t.Fatalf("%s: got %q, want %s", step.cmd, strings.TrimSpace(reply), step.code)
+		}
+	}
+}

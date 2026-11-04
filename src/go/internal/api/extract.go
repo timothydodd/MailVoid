@@ -33,7 +33,9 @@ type mailAttachmentDto struct {
 }
 
 var (
-	emailRegex       = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+	// Unicode letters/marks are allowed so internationalized (SMTPUTF8) addresses such
+	// as peña@x.com are kept whole instead of truncated to their ASCII tail (a@x.com).
+	emailRegex       = regexp.MustCompile(`[\p{L}\p{M}\p{N}._%+-]+@[\p{L}\p{M}\p{N}.-]+\.[\p{L}\p{M}]{2,}`)
 	displayNameRegex = regexp.MustCompile(`^([^<>]+)\s*<`)
 	charsetRegex     = regexp.MustCompile(`(?i)charset=([^;]+)`)
 	mimeWordRegex    = regexp.MustCompile(`=\?([^?]+)\?([BbQq])\?([^?]*)\?=`)

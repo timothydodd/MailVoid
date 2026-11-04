@@ -158,6 +158,9 @@ func (s *Server) newBackend(port int, tlsConfig *tls.Config, implicitTLS bool, a
 	srv.Domain = s.opts.Name
 	srv.MaxMessageBytes = int64(s.opts.MaxMessageSize)
 	srv.MaxRecipients = max(0, s.opts.MaxRecipients)
+	// Advertise SMTPUTF8 (RFC 6531) so senders deliver to non-ASCII addresses like
+	// peña@sub.mailvoid.com; without it they bounce such mail before reaching us.
+	srv.EnableSMTPUTF8 = true
 	srv.ReadTimeout = 5 * time.Minute
 	srv.WriteTimeout = time.Minute
 	if !implicitTLS {

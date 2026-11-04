@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"mailvoid/internal/ordered"
 	"strings"
 	"testing"
 	"time"
@@ -63,5 +64,28 @@ func TestExtractSubdomain(t *testing.T) {
 		if got := extractSubdomain(in); got != want {
 			t.Errorf("extractSubdomain(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Internationalized addresses must be kept whole; an ASCII-only pattern used to
+// truncate peña.qa5546@dbmk2.com to a.qa5546@dbmk2.com and file it in the wrong mailbox.
+func TestExtractEmailAddress_Unicode(t *testing.T) {
+	cases := map[string]string{
+		"peña.qa5546@dbmk2.com":                   "peña.qa5546@dbmk2.com",
+		`"José Peña" <josé.peña@kk.mailvoid.com>`: "josé.peña@kk.mailvoid.com",
+		"Ünïcödé <müller@bücher.de>":              "müller@bücher.de",
+		"plain@example.com":                       "plain@example.com",
+	}
+	for in, want := range cases {
+		if got := extractEmailAddress(in); got != want {
+			t.Errorf("extractEmailAddress(%q) = %q, want %q", in, got, want)
+		}
+	}
+
+	var h ordered.Map
+	h.Set("To", "peña.qa5546@dbmk2.com, zoë@dbmk2.com")
+	h.Set("Cc", "renée@dbmk2.com")
+	if got := deref(additionalRecipients(h, "peña.qa5546@dbmk2.com")); got != "zoë@dbmk2.com, renée@dbmk2.com" {
+		t.Errorf("additionalRecipients = %q", got)
 	}
 }
