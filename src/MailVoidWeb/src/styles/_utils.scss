@@ -24,21 +24,18 @@
 }
 
 .badge-success {
-  background-color: rgba(80, 250, 123, 0.2);
-  color: var(--green);
-  border: 1px solid rgba(80, 250, 123, 0.3);
+  background-color: var(--ok-soft);
+  color: var(--ok);
 }
 
 .badge-danger {
-  background-color: rgba(255, 85, 85, 0.2);
-  color: var(--red);
-  border: 1px solid rgba(255, 85, 85, 0.3);
+  background-color: var(--bad-soft);
+  color: var(--bad);
 }
 
 .badge-warning {
-  background-color: rgba(255, 184, 0, 0.2);
-  color: var(--orange);
-  border: 1px solid rgba(255, 184, 0, 0.3);
+  background-color: var(--warn-soft);
+  color: var(--warn);
 }
 
 /* Role & Status Badges */
@@ -98,8 +95,7 @@
   padding: 0.75rem 1rem;
   border-radius: 6px;
   font:
-    normal 0.875rem "Roboto",
-    sans-serif;
+    normal 0.875rem var(--font-sans);
   margin-top: 1rem;
   border: 1px solid;
 }
@@ -145,8 +141,7 @@
   text-align: center;
   color: var(--comment);
   font:
-    normal 0.875rem "Roboto",
-    sans-serif;
+    normal 0.875rem var(--font-sans);
 }
 
 /* Sections */
@@ -168,8 +163,7 @@
 .section-title {
   color: var(--foreground);
   font:
-    600 1.1rem "Roboto",
-    sans-serif;
+    600 1.1rem var(--font-sans);
   margin: 0;
 }
 
@@ -207,15 +201,13 @@
   align-items: center;
   color: var(--foreground);
   font:
-    normal 0.875rem "Roboto",
-    sans-serif;
+    normal 0.875rem var(--font-sans);
 }
 
 .header-cell {
   color: var(--comment);
   font:
-    600 0.75rem "Roboto",
-    sans-serif;
+    600 0.75rem var(--font-sans);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -332,7 +324,7 @@
   font-size: 1.5rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-sans);
 }
 
 .settings-subtitle {
@@ -340,7 +332,7 @@
   font-size: 0.875rem;
   margin: 0;
   line-height: 1.4;
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-sans);
 }
 
 .section-title {
@@ -348,7 +340,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0 0 1rem 0;
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-sans);
 }
 
 .meta-label {
@@ -383,7 +375,7 @@
   cursor: pointer;
   border-bottom: 3px solid transparent;
   transition: all 0.2s ease;
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-sans);
   position: relative;
 
   &:hover {
@@ -517,7 +509,7 @@
 .slide-panel-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--overlay-bg);
   z-index: 1000;
 }
 

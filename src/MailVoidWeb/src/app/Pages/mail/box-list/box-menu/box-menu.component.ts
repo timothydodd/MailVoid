@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { MailService } from '../../../../_services/api/mail.service';
 import { ClickOutsideDirective } from '../../../../_services/click-outside.directive';
@@ -6,14 +15,21 @@ import { ClickOutsideDirective } from '../../../../_services/click-outside.direc
 @Component({
   selector: 'app-box-menu',
   imports: [LucideDynamicIcon, ClickOutsideDirective],
-  template: ` <button type="button" class="btn-icon" #triggerButton (click)="toggleMenu()">
-      <svg lucideIcon="ellipsis-vertical"></svg>
+  template: ` <button
+      type="button"
+      class="icon-btn icon-btn-sm"
+      #triggerButton
+      (click)="toggleMenu()"
+      aria-label="Mailbox actions"
+      title="Mailbox actions"
+    >
+      <svg lucideIcon="ellipsis-vertical" size="14"></svg>
     </button>
     @if (isOpen()) {
-      <div 
-        class="menu" 
+      <div
+        class="menu"
         #menuElement
-        [style.top.px]="menuPosition().top" 
+        [style.top.px]="menuPosition().top"
         [style.left.px]="menuPosition().left"
         appClickOutside
         (clickOutside)="close()"
@@ -43,7 +59,7 @@ export class BoxMenuComponent {
   unreadCount = input<number>(0);
   deleteEvent = output<string>();
   markAllAsReadEvent = output<string>();
-  
+
   triggerButton = viewChild<ElementRef>('triggerButton');
   menuElement = viewChild<ElementRef>('menuElement');
   menuPosition = signal({ top: 0, left: 0 });
@@ -58,7 +74,7 @@ export class BoxMenuComponent {
 
   open() {
     this.isOpen.set(true);
-    
+
     // Calculate position after the menu is opened
     setTimeout(() => {
       this.calculateMenuPosition();
@@ -68,17 +84,17 @@ export class BoxMenuComponent {
   calculateMenuPosition() {
     const trigger = this.triggerButton()?.nativeElement;
     const menu = this.menuElement()?.nativeElement;
-    
+
     if (!trigger || !menu) return;
-    
+
     const triggerRect = trigger.getBoundingClientRect();
     const menuRect = menu.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    
+
     let top = triggerRect.bottom + 4; // 4px gap below trigger
     let left = triggerRect.right - menuRect.width; // Align right edge with trigger
-    
+
     // Adjust if menu would go off-screen
     if (left < 8) {
       left = 8; // 8px margin from left edge
@@ -89,7 +105,7 @@ export class BoxMenuComponent {
     if (top + menuRect.height > viewportHeight - 8) {
       top = triggerRect.top - menuRect.height - 4; // Show above trigger instead
     }
-    
+
     this.menuPosition.set({ top, left });
   }
 

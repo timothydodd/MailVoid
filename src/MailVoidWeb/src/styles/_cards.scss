@@ -49,7 +49,7 @@
 
 .container-title {
   color: var(--foreground);
-  font: 600 1.125rem "Roboto", sans-serif;
+  font: 600 1.125rem var(--font-sans);
   margin: 0;
 }
 
@@ -72,7 +72,7 @@
 
 .panel-title {
   color: var(--foreground);
-  font: 600 1.125rem "Roboto", sans-serif;
+  font: 600 1.125rem var(--font-sans);
   margin: 0;
 }
 

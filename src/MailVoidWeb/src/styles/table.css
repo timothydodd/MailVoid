@@ -14,28 +14,26 @@ table {
 
 /* Header Styles */
 thead {
-    background-color: var(--bGDark);
-    border-bottom: 2px solid var(--border-color);
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
 }
 
 th {
-    padding: 1.25rem 1rem;
+    padding: 0.75rem 1rem;
     text-align: left;
     color: var(--comment);
-    font-weight: 600;
-    text-transform: uppercase;
+    font-weight: 500;
     font-size: 0.75rem;
-    letter-spacing: 0.1em;
     white-space: nowrap;
 }
 
 /* Body Styles */
 tbody tr {
-    background-color: var(--bGLight);
+    background-color: transparent;
     border-bottom: 1px solid var(--border-color);
     border-left: 1px solid transparent;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color 0.12s ease;
     position: relative;
 }
 
@@ -45,10 +43,6 @@ tbody tr:last-child {
 
 tbody tr:hover {
     background-color: var(--table-row-hover-bg);
-    transform: translateX(4px);
-    box-shadow: 0 2px 8px var(--table-hover-shadow);
-    border-left-color: var(--primary);
-    border-left-width: 3px;
 }
 
 tbody tr:hover td {

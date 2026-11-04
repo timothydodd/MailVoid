@@ -1,7 +1,5 @@
-import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
 import {
   auditTime,
@@ -33,6 +31,8 @@ import { MailSearchService } from '../../_services/mail-search.service';
 import { MobileMenuService } from '../../_services/mobile-menu.service';
 import { MailNotification, SignalRService } from '../../services/signalr.service';
 import { BoxListComponent } from './box-list/box-list.component';
+import { MailListComponent } from './mail-list/mail-list.component';
+import { MailPanelComponent } from './mail-panel/mail-panel.component';
 
 type SortColumn = MailSortColumn;
 type SortDirection = MailSortDirection;
@@ -43,149 +43,144 @@ const LIVE_REFRESH_INTERVAL_MS = 1000;
 @Component({
   selector: 'app-mail',
   standalone: true,
-  imports: [CommonModule, BoxListComponent, LucideDynamicIcon],
+  imports: [BoxListComponent, LucideDynamicIcon, MailListComponent, MailPanelComponent],
   template: `
-    <div class="mail-container">
-      <!-- Left Sidebar (Hidden on mobile, shown as overlay when menu is open) -->
-      <div class="mail-sidebar" [class.mobile-menu-open]="isMobileMenuOpen()">
-        <div class="sidebar-card">
-          <div class="sidebar-header">
-            <button class="btn btn-icon mobile-close-btn" (click)="closeMobileMenu()" title="Close">
-              <svg lucideIcon="x" size="24"></svg>
-            </button>
-            <button
-              class="btn btn-icon show-all-btn"
-              [class.active]="selectedBox() === null"
-              (click)="clickBox(null)"
-              title="Show all emails"
-            >
-              <svg lucideIcon="inbox" size="20"></svg>
-            </button>
-            <button class="btn btn-icon" (click)="mailSettingsClick()" title="Mail Settings">
-              <svg lucideIcon="cog" size="20"></svg>
-            </button>
-          </div>
-          <div class="sidebar-body">
-            <app-box-list
-              [mailboxes]="mailboxes()"
-              [(selectedBox)]="selectedBox"
-              (deleteEvent)="deleteBox($event)"
-              (markAllAsReadEvent)="markAllAsRead($event)"
-              (boxClick)="onMobileBoxSelect($event)"
-            ></app-box-list>
-          </div>
+    <div class="mail-layout">
+      <aside class="mail-sidebar side-nav" [class.open]="isMobileMenuOpen()" aria-label="Mailboxes">
+        <div class="mail-sidebar-mobile-head">
+          <span>Mailboxes</span>
+          <button type="button" class="icon-btn" (click)="closeMobileMenu()" aria-label="Close mailboxes">
+            <svg lucideIcon="x" size="18"></svg>
+          </button>
         </div>
-      </div>
+        <div class="side-nav-body">
+          <button
+            type="button"
+            class="side-item"
+            [class.selected]="selectedBox() === null"
+            (click)="onMobileBoxSelect(null)"
+          >
+            <svg lucideIcon="inbox" size="16"></svg>
+            <span class="side-item-label">All mail</span>
+            @if (totalUnread() > 0) {
+              <span class="count-pill">{{ totalUnread() }}</span>
+            }
+          </button>
+          <app-box-list
+            [mailboxes]="mailboxes()"
+            [(selectedBox)]="selectedBox"
+            (deleteEvent)="deleteBox($event)"
+            (markAllAsReadEvent)="markAllAsRead($event)"
+            (boxClick)="onMobileBoxSelect($event)"
+          ></app-box-list>
+        </div>
+        <div class="side-nav-footer">
+          <button type="button" class="side-item side-item-muted" (click)="mailSettingsClick()">
+            <svg lucideIcon="cog" size="16"></svg>
+            <span class="side-item-label">Mail settings</span>
+          </button>
+        </div>
+      </aside>
 
-      <!-- Overlay backdrop for mobile -->
       @if (isMobileMenuOpen()) {
-        <div class="mobile-overlay" (click)="closeMobileMenu()"></div>
+        <div class="mail-sidebar-backdrop" (click)="closeMobileMenu()"></div>
       }
 
-      <!-- Main Content Area -->
-      <div class="mail-content">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="sortable" (click)="toggleSort('from')">
-                  From
-                  @if (sortColumn() === 'from') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
-                <th class="sortable" (click)="toggleSort('to')">
-                  To
-                  @if (sortColumn() === 'to') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
-                <th class="sortable" (click)="toggleSort('subject')">
-                  Subject
-                  @if (sortColumn() === 'subject') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
-                <th class="sortable" (click)="toggleSort('createdOn')">
-                  Created On
-                  @if (sortColumn() === 'createdOn') {
-                    <svg
-                      [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'"
-                      size="14"
-                    ></svg>
-                  }
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              @if (loading()) {
-                <tr>
-                  <td colspan="4" class="table-status">Loading emails...</td>
-                </tr>
-              } @else if (error()) {
-                <tr>
-                  <td colspan="4" class="table-status table-status-error">
-                    Failed to load emails. Please try again.
-                  </td>
-                </tr>
-              } @else if (sortedEmails() && sortedEmails()!.length > 0) {
-                @for (email of sortedEmails(); track email.id) {
-                  <tr
-                    role="button"
-                    tabindex="0"
-                    (click)="clickMail(email)"
-                    (keydown.enter)="clickMail(email)"
-                    (keydown.space)="$event.preventDefault(); clickMail(email)"
-                    [class.read]="email.isRead"
-                  >
-                    <td class="from-email">{{ email.from }}</td>
-                    <td style="max-width: 100px;overflow:hidden;">{{ email.to }}</td>
-                    <td style="max-width: 300px;word-break: break-all;">
-                      {{ email.subject }}
-                    </td>
-                    <td>{{ email.createdOn | date: 'short' }}</td>
-                  </tr>
-                }
-              } @else {
-                <tr>
-                  <td colspan="4" class="table-status">No emails found</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        @if (totalPages() > 1) {
-          <div class="pagination-controls">
-            <div>
-              <button class="btn" (click)="previousPage()" [disabled]="currentPage() === 1">
-                <svg lucideIcon="chevron-left" size="14"></svg>
-                Previous
-              </button>
-              <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
-              <button class="btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
-                Next
-                <svg lucideIcon="chevron-right" size="14"></svg>
-              </button>
-            </div>
+      <main class="mail-main">
+        <div class="page-toolbar">
+          <div class="page-toolbar-title">
+            <h1 [title]="selectedBox() ?? 'All mail'">{{ selectedBox() ?? 'All mail' }}</h1>
+            <p>{{ subtitle() }}</p>
           </div>
-        }
-      </div>
+          @if (selectedBox(); as box) {
+            <button
+              type="button"
+              class="icon-btn icon-btn-bordered"
+              (click)="copyBox(box)"
+              [attr.aria-label]="boxCopied() ? 'Copied' : 'Copy address'"
+              [title]="boxCopied() ? 'Copied!' : 'Copy address'"
+            >
+              <svg [lucideIcon]="boxCopied() ? 'circle-check' : 'copy'" size="15"></svg>
+            </button>
+          }
+          @if (currentUnread() > 0) {
+            <button type="button" class="btn-quiet" (click)="markCurrentAsRead()">
+              <svg lucideIcon="check" size="14"></svg>
+              Mark all read
+            </button>
+          }
+          <button
+            type="button"
+            class="icon-btn icon-btn-bordered"
+            (click)="reload()"
+            aria-label="Refresh"
+            title="Refresh"
+          >
+            <svg lucideIcon="refresh-cw" size="15"></svg>
+          </button>
+        </div>
+
+        <div class="list-card">
+          <app-mail-list
+            [emails]="sortedEmails()"
+            [loading]="loading()"
+            [error]="error()"
+            [showTo]="selectedBox() === null"
+            [selectedBox]="selectedBox()"
+            [sortColumn]="sortColumn()"
+            [sortDirection]="sortDirection()"
+            [openId]="openMailId()"
+            (sort)="toggleSort($event)"
+            (open)="openMail($event)"
+          />
+          @if (totalCount() > 0) {
+            <div class="list-footer">
+              <span>{{ rangeLabel() }}</span>
+              @if (totalPages() > 1) {
+                <div class="list-footer-actions">
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-bordered"
+                    (click)="previousPage()"
+                    [disabled]="currentPage() === 1"
+                    aria-label="Previous page"
+                  >
+                    <svg lucideIcon="chevron-left" size="15"></svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-bordered"
+                    (click)="nextPage()"
+                    [disabled]="currentPage() === totalPages()"
+                    aria-label="Next page"
+                  >
+                    <svg lucideIcon="chevron-right" size="15"></svg>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </main>
     </div>
+
+    @if (openMailId(); as id) {
+      <app-mail-panel
+        [mailId]="id"
+        [position]="openPosition()"
+        [hasPrev]="openIndex() > 0"
+        [hasNext]="openIndex() >= 0 && openIndex() < (sortedEmails()?.length ?? 0) - 1"
+        (closed)="closeMail()"
+        (prev)="stepMail(-1)"
+        (next)="stepMail(1)"
+        (loaded)="onMailLoaded()"
+      />
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './mail.component.scss',
 })
 export class MailComponent {
-  router = inject(Router);
   modalContainerService = inject(ModalContainerService);
   mailService = inject(MailService);
   lastSeenService = inject(LastSeenService);
@@ -211,6 +206,49 @@ export class MailComponent {
   totalCount = signal(0);
 
   totalPages = computed(() => Math.ceil(this.totalCount() / this.pageSize));
+
+  // Message open in the slide-over reader (null = closed).
+  openMailId = signal<number | null>(null);
+  boxCopied = signal(false);
+  private boxCopiedTimer?: ReturnType<typeof setTimeout>;
+
+  // Unread count per mailbox address (a box can be listed under more than one group).
+  private unreadByBox = computed(() => {
+    const counts = new Map<string, number>();
+    for (const group of this.mailboxes() ?? []) {
+      for (const box of group.mailBoxes) counts.set(box.name, box.unreadCount);
+    }
+    return counts;
+  });
+  totalUnread = computed(() => [...this.unreadByBox().values()].reduce((a, b) => a + b, 0));
+  currentUnread = computed(() => {
+    const box = this.selectedBox();
+    return box ? (this.unreadByBox().get(box) ?? 0) : this.totalUnread();
+  });
+
+  subtitle = computed(() => {
+    const total = this.totalCount();
+    const unread = this.currentUnread();
+    const parts = [`${total} ${total === 1 ? 'message' : 'messages'}`];
+    if (unread > 0) parts.push(`${unread} unread`);
+    if (this.mailSearchService.searchText().trim()) parts.push('filtered by search');
+    return parts.join(' · ');
+  });
+
+  rangeLabel = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize + 1;
+    const end = Math.min(this.currentPage() * this.pageSize, this.totalCount());
+    return `${start}–${end} of ${this.totalCount()}`;
+  });
+
+  openIndex = computed(() => {
+    const id = this.openMailId();
+    return id === null ? -1 : (this.sortedEmails()?.findIndex((e) => e.id === id) ?? -1);
+  });
+  openPosition = computed(() => {
+    const i = this.openIndex();
+    return i < 0 ? '' : `${i + 1} of ${this.sortedEmails()?.length ?? 0}`;
+  });
 
   sortedEmails = computed(() => {
     const emails = this.emails();
@@ -296,6 +334,7 @@ export class MailComponent {
       .pipe(takeUntilDestroyed())
       .subscribe(() => {
         this.currentPage.set(1);
+        this.openMailId.set(null);
         this.fetchEmails();
       });
 
@@ -346,12 +385,50 @@ export class MailComponent {
   refreshMail() {
     this.refreshRequests.next();
   }
-  clickBox(box: string | null) {
-    this.selectedBox.set(box);
-    this.updateLastSeen(box);
+  reload() {
+    this.refreshMail();
+    this.fetchEmails();
   }
-  clickMail(mail: MailWithReadStatus) {
-    this.router.navigate(['mail', mail.id]);
+
+  openMail(mail: MailWithReadStatus) {
+    this.openMailId.set(mail.id);
+    // Opening marks it read on the server; reflect that in the row right away.
+    this.emails.update((list) => list?.map((e) => (e.id === mail.id ? { ...e, isRead: true } : e)) ?? null);
+  }
+
+  closeMail() {
+    this.openMailId.set(null);
+  }
+
+  stepMail(delta: number) {
+    const list = this.sortedEmails();
+    const next = list?.[this.openIndex() + delta];
+    if (next) this.openMail(next);
+  }
+
+  // The reader marked the message read server-side; refresh sidebar unread counts.
+  onMailLoaded() {
+    this.refreshMail();
+  }
+
+  copyBox(address: string) {
+    navigator.clipboard.writeText(address).then(() => {
+      this.boxCopied.set(true);
+      clearTimeout(this.boxCopiedTimer);
+      this.boxCopiedTimer = setTimeout(() => this.boxCopied.set(false), 1500);
+    });
+  }
+
+  markCurrentAsRead() {
+    const box = this.selectedBox();
+    if (box) {
+      this.markAllAsRead(box);
+      return;
+    }
+    this.mailService.markAllAsRead().subscribe({
+      next: () => this.reload(),
+      error: (error) => console.error('Error marking emails as read:', error),
+    });
   }
   deleteBox(email: string) {
     this.mailService.deleteBoxes({ to: email, search: null, page: 1, pageSize: this.pageSize }).subscribe(() => {

@@ -2,70 +2,62 @@ import { ChangeDetectionStrategy, Component, input, model, output, signal } from
 import { LucideDynamicIcon } from '@lucide/angular';
 import { MailBoxGroups } from '../../../_services/api/mail.service';
 import { BoxMenuComponent } from './box-menu/box-menu.component';
+import { splitAddress } from '../../../_services/mail-format';
 
 @Component({
   selector: 'app-box-list',
   standalone: true,
   imports: [LucideDynamicIcon, BoxMenuComponent],
   template: `
-    <div class="box-list-container">
-      @if (mailboxes(); as mb) {
-        @for (group of mb; track group.groupName) {
-          <div class="group-section">
-            <div class="group-header">
-              <h3 class="group-title">{{ group.groupName }}</h3>
-              <div class="group-indicators">
-                @if (group.isOwner) {
-                  <svg lucideIcon="crown" size="12" class="group-owner-icon" title="You own this group"></svg>
-                }
-                @if (group.isPublic) {
-                  <svg lucideIcon="users" size="12" class="group-public-icon" title="Public group"></svg>
-                } @else {
-                  <svg lucideIcon="lock" size="12" class="group-private-icon" title="Private group"></svg>
-                }
-              </div>
-            </div>
-            <div class="mailbox-list">
-              @for (item of group.mailBoxes; track (item.path ?? '') + '|' + item.name) {
-                <div class="mailbox-item" [class.selected]="selectedBox() === item.name">
-                  <button class="mailbox-button" (click)="clickBox(item.name)" [title]="item.name">
-                    <span class="mailbox-name">
-                      <span class="email-address">{{ item.name }}</span>
-                      @if (item.mailBoxName && group.groupName === 'My Boxes') {
-                        <span class="mailbox-subdomain">{{ item.mailBoxName }}</span>
-                      }
-                    </span>
-                  </button>
-                  <button
-                    class="copy-btn"
-                    (click)="copyEmail(item.name)"
-                    [title]="copiedBox() === item.name ? 'Copied!' : 'Copy email address'"
-                  >
-                    <svg [lucideIcon]="copiedBox() === item.name ? 'circle-check' : 'copy'" size="14"></svg>
-                  </button>
-                  <span class="row-spacer"></span>
-                  @if (item.unreadCount > 0) {
-                    <span class="unread-count">{{ item.unreadCount }}</span>
-                  }
-                  <app-box-menu
-                    [item]="item.name"
-                    [groupName]="group.groupName"
-                    [unreadCount]="item.unreadCount"
-                    (deleteEvent)="deleteEvent.emit($event)"
-                    (markAllAsReadEvent)="markAllAsReadEvent.emit($event)"
-                  >
-                  </app-box-menu>
-                </div>
-              }
-            </div>
+    @if (mailboxes(); as mb) {
+      @for (group of mb; track group.groupName) {
+        <section class="side-section">
+          <div class="side-section-label">
+            <span class="side-section-title">{{ group.groupName }}</span>
+            <span class="side-section-meta" [title]="group.isOwner ? 'You own this group' : ''">
+              {{ group.isPublic ? 'Shared' : 'Private' }}
+            </span>
           </div>
-        }
-      } @else {
-        <div class="empty-state">
-          <p>No mailboxes available</p>
-        </div>
+          @for (item of group.mailBoxes; track (item.path ?? '') + '|' + item.name) {
+            <div class="side-item box-row" [class.selected]="selectedBox() === item.name">
+              <button
+                type="button"
+                class="box-select"
+                (click)="clickBox(item.name)"
+                [title]="item.mailBoxName ? item.name + ' · ' + item.mailBoxName : item.name"
+              >
+                <span class="side-item-label" [class.has-unread]="item.unreadCount > 0">
+                  {{ split(item.name).local
+                  }}<span class="box-domain">{{ split(item.name).domain ? '@' + split(item.name).domain : '' }}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="icon-btn icon-btn-sm box-hover"
+                (click)="copyEmail(item.name)"
+                [attr.aria-label]="copiedBox() === item.name ? 'Copied' : 'Copy ' + item.name"
+                [title]="copiedBox() === item.name ? 'Copied!' : 'Copy address'"
+              >
+                <svg [lucideIcon]="copiedBox() === item.name ? 'circle-check' : 'copy'" size="14"></svg>
+              </button>
+              @if (item.unreadCount > 0) {
+                <span class="count-pill">{{ item.unreadCount }}</span>
+              }
+              <app-box-menu
+                class="box-hover"
+                [item]="item.name"
+                [groupName]="group.groupName"
+                [unreadCount]="item.unreadCount"
+                (deleteEvent)="deleteEvent.emit($event)"
+                (markAllAsReadEvent)="markAllAsReadEvent.emit($event)"
+              ></app-box-menu>
+            </div>
+          }
+        </section>
+      } @empty {
+        <p class="box-empty">No mailboxes yet. Mail sent to a test domain shows up here.</p>
       }
-    </div>
+    }
   `,
   styleUrl: './box-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -78,6 +70,7 @@ export class BoxListComponent {
   boxClick = output<string | null>();
 
   copiedBox = signal<string | null>(null);
+  split = splitAddress;
   private copiedTimer?: ReturnType<typeof setTimeout>;
 
   clickBox(box: string | null) {

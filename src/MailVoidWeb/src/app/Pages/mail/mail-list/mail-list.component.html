@@ -1,0 +1,57 @@
+<div class="ml-grid" [class.with-to]="showTo()">
+  <div class="ml-head">
+    <span></span>
+    @for (col of columns(); track col.key) {
+      <button
+        type="button"
+        class="ml-sort"
+        [class.active]="sortColumn() === col.key"
+        [class.ml-end]="col.key === 'createdOn'"
+        (click)="sort.emit(col.key)"
+        [attr.aria-label]="'Sort by ' + col.label"
+      >
+        {{ col.label }}
+        @if (sortColumn() === col.key) {
+          <svg [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="13"></svg>
+        }
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="list-status">Loading mail…</div>
+  } @else if (error()) {
+    <div class="list-status list-status-error">Failed to load mail. Please try again.</div>
+  } @else if (emails()?.length) {
+    @for (email of emails(); track email.id) {
+      <button
+        type="button"
+        class="ml-row"
+        [class.unread]="!email.isRead"
+        [class.open]="email.id === openId()"
+        (click)="open.emit(email)"
+      >
+        <span class="unread-dot" [class.is-read]="email.isRead"></span>
+        <span class="ml-from">
+          <span class="avatar-initials">{{ initials(email.from) }}</span>
+          <span class="ml-ellipsis">{{ email.from }}</span>
+        </span>
+        @if (showTo()) {
+          <span class="ml-to ml-ellipsis">{{ email.to }}</span>
+        }
+        <span class="ml-subject ml-ellipsis">{{ email.subject || '(no subject)' }}</span>
+        <time class="ml-time" [attr.datetime]="email.createdOn" [attr.title]="email.createdOn | date: 'medium'">
+          {{ shortDate(email.createdOn) }}
+        </time>
+      </button>
+    }
+  } @else {
+    <div class="list-status">
+      @if (selectedBox(); as box) {
+        No mail in {{ box }} yet.
+      } @else {
+        No mail yet.
+      }
+    </div>
+  }
+</div>

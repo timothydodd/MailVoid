@@ -48,6 +48,9 @@ import {
   LucideUsers,
   LucideWebhook,
   LucideX,
+  LucideCheck,
+  LucideRefreshCw,
+  LucideMaximize2,
 } from '@lucide/angular';
 import { JwtInterceptor } from './_services/jwt-interceptor';
 import { routes } from './app.routes';
@@ -106,7 +109,10 @@ export const appConfig: ApplicationConfig = {
       LucideCircleCheck,
       LucideCircleX,
       LucideCopy,
-      LucideWebhook
+      LucideWebhook,
+      LucideCheck,
+      LucideRefreshCw,
+      LucideMaximize2
     ),
     { provide: LOCALE_ID, useValue: 'en-US' },
   ],

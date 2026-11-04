@@ -8,23 +8,23 @@ import { MailAttachment } from '../../../_services/api/mail.service';
   imports: [LucideDynamicIcon],
   template: `
     @if (attachments().length > 0) {
-      <div class="attachments-panel">
-        <div class="attachments-header">
-          <svg lucideIcon="paperclip" size="16"></svg>
-          <span>{{ attachments().length }} attachment{{ attachments().length === 1 ? '' : 's' }}</span>
-        </div>
-        <div class="attachments-list">
-          @for (att of attachments(); track att.filename) {
-            <button class="attachment" (click)="downloadAttachment(att)" [title]="'Download ' + att.filename">
-              <svg lucideIcon="file" size="20"></svg>
-              <div class="attachment-info">
-                <div class="attachment-name">{{ att.filename }}</div>
-                <div class="attachment-meta">{{ att.contentType }} &middot; {{ formatBytes(att.sizeBytes) }}</div>
-              </div>
-              <svg lucideIcon="download" size="16"></svg>
-            </button>
-          }
-        </div>
+      <div class="attachments-list" role="list" aria-label="Attachments">
+        @for (att of attachments(); track $index) {
+          <button
+            type="button"
+            role="listitem"
+            class="attachment"
+            (click)="downloadAttachment(att)"
+            [title]="'Download ' + att.filename"
+          >
+            <span class="attachment-icon"><svg lucideIcon="paperclip" size="16"></svg></span>
+            <span class="attachment-info">
+              <span class="attachment-name">{{ att.filename }}</span>
+              <span class="attachment-meta">{{ formatBytes(att.sizeBytes) }} · {{ att.contentType }}</span>
+            </span>
+            <svg lucideIcon="download" size="15" class="attachment-download"></svg>
+          </button>
+        }
       </div>
     }
   `,

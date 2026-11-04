@@ -172,7 +172,7 @@
 
   .row-bucket {
     display: block;
-    font-family: "Roboto", sans-serif;
+    font-family: var(--font-sans);
     font-size: 0.7rem;
     color: var(--comment);
   }
