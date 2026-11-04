@@ -9,7 +9,7 @@ updates:
     directory: "/src/MailVoidWeb" # Location of package manifests
     schedule:
       interval: "weekly"
-  - package-ecosystem: "nuget" # See documentation for possible values
-    directory: "/src/MailVoidApi" # Location of package manifests
+  - package-ecosystem: "gomod"
+    directory: "/src/go"
     schedule:
       interval: "weekly"

@@ -1,49 +1,19 @@
-name: Build and Deploy
+name: Build Frontend
 
-# Legacy .NET API image. Main now builds the Go images (go.yml); the Docker job here
-# only runs on demand (e.g. to publish a rollback image). PRs still build the frontend.
+# PR validation for the Angular frontend. The Go services and Docker images are built
+# by go.yml.
 on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
 env:
-  DOTNET_VERSION: '10.0.x'
   NODE_VERSION: '24.x'
 
 jobs:
-  # PR validation only — on main pushes the Docker build compiles everything
-  # itself, so running these first would just build the same code twice.
-  build-backend:
-    name: Build Backend
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v7
-      with:
-        submodules: recursive
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v6
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
-    - name: Restore dependencies
-      run: dotnet restore src/legacy/MailVoidApi/MailVoidApi.csproj
-
-    - name: Build
-      run: dotnet build src/legacy/MailVoidApi/MailVoidApi.csproj --configuration Release --no-restore
-
-    - name: Test
-      run: dotnet test src/legacy/MailVoidApi/MailVoidApi.csproj --no-restore --verbosity normal
-      continue-on-error: true
-
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     steps:
     - name: Checkout repository
@@ -79,45 +49,3 @@ jobs:
       working-directory: src/MailVoidWeb
       run: npm test -- --watch=false --browsers=ChromeHeadless
       continue-on-error: true
-
-  docker-build:
-    name: Build and Push Docker Image
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v7
-      with:
-        submodules: recursive
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-
-    - name: Log in to DockerHub
-      uses: docker/login-action@v4
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v6
-      with:
-        images: ${{ secrets.DOCKERHUB_USERNAME }}/mailvoid
-        tags: |
-          type=ref,event=branch
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v7
-      with:
-        context: ./src/
-        file: ./src/legacy/MailVoidApi/Dockerfile
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        platforms: linux/amd64,linux/arm64
