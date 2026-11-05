@@ -11,21 +11,23 @@
 
 /* ---------- Page layout: sidebar + main, each scrolling on its own ---------- */
 
-.app-layout {
+.shell-layout {
   display: flex;
+  flex: 1;
+  min-height: 0;
   height: calc(100dvh - var(--nav-height));
 }
 
-.app-sidebar {
+.shell-sidebar {
   width: 272px;
   flex-shrink: 0;
 }
 
-.app-sidebar-mobile-head {
+.shell-sidebar-mobile-head {
   display: none;
 }
 
-.app-main {
+.shell-main {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
@@ -37,7 +39,7 @@
 
 /* Phones/tablets: the sidebar becomes an off-canvas drawer opened from the nav. */
 @media (max-width: 768px) {
-  .app-sidebar {
+  .shell-sidebar {
     position: fixed;
     top: 0;
     bottom: 0;
@@ -53,7 +55,7 @@
     }
   }
 
-  .app-sidebar-mobile-head {
+  .shell-sidebar-mobile-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -63,14 +65,14 @@
     font-weight: 600;
   }
 
-  .app-sidebar-backdrop {
+  .shell-sidebar-backdrop {
     position: fixed;
     inset: 0;
     z-index: 999;
     background: var(--overlay-bg);
   }
 
-  .app-main {
+  .shell-main {
     padding: 14px 12px 20px;
   }
 }

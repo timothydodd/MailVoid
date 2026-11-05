@@ -39,9 +39,9 @@ interface FetchResult {
     '(document:keydown.escape)': 'selectWebhook(null)',
   },
   template: `
-    <div class="app-layout">
-      <aside class="app-sidebar side-nav" [class.open]="menuOpen()" aria-label="Buckets">
-        <div class="app-sidebar-mobile-head">
+    <div class="shell-layout">
+      <aside class="shell-sidebar side-nav" [class.open]="menuOpen()" aria-label="Buckets">
+        <div class="shell-sidebar-mobile-head">
           <span>Buckets</span>
           <button type="button" class="icon-btn" (click)="menuOpen.set(false)" aria-label="Close buckets">
             <svg lucideIcon="x" size="18"></svg>
@@ -87,10 +87,10 @@ interface FetchResult {
       </aside>
 
       @if (menuOpen()) {
-        <div class="app-sidebar-backdrop" (click)="menuOpen.set(false)"></div>
+        <div class="shell-sidebar-backdrop" (click)="menuOpen.set(false)"></div>
       }
 
-      <main class="app-main">
+      <main class="shell-main">
         <div class="page-toolbar">
           <div class="page-toolbar-title">
             <h1 [title]="selectedBucket() ?? 'All webhooks'">{{ selectedBucket() ?? 'All webhooks' }}</h1>

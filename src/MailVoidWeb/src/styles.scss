@@ -22,6 +22,12 @@
 // Shiki
 // Only applied if using a defined Shiki theme
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html {
   height: 100%;
   font-family: var(--font-sans);
