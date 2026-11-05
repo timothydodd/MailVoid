@@ -45,9 +45,9 @@ const LIVE_REFRESH_INTERVAL_MS = 1000;
   standalone: true,
   imports: [BoxListComponent, LucideDynamicIcon, MailListComponent, MailPanelComponent],
   template: `
-    <div class="mail-layout">
-      <aside class="mail-sidebar side-nav" [class.open]="isMobileMenuOpen()" aria-label="Mailboxes">
-        <div class="mail-sidebar-mobile-head">
+    <div class="app-layout">
+      <aside class="app-sidebar side-nav" [class.open]="isMobileMenuOpen()" aria-label="Mailboxes">
+        <div class="app-sidebar-mobile-head">
           <span>Mailboxes</span>
           <button type="button" class="icon-btn" (click)="closeMobileMenu()" aria-label="Close mailboxes">
             <svg lucideIcon="x" size="18"></svg>
@@ -83,10 +83,10 @@ const LIVE_REFRESH_INTERVAL_MS = 1000;
       </aside>
 
       @if (isMobileMenuOpen()) {
-        <div class="mail-sidebar-backdrop" (click)="closeMobileMenu()"></div>
+        <div class="app-sidebar-backdrop" (click)="closeMobileMenu()"></div>
       }
 
-      <main class="mail-main">
+      <main class="app-main">
         <div class="page-toolbar">
           <div class="page-toolbar-title">
             <h1 [title]="selectedBox() ?? 'All mail'">{{ selectedBox() ?? 'All mail' }}</h1>

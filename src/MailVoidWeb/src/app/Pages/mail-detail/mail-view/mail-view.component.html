@@ -117,17 +117,17 @@
         <app-mail-attachments [attachments]="attachments()" />
       }
       @case ('headers') {
-        <div class="mv-headers">
+        <div class="kv-list">
           @for (h of headers(); track $index) {
-            <div class="mv-header-row">
-              <span class="mv-muted">{{ h.name }}</span>
+            <div class="kv-row">
+              <span class="kv-key">{{ h.name }}</span>
               <span>{{ h.value }}</span>
             </div>
           }
         </div>
       }
       @case ('raw') {
-        <pre class="mv-raw">{{ m.rawSource }}</pre>
+        <pre class="code-block">{{ m.rawSource }}</pre>
       }
     }
   </div>

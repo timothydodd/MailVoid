@@ -2,69 +2,17 @@
   display: block;
 }
 
-// Columns: dot | from | [to] | subject | received
-.ml-head,
-.ml-row {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1.1fr) minmax(0, 2.2fr) 92px;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border);
-}
+// Columns: dot | from | [to] | subject | received. Row/head/sort basics are the shared .grid-list-*.
+.ml-grid {
+  --cols: 12px minmax(0, 1.1fr) minmax(0, 2.2fr) 92px;
 
-.with-to .ml-head,
-.with-to .ml-row {
-  grid-template-columns: 12px minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 2.2fr) 92px;
-}
-
-.ml-head {
-  height: 38px;
-}
-
-.ml-sort {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-
-  &:hover,
-  &.active {
-    color: var(--text);
-  }
-
-  &.ml-end {
-    justify-self: end;
+  &.with-to {
+    --cols: 12px minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 2.2fr) 92px;
   }
 }
 
 .ml-row {
-  width: 100%;
   height: 52px;
-  border-top: 0;
-  border-right: 0;
-  border-left: 2px solid transparent;
-  padding-left: 14px;
-  background: transparent;
-  color: var(--text-2);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.12s ease;
-
-  &:hover {
-    background: var(--hover);
-  }
-
-  &.open {
-    background: var(--accent-soft);
-    border-left-color: var(--accent);
-  }
 
   &.unread {
     color: var(--text);
@@ -88,41 +36,26 @@
   min-width: 0;
 }
 
-.ml-ellipsis {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .ml-to {
   font-size: 0.8125rem;
   color: var(--muted);
 }
 
-.ml-time {
-  justify-self: end;
-  font-size: 0.78125rem;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
 // Phones: stacked rows (sender + time, then subject, then recipient).
 @media (max-width: 768px) {
-  .ml-head {
+  .grid-list-head {
     display: none;
   }
 
-  .ml-row,
-  .with-to .ml-row {
+  .ml-row {
     height: auto;
     padding: 12px 16px 12px 14px;
     row-gap: 2px;
     grid-template-columns: 8px minmax(0, 1fr) auto;
     grid-template-areas:
-      'dot from time'
-      '. subject subject'
-      '. to to';
+      "dot from time"
+      ". subject subject"
+      ". to to";
   }
 
   .unread-dot {

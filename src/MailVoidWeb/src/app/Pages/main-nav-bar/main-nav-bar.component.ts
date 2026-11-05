@@ -20,8 +20,8 @@ import { ThemeService } from '../../_services/theme.service';
           type="button"
           class="icon-btn mobile-menu-btn"
           (click)="onMobileMenuClick()"
-          aria-label="Mailboxes"
-          title="Mailboxes"
+          aria-label="Open sidebar"
+          title="Sidebar"
         >
           <svg lucideIcon="menu" size="20"></svg>
         </button>

@@ -1,29 +1,23 @@
-.loading, .no-users {
-  padding: 2rem;
-  text-align: center;
-  color: var(--comment);
-  font: normal 0.875rem var(--font-sans);
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.subdomain-badge {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-  background-color: rgba(139, 233, 253, 0.15);
-  color: var(--cyan);
-  font-size: 0.8125rem;
+.users-table {
+  --cols: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.9fr) 128px;
+}
+
+.user-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   font-weight: 500;
 }
 
-.text-muted {
-  color: var(--comment);
-}
-
-/* Component-specific responsive overrides */
-@media (max-width: 768px) {
-  .actions { 
-    display: flex;
-    flex-wrap: wrap; 
-    gap: 0.5rem;
-  }
+.user-access {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }

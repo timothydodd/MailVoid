@@ -11,14 +11,19 @@ import { ApiKey, ApiKeyService, CreatedApiKey } from '../../../_services/api/api
   standalone: true,
   imports: [FormsModule, DatePipe, LucideDynamicIcon],
   template: `
-    <p class="settings-subtitle">
-      Keys let scripts and test suites read your mail and webhook captures through the
-      <code>/api/v1</code> endpoints. A key sees exactly what you see here, and can only read.
-    </p>
+    <div class="settings-section-head">
+      <div>
+        <h4>API keys</h4>
+        <p>
+          Let scripts and test suites read your mail and webhook captures through the
+          <code class="inline-code">/api/v1</code> endpoints. A key sees exactly what you see, and can only read.
+        </p>
+      </div>
+    </div>
 
-    <form class="form-row key-form" (submit)="create($event)">
+    <form class="key-form" (submit)="create($event)">
       <div class="form-group">
-        <label for="key-name">Key name</label>
+        <label for="key-name">New key name</label>
         <input
           id="key-name"
           class="form-control"
@@ -30,74 +35,86 @@ import { ApiKey, ApiKeyService, CreatedApiKey } from '../../../_services/api/api
         />
       </div>
       <button type="submit" class="btn btn-primary" [disabled]="isCreating()">
-        {{ isCreating() ? 'Generating...' : 'Generate key' }}
+        <svg lucideIcon="plus" size="14"></svg>
+        {{ isCreating() ? 'Generating…' : 'Generate key' }}
       </button>
     </form>
 
     @if (newKey(); as created) {
-      <div class="alert alert-success new-key">
+      <div class="new-key">
         <div>
-          <b>{{ created.name }}</b> created. Copy it now &mdash; it won't be shown again.
+          <b>{{ created.name }}</b> created. Copy it now; it won't be shown again.
         </div>
         <div class="key-value">
-          <code>{{ created.key }}</code>
+          <code class="inline-code">{{ created.key }}</code>
           <button
             type="button"
-            class="copy-btn"
+            class="icon-btn icon-btn-sm"
             (click)="copy(created.key)"
+            [attr.aria-label]="copied() ? 'Copied' : 'Copy key'"
             [title]="copied() ? 'Copied!' : 'Copy key'"
           >
-            <svg [lucideIcon]="copied() ? 'circle-check' : 'copy'" size="16"></svg>
+            <svg [lucideIcon]="copied() ? 'circle-check' : 'copy'" size="14"></svg>
           </button>
         </div>
       </div>
     }
 
-    @if (isLoading()) {
-      <div class="loading">Loading keys...</div>
-    } @else if (keys().length === 0) {
-      <div class="empty-message">No API keys yet.</div>
-    } @else {
-      <div class="table-grid header">
-        <div class="header-cell">Name</div>
-        <div class="header-cell">Key</div>
-        <div class="header-cell">Created</div>
-        <div class="header-cell">Last used</div>
-        <div class="header-cell"></div>
+    <div class="data-table keys-table">
+      <div class="data-table-head">
+        <span>Name</span>
+        <span>Key</span>
+        <span>Created</span>
+        <span>Last used</span>
+        <span></span>
       </div>
-      @for (key of keys(); track key.id) {
-        <div class="table-grid row">
-          <div class="cell" data-label="Name">{{ key.name }}</div>
-          <div class="cell" data-label="Key">
-            <code>{{ key.prefix }}&hellip;</code>
+      @if (isLoading()) {
+        <div class="data-table-empty">Loading keys…</div>
+      } @else {
+        @for (key of keys(); track key.id) {
+          <div class="data-table-row">
+            <span class="cell-ellipsis key-name">{{ key.name }}</span>
+            <span
+              ><code class="inline-code">{{ key.prefix }}&hellip;</code></span
+            >
+            <span class="text-muted">{{ key.createdAt | date: 'mediumDate' }}</span>
+            <span class="text-muted">
+              @if (key.lastUsedAt) {
+                {{ key.lastUsedAt | date: 'medium' }}
+              } @else {
+                Never
+              }
+            </span>
+            <div class="data-table-actions">
+              <button
+                type="button"
+                class="icon-btn icon-btn-sm icon-btn-danger"
+                (click)="remove(key)"
+                [disabled]="isDeleting() === key.id"
+                [attr.aria-label]="'Delete key ' + key.name"
+                title="Delete key"
+              >
+                <svg lucideIcon="trash-2" size="14"></svg>
+              </button>
+            </div>
           </div>
-          <div class="cell" data-label="Created">{{ key.createdAt | date: 'mediumDate' }}</div>
-          <div class="cell" data-label="Last used">
-            @if (key.lastUsedAt) {
-              {{ key.lastUsedAt | date: 'medium' }}
-            } @else {
-              <span class="text-muted">Never</span>
-            }
-          </div>
-          <div class="cell actions">
-            <button class="btn btn-sm btn-danger" (click)="remove(key)" [disabled]="isDeleting() === key.id">
-              {{ isDeleting() === key.id ? 'Deleting...' : 'Delete' }}
-            </button>
-          </div>
-        </div>
+        } @empty {
+          <div class="data-table-empty">No API keys yet.</div>
+        }
       }
-    }
+    </div>
 
     @if (errorMessage()) {
       <div class="message message-error">{{ errorMessage() }}</div>
     }
 
-    <details class="usage">
+    <details class="disclosure">
       <summary>How to use a key</summary>
-      <p class="settings-subtitle">
-        Send it in an <code>X-Api-Key</code> header (or <code>Authorization: Bearer</code>). All endpoints are GET.
+      <p class="settings-subtitle usage-hint">
+        Send it in an <code class="inline-code">X-Api-Key</code> header (or
+        <code class="inline-code">Authorization: Bearer</code>). All endpoints are GET.
       </p>
-      <pre><code>{{ usageExample }}</code></pre>
+      <pre class="code-block">{{ usageExample }}</pre>
     </details>
   `,
   styleUrl: './api-keys.component.scss',

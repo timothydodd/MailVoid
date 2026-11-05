@@ -1,71 +1,7 @@
+// Layout comes from the shared .app-layout / .app-sidebar / .app-main (styles/_shell.scss).
 :host {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-
-// Sidebar + list fill the viewport under the sticky nav; each scrolls on its own.
-.mail-layout {
-  display: flex;
-  height: calc(100dvh - var(--nav-height));
-}
-
-.mail-sidebar {
-  width: 272px;
-  flex-shrink: 0;
-}
-
-.mail-sidebar-mobile-head {
-  display: none;
-}
-
-.mail-main {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 20px 28px 28px;
-}
-
-// Phones/tablets: the sidebar becomes an off-canvas drawer opened from the nav.
-@media (max-width: 768px) {
-  .mail-sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 1000;
-    width: min(320px, 85vw);
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
-
-    &.open {
-      transform: none;
-      box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25);
-    }
-  }
-
-  .mail-sidebar-mobile-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: var(--nav-height);
-    padding: 0 8px 0 22px;
-    border-bottom: 1px solid var(--border);
-    font-weight: 600;
-  }
-
-  .mail-sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 999;
-    background: var(--overlay-bg);
-  }
-
-  .mail-main {
-    padding: 14px 12px 20px;
-  }
 }

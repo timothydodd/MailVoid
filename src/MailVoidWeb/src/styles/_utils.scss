@@ -1,26 +1,28 @@
-/* Utility classes - Reusable UI components */
-
 /* Badges */
 .badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.badge-primary {
-  background-color: rgba(var(--primary-rgb), 0.1);
-  color: var(--primary);
+.badge-primary,
+.badge-accent {
+  background-color: var(--accent-soft);
+  color: var(--accent);
 }
 
-.badge-secondary {
-  background-color: rgba(var(--comment-rgb), 0.1);
-  color: var(--comment);
+.badge-secondary,
+.badge-muted {
+  background-color: var(--surface-2);
+  color: var(--muted);
 }
 
 .badge-success {
@@ -38,101 +40,21 @@
   color: var(--warn);
 }
 
-/* Role & Status Badges */
-.role-badge {
-  @extend .badge;
-
-  &.role-admin {
-    background-color: rgba(var(--primary-rgb), 0.1);
-    color: var(--primary);
-  }
-
-  &.role-user {
-    background-color: rgba(var(--comment-rgb), 0.1);
-    color: var(--comment);
-  }
-}
-
-.private-label {
-  @extend .badge;
-  color: var(--orange);
-  background-color: rgba(255, 184, 0, 0.1);
-  border: 1px solid rgba(255, 184, 0, 0.3);
-}
-
-.group-badge {
-  @extend .badge;
-
-  &.public {
-    background-color: rgba(80, 250, 123, 0.2);
-    color: var(--green);
-    border: 1px solid rgba(80, 250, 123, 0.3);
-  }
-
-  &.private {
-    background-color: rgba(255, 85, 85, 0.2);
-    color: var(--red);
-    border: 1px solid rgba(255, 85, 85, 0.3);
-  }
-}
-
-.owner-badge {
-  @extend .badge;
-  background-color: rgba(255, 184, 0, 0.2);
-  color: var(--orange);
-  border: 1px solid rgba(255, 184, 0, 0.3);
-}
-
-.admin-badge {
-  @extend .badge;
-  background-color: rgba(111, 131, 190, 0.2);
-  color: var(--primary);
-  border: 1px solid rgba(111, 131, 190, 0.3);
-}
-
-/* Messages */
+/* Inline status messages */
 .message {
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  font:
-    normal 0.875rem var(--font-sans);
-  margin-top: 1rem;
-  border: 1px solid;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
 }
 
 .message-error {
-  background-color: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
-  border-color: rgba(220, 53, 69, 0.2);
+  background-color: var(--bad-soft);
+  color: var(--bad);
 }
 
 .message-success {
-  background-color: rgba(40, 167, 69, 0.1);
-  color: #28a745;
-  border-color: rgba(40, 167, 69, 0.2);
-}
-
-/* Empty states */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  text-align: center;
-}
-
-.empty-message {
-  color: var(--comment);
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-}
-
-.empty-title {
-  color: var(--foreground);
-  font-size: 1.125rem;
-  font-weight: 500;
-  margin: 0 0 0.5rem 0;
+  background-color: var(--ok-soft);
+  color: var(--ok);
 }
 
 /* Loading states */
@@ -140,76 +62,13 @@
   padding: 2rem;
   text-align: center;
   color: var(--comment);
-  font:
-    normal 0.875rem var(--font-sans);
-}
-
-/* Sections */
-.section {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--bGLight);
-}
-
-.section-title {
-  color: var(--foreground);
-  font:
-    600 1.1rem var(--font-sans);
-  margin: 0;
+  font: normal 0.875rem var(--font-sans);
 }
 
 /* Actions */
 .actions {
   display: flex;
   gap: 0.5rem;
-}
-
-/* Tables */
-.table-responsive {
-  display: flex;
-  flex-direction: column;
-}
-
-.table-header {
-  background-color: var(--bGLight);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.table-row {
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--bGLight);
-  }
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.cell {
-  display: flex;
-  align-items: center;
-  color: var(--foreground);
-  font:
-    normal 0.875rem var(--font-sans);
-}
-
-.header-cell {
-  color: var(--comment);
-  font:
-    600 0.75rem var(--font-sans);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 /* Text utilities */
@@ -221,80 +80,6 @@
 .text-danger {
   color: var(--danger);
   font-size: 0.875rem;
-}
-
-/* List Groups */
-.group-section {
-  .group-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.375rem 0;
-    margin-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
-
-    .group-title {
-      margin: 0;
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: var(--secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.75px;
-    }
-
-    .group-count {
-      font-size: 0.65rem;
-      color: var(--secondary);
-      opacity: 0.7;
-      font-weight: 500;
-    }
-  }
-}
-
-/* List Items */
-.list-item {
-  display: flex;
-  align-items: center;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: var(--bGLight);
-  }
-
-  &.selected {
-    background: var(--bGLight);
-
-    .list-button {
-      color: var(--primary);
-      font-weight: 500;
-    }
-  }
-
-  .list-button {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    padding: 0.6rem 0.75rem;
-    border: none;
-    background: none;
-    color: var(--foreground);
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.875rem;
-    border-radius: 4px;
-    min-width: 0;
-
-    &:hover {
-      color: var(--primary);
-    }
-
-    &:focus {
-      outline: 2px solid var(--primary);
-      outline-offset: -2px;
-    }
-  }
 }
 
 /* Dropdown Menu */
@@ -316,106 +101,6 @@
   position: relative;
   width: auto;
   height: auto;
-}
-
-/* Typography */
-.settings-title {
-  color: var(--foreground);
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 0.5rem 0;
-  font-family: var(--font-sans);
-}
-
-.settings-subtitle {
-  color: var(--comment);
-  font-size: 0.875rem;
-  margin: 0;
-  line-height: 1.4;
-  font-family: var(--font-sans);
-}
-
-.section-title {
-  color: var(--foreground);
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0 0 1rem 0;
-  font-family: var(--font-sans);
-}
-
-.meta-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--comment);
-}
-
-.meta-value {
-  font-size: 0.875rem;
-  color: var(--foreground);
-  word-break: break-word;
-  line-height: 1.4;
-  overflow-wrap: break-word;
-  hyphens: auto;
-}
-
-/* Navigation Tabs */
-.nav-tabs {
-  display: flex;
-}
-
-.nav-tab {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  background: none;
-  color: var(--comment);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  transition: all 0.2s ease;
-  font-family: var(--font-sans);
-  position: relative;
-
-  &:hover {
-    color: var(--foreground);
-    background-color: rgba(var(--primary-rgb), 0.1);
-  }
-
-  &.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-    background-color: rgba(var(--primary-rgb), 0.1);
-  }
-
-  &:first-child {
-    margin-left: 0;
-  }
-}
-
-/* Settings Layout */
-.settings-container {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-header {
-  padding: 0 0 1rem 0;
-}
-
-.settings-subheader {
-  background-color: var(--bGLight);
-  border-top: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
-  margin: 0 -20px;
-  padding: 0 20px;
-}
-
-.settings-content {
-  flex: 1;
-  padding: 1.5rem 0 0 0;
 }
 
 /* Loading Spinner */
@@ -458,53 +143,6 @@
   }
 }
 
-/* Small Icon Buttons */
-.btn-icon-sm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--comment);
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background-color: var(--bGLighter);
-    color: var(--foreground);
-    border-color: var(--border-color);
-  }
-}
-
-.btn-icon-danger:hover {
-  color: var(--red);
-  background-color: rgba(255, 85, 85, 0.1);
-  border-color: rgba(255, 85, 85, 0.3);
-}
-
-/* Contextual Badges */
-.badge-owner {
-  @extend .badge;
-  background-color: rgba(139, 233, 253, 0.15);
-  color: var(--cyan);
-}
-
-.badge-admin {
-  @extend .badge;
-  background-color: rgba(189, 147, 249, 0.15);
-  color: var(--purple);
-}
-
-.badge-private {
-  @extend .badge;
-  background-color: rgba(255, 184, 108, 0.15);
-  color: var(--orange);
-}
-
 /* Slide-over Panel */
 .slide-panel-overlay {
   position: fixed;
@@ -520,8 +158,9 @@
   bottom: 0;
   width: 360px;
   max-width: 90vw;
-  background-color: var(--bGDark);
-  border-left: 1px solid var(--border-color);
+  background-color: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--panel-shadow);
   z-index: 1001;
   display: flex;
   flex-direction: column;
@@ -531,26 +170,27 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color);
+  gap: 12px;
+  padding: 14px 12px 14px 20px;
+  border-bottom: 1px solid var(--border);
 
   h5 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.9375rem;
     font-weight: 600;
-    color: var(--foreground);
+    color: var(--text);
   }
 }
 
 .slide-panel-subtitle {
-  font-size: 0.75rem;
-  color: var(--cyan);
+  font-size: 0.78125rem;
+  color: var(--muted);
 }
 
 .slide-panel-body {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem 1.25rem;
+  padding: 16px 20px;
 }
 
 @media (max-width: 768px) {
@@ -558,30 +198,28 @@
     width: 100%;
   }
 }
-/* HTTP method badges (webhook list + detail) */
+/* HTTP method badges (webhook list + detail): tinted from their own text color. */
 .method-badge {
   @extend .badge;
-  border-radius: 4px;
-  font-weight: 600;
+  justify-content: center;
+  min-width: 54px;
+  font-family: var(--font-mono);
+  color: var(--text-2);
+  background-color: color-mix(in srgb, currentColor 14%, transparent);
 
+  &.method-get {
+    color: var(--accent);
+  }
   &.method-post {
-    background-color: rgba(80, 200, 120, 0.2);
-    color: #50c878;
+    color: var(--ok);
   }
   &.method-put {
-    background-color: rgba(255, 165, 0, 0.2);
-    color: #ffa500;
+    color: var(--warn);
   }
   &.method-patch {
-    background-color: rgba(100, 149, 237, 0.2);
-    color: #6495ed;
-  }
-  &.method-get {
-    background-color: rgba(var(--primary-rgb), 0.2);
-    color: var(--primary);
+    color: var(--purple);
   }
   &.method-delete {
-    background-color: rgba(255, 99, 71, 0.2);
-    color: #ff6347;
+    color: var(--bad);
   }
 }

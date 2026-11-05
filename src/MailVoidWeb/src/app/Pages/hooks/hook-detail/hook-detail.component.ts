@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { LucideDynamicIcon } from '@lucide/angular';
@@ -14,98 +14,136 @@ type DetailTab = 'body' | 'headers';
 @Component({
   selector: 'app-hook-detail',
   standalone: true,
-  imports: [CommonModule, LucideDynamicIcon],
+  imports: [DatePipe, LucideDynamicIcon],
   template: `
-    <div class="panel-toolbar">
-      <div class="nav-group">
-        <button class="btn-icon-sm" (click)="previous.emit()" [disabled]="!hasPrevious()" title="Previous (↑)">
-          <svg lucideIcon="chevron-up" size="16"></svg>
-        </button>
-        <button class="btn-icon-sm" (click)="next.emit()" [disabled]="!hasNext()" title="Next (↓)">
-          <svg lucideIcon="chevron-down" size="16"></svg>
-        </button>
-      </div>
-      <div class="nav-group">
-        <button
-          class="btn-icon-sm btn-icon-danger"
-          (click)="deleteWebhook()"
-          [disabled]="!webhook()"
-          title="Delete this webhook"
-        >
-          <svg lucideIcon="trash-2" size="16"></svg>
-        </button>
-        <button class="btn-icon-sm" (click)="close.emit()" title="Close (Esc)">
-          <svg lucideIcon="x" size="16"></svg>
-        </button>
-      </div>
+    <div class="slide-panel-toolbar">
+      <button type="button" class="icon-btn" (click)="close.emit()" aria-label="Close" title="Close (Esc)">
+        <svg lucideIcon="x" size="18"></svg>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        (click)="previous.emit()"
+        [disabled]="!hasPrevious()"
+        aria-label="Previous webhook"
+        title="Previous (↑)"
+      >
+        <svg lucideIcon="chevron-up" size="18"></svg>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        (click)="next.emit()"
+        [disabled]="!hasNext()"
+        aria-label="Next webhook"
+        title="Next (↓)"
+      >
+        <svg lucideIcon="chevron-down" size="18"></svg>
+      </button>
+      @if (position()) {
+        <span class="slide-panel-position">{{ position() }}</span>
+      }
+      <span class="spacer"></span>
+      <button
+        type="button"
+        class="icon-btn icon-btn-danger"
+        (click)="deleteWebhook()"
+        [disabled]="!webhook()"
+        aria-label="Delete webhook"
+        title="Delete this webhook"
+      >
+        <svg lucideIcon="trash-2" size="16"></svg>
+      </button>
     </div>
 
     @if (webhook(); as hook) {
-      <div class="panel-meta">
-        <div class="meta-line">
+      <header class="hd-header">
+        <div class="hd-request">
           <span class="method-badge method-{{ hook.httpMethod.toLowerCase() }}">{{ hook.httpMethod }}</span>
-          <span class="meta-path">{{ hook.path }}{{ hook.queryString || '' }}</span>
-          <button class="copy-btn" (click)="copy(hook.path + (hook.queryString || ''))" title="Copy path">
-            <svg lucideIcon="copy" size="14"></svg>
+          <span class="hd-path">{{ hook.path }}{{ hook.queryString || '' }}</span>
+          <button
+            type="button"
+            class="icon-btn icon-btn-sm"
+            (click)="copy(hook.path + (hook.queryString || ''), 'path')"
+            [attr.aria-label]="copied() === 'path' ? 'Copied' : 'Copy path'"
+            [title]="copied() === 'path' ? 'Copied!' : 'Copy path'"
+          >
+            <svg [lucideIcon]="copied() === 'path' ? 'circle-check' : 'copy'" size="14"></svg>
           </button>
         </div>
-        <div class="meta-line meta-facts">
-          <span><span class="meta-label">Bucket</span> {{ hook.bucketName }}</span>
-          <span><span class="meta-label">Received</span> {{ hook.createdOn | date: 'medium' }}</span>
+        <div class="hd-facts">
+          <span>{{ hook.bucketName }}</span>
+          <time [attr.datetime]="hook.createdOn">{{ hook.createdOn | date: 'medium' }}</time>
           @if (hook.sourceIp) {
-            <span><span class="meta-label">From</span> {{ hook.sourceIp }}</span>
+            <span>from {{ hook.sourceIp }}</span>
           }
         </div>
-      </div>
 
-      <div class="nav-tabs panel-tabs">
-        <button class="nav-tab" [class.active]="tab() === 'body'" (click)="tab.set('body')">
-          Body
-          @if (hook.contentType) {
-            <span class="tab-hint">{{ shortContentType() }}</span>
-          }
-        </button>
-        <button class="nav-tab" [class.active]="tab() === 'headers'" (click)="tab.set('headers')">
-          Headers
-          @if (headerEntries(); as entries) {
-            <span class="tab-hint">{{ entries.length }}</span>
-          }
-        </button>
-        <span class="tabs-spacer"></span>
-        <button class="btn btn-outline btn-sm" (click)="copy(tab() === 'body' ? hook.body : hook.headers)">
-          <svg lucideIcon="copy" size="14"></svg>
-          {{ copyLabel() }}
-        </button>
-      </div>
+        <div class="tab-bar" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            class="tab-bar-item"
+            [class.active]="tab() === 'body'"
+            [attr.aria-selected]="tab() === 'body'"
+            (click)="tab.set('body')"
+          >
+            Body
+            @if (hook.contentType) {
+              <span class="count-pill count-pill-muted">{{ shortContentType() }}</span>
+            }
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab-bar-item"
+            [class.active]="tab() === 'headers'"
+            [attr.aria-selected]="tab() === 'headers'"
+            (click)="tab.set('headers')"
+          >
+            Headers
+            @if (headerEntries(); as entries) {
+              <span class="count-pill count-pill-muted">{{ entries.length }}</span>
+            }
+          </button>
+          <span class="spacer"></span>
+          <button
+            type="button"
+            class="btn-quiet btn-quiet-sm"
+            (click)="copy(tab() === 'body' ? prettyBody() : hook.headers, 'content')"
+          >
+            <svg [lucideIcon]="copied() === 'content' ? 'circle-check' : 'copy'" size="13"></svg>
+            {{ copied() === 'content' ? 'Copied' : 'Copy' }}
+          </button>
+        </div>
+      </header>
 
-      <div class="panel-body">
+      <div class="hd-body">
         @if (tab() === 'body') {
           @if (hook.body) {
-            <pre class="raw" [class.json]="isJsonBody()">{{ prettyBody() }}</pre>
+            <pre class="code-block">{{ prettyBody() }}</pre>
           } @else {
-            <p class="empty">No body</p>
+            <p class="list-status">No body</p>
           }
         } @else {
           @if (headerEntries(); as entries) {
-            <table class="headers-table">
-              <tbody>
-                @for (entry of entries; track entry.key) {
-                  <tr>
-                    <td class="header-name">{{ entry.key }}</td>
-                    <td class="header-value">{{ entry.value }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+            <div class="kv-list">
+              @for (entry of entries; track entry.key) {
+                <div class="kv-row">
+                  <span class="kv-key">{{ entry.key }}</span>
+                  <span>{{ entry.value }}</span>
+                </div>
+              }
+            </div>
           } @else {
-            <pre class="raw">{{ hook.headers }}</pre>
+            <pre class="code-block">{{ hook.headers }}</pre>
           }
         }
       </div>
     } @else if (error()) {
-      <p class="empty">Failed to load this webhook.</p>
+      <p class="list-status list-status-error">Failed to load this webhook.</p>
     } @else {
-      <div class="loading-container">
+      <div class="loading-container hd-loading">
         <div class="loading-spinner"></div>
       </div>
     }
@@ -115,6 +153,7 @@ type DetailTab = 'body' | 'headers';
 })
 export class HookDetailComponent {
   webhookId = input.required<number>();
+  position = input('');
   hasPrevious = input(false);
   hasNext = input(false);
 
@@ -128,7 +167,9 @@ export class HookDetailComponent {
   webhook = signal<WebhookDetail | null>(null);
   error = signal(false);
   tab = signal<DetailTab>('body');
-  copyLabel = signal('Copy');
+  // Which copy button last succeeded, for its brief "Copied" state.
+  copied = signal<'path' | 'content' | null>(null);
+  private copiedTimer?: ReturnType<typeof setTimeout>;
 
   headerEntries = computed(() => {
     const hook = this.webhook();
@@ -174,10 +215,11 @@ export class HookDetailComponent {
       });
   }
 
-  copy(text: string) {
+  copy(text: string, what: 'path' | 'content') {
     navigator.clipboard.writeText(text).then(() => {
-      this.copyLabel.set('Copied!');
-      setTimeout(() => this.copyLabel.set('Copy'), 1500);
+      this.copied.set(what);
+      clearTimeout(this.copiedTimer);
+      this.copiedTimer = setTimeout(() => this.copied.set(null), 1500);
     });
   }
 

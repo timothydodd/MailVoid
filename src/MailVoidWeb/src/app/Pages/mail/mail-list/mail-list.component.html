@@ -1,12 +1,12 @@
 <div class="ml-grid" [class.with-to]="showTo()">
-  <div class="ml-head">
+  <div class="grid-list-head">
     <span></span>
     @for (col of columns(); track col.key) {
       <button
         type="button"
-        class="ml-sort"
+        class="grid-list-sort"
         [class.active]="sortColumn() === col.key"
-        [class.ml-end]="col.key === 'createdOn'"
+        [class.grid-list-end]="col.key === 'createdOn'"
         (click)="sort.emit(col.key)"
         [attr.aria-label]="'Sort by ' + col.label"
       >
@@ -26,7 +26,7 @@
     @for (email of emails(); track email.id) {
       <button
         type="button"
-        class="ml-row"
+        class="grid-list-row ml-row"
         [class.unread]="!email.isRead"
         [class.open]="email.id === openId()"
         (click)="open.emit(email)"
@@ -34,13 +34,17 @@
         <span class="unread-dot" [class.is-read]="email.isRead"></span>
         <span class="ml-from">
           <span class="avatar-initials">{{ initials(email.from) }}</span>
-          <span class="ml-ellipsis">{{ email.from }}</span>
+          <span class="cell-ellipsis">{{ email.from }}</span>
         </span>
         @if (showTo()) {
-          <span class="ml-to ml-ellipsis">{{ email.to }}</span>
+          <span class="ml-to cell-ellipsis">{{ email.to }}</span>
         }
-        <span class="ml-subject ml-ellipsis">{{ email.subject || '(no subject)' }}</span>
-        <time class="ml-time" [attr.datetime]="email.createdOn" [attr.title]="email.createdOn | date: 'medium'">
+        <span class="ml-subject cell-ellipsis">{{ email.subject || '(no subject)' }}</span>
+        <time
+          class="cell-time ml-time"
+          [attr.datetime]="email.createdOn"
+          [attr.title]="email.createdOn | date: 'medium'"
+        >
           {{ shortDate(email.createdOn) }}
         </time>
       </button>

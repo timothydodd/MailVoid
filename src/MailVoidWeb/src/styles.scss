@@ -1,6 +1,5 @@
 /* You can add global styles to this file, and also import other style files */
 
-
 @use "styles/_button.scss";
 @use "styles/_forms.scss";
 @use "styles/_alerts.scss";
@@ -12,46 +11,45 @@
 @use "styles/_cards.scss";
 @use "styles/menu.scss";
 @use "styles/_shell.scss";
+@use "styles/_settings.scss";
 @import url("styles/css-vars.css");
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @import url("styles/cards.css");
 
-@import url("styles/table.css");
 // scss-docs-end theme-color-dark-variables
 
 // Shiki
 // Only applied if using a defined Shiki theme
 
-
 html {
-    height: 100%;
-    font-family: var(--font-sans);
-    font-weight: 400;
-    font-style: normal;
-    font-size: 16px;
-    line-height: 1.5;
-    margin: 0;
-    overflow-x: hidden;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 
-    body {
-        min-height: 100%;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        margin: 0;
-        font-size: 0.875rem;
-        color: var(--foreground);
-        background-color: var(--background);
-        overflow-x: hidden;
-    }
+  body {
+    min-height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--foreground);
+    background-color: var(--background);
+    overflow-x: hidden;
+  }
 }
 
 button,
 input,
 select,
 textarea {
-    font-family: inherit;
+  font-family: inherit;
 }

@@ -3,71 +3,72 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 6px;
+  min-width: 0;
   position: relative;
 }
 
 .form-group label {
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--foreground);
-  font-size: 0.875rem;
-  font-family: var(--font-sans);
+  color: var(--text-2);
 }
 
-/* Form rows and layouts */
-.form-row {
+/* Fields side by side that wrap on narrow screens; buttons align with the inputs. */
+.form-grid {
   display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
   align-items: end;
 }
 
-.form-row-4 {
-  grid-template-columns: 2fr 2fr 1fr auto;
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-/* Role select */
 .role-select {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--background);
-  color: var(--foreground);
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--text);
   font-size: 0.75rem;
-  font-family: var(--font-sans);
 }
 
 .form-control {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  font-size: 1rem;
-  background-color: var(--bGLighter);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, background-color 0.15s ease-in-out;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  color: var(--text);
+  font-size: 0.875rem;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+select.form-control {
+  padding-right: 8px;
 }
 
 .form-control::placeholder {
-  color: var(--comment);
+  color: var(--muted);
 }
 
 .form-control:focus {
   outline: none;
-  border-color: var(--primary);
-  background-color: var(--bGLight);
-  box-shadow: 0 0 0 2px var(--shadow-color);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .form-control:disabled {
-  background-color: var(--current-line);
-  color: var(--comment);
+  background-color: var(--surface-2);
+  color: var(--muted);
   cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.form-control:focus + label,
-.form-control:not(:placeholder-shown) + label {
-  color: var(--primary);
 }
 
 /* Form Control Sizes */
@@ -242,7 +243,9 @@
   background-size: 16px 12px;
   border: 1px solid var(--border-color);
   border-radius: 5px;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition:
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
   appearance: none;
 }
 
@@ -286,7 +289,9 @@ textarea.form-control {
 }
 
 .form-range:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 1px var(--background), 0 0 0 0.25rem var(--shadow-color);
+  box-shadow:
+    0 0 0 1px var(--background),
+    0 0 0 0.25rem var(--shadow-color);
 }
 
 .form-range::-webkit-slider-track {
@@ -306,7 +311,10 @@ textarea.form-control {
   background-color: var(--primary);
   border: 0;
   border-radius: 1rem;
-  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition:
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
   appearance: none;
 }
 
@@ -326,7 +334,10 @@ textarea.form-control {
   background-color: var(--primary);
   border: 0;
   border-radius: 1rem;
-  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition:
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
   appearance: none;
 }
 
@@ -342,7 +353,9 @@ textarea.form-control {
   color: var(--red);
   cursor: pointer;
   padding: 0.75rem;
-  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  transition:
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out;
 
   > div {
     margin-top: 0.5rem;

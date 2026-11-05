@@ -1,11 +1,78 @@
-/* App shell building blocks shared by the mail and hooks pages: icon buttons, pills,
-   sidebar navigation, page toolbars, list cards, tab bars and the wide slide panel.
+/* App shell building blocks shared by the mail and hooks pages and the settings modals:
+   page layout, icon buttons, pills, sidebar navigation, page toolbars, list cards,
+   grid lists, data tables, code blocks, tab bars and the wide slide panel.
    Colors come from the core tokens in css-vars.css. */
 
 /* Visible keyboard focus everywhere (mouse clicks stay ring-free). */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ---------- Page layout: sidebar + main, each scrolling on its own ---------- */
+
+.app-layout {
+  display: flex;
+  height: calc(100dvh - var(--nav-height));
+}
+
+.app-sidebar {
+  width: 272px;
+  flex-shrink: 0;
+}
+
+.app-sidebar-mobile-head {
+  display: none;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 28px 28px;
+}
+
+/* Phones/tablets: the sidebar becomes an off-canvas drawer opened from the nav. */
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    width: min(320px, 85vw);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+
+    &.open {
+      transform: none;
+      box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25);
+    }
+  }
+
+  .app-sidebar-mobile-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--nav-height);
+    padding: 0 8px 0 22px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+
+  .app-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: var(--overlay-bg);
+  }
+
+  .app-main {
+    padding: 14px 12px 20px;
+  }
 }
 
 /* ---------- Buttons ---------- */
@@ -24,7 +91,9 @@
   background: transparent;
   color: var(--text-2);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 
   &:hover:not(:disabled) {
     background: var(--hover);
@@ -51,6 +120,11 @@
     border: 1px solid var(--border);
     background: var(--surface);
   }
+
+  &.icon-btn-danger:hover:not(:disabled) {
+    background: var(--bad-soft);
+    color: var(--bad);
+  }
 }
 
 /* Low-emphasis bordered button for toolbars ("Mark all read", "Load images"). */
@@ -68,7 +142,9 @@
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 
   &:hover:not(:disabled) {
     background: var(--hover);
@@ -78,6 +154,12 @@
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  &.btn-quiet-danger:hover:not(:disabled) {
+    border-color: var(--bad);
+    background: var(--bad-soft);
+    color: var(--bad);
   }
 
   &.btn-quiet-sm {
@@ -234,7 +316,9 @@
   font-size: 0.8125rem;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 
   &:hover {
     background: var(--hover);
@@ -257,6 +341,21 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  .side-item-meta {
+    flex-shrink: 0;
+    font-size: 0.71875rem;
+    font-weight: 400;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.side-empty {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  color: var(--muted);
 }
 
 /* ---------- Page toolbar + list card ---------- */
@@ -323,12 +422,221 @@
   }
 }
 
+/* ---------- Grid list (mail + webhook lists) ----------
+   Rows are buttons laid out on a grid; the list sets its columns with --cols. */
+
+.grid-list-head,
+.grid-list-row {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.grid-list-head {
+  height: 38px;
+}
+
+.grid-list-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover,
+  &.active {
+    color: var(--text);
+  }
+
+  &.grid-list-end {
+    justify-self: end;
+  }
+}
+
+.grid-list-row {
+  width: 100%;
+  min-height: 48px;
+  border-top: 0;
+  border-right: 0;
+  border-left: 2px solid transparent;
+  padding-left: 14px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+
+  &:hover {
+    background: var(--hover);
+  }
+
+  &.open {
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
+}
+
+.cell-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-time {
+  justify-self: end;
+  font-size: 0.78125rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Data table (settings lists) ----------
+   <div class="data-table" style="--cols: 2fr 1fr auto"> with .data-table-head and
+   .data-table-row children. Rows stack on phones. */
+
+.data-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.data-table-head,
+.data-table-row {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+}
+
+.data-table-head {
+  height: 34px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.71875rem;
+  font-weight: 600;
+}
+
+.data-table-row {
+  min-height: 48px;
+  padding-block: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+
+  &.expanded {
+    background: var(--surface-2);
+  }
+}
+
+.data-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+/* Extra content under a row (inline edit form). */
+.data-table-detail {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.data-table-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 640px) {
+  .data-table-head {
+    display: none;
+  }
+
+  .data-table-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-block: 12px;
+  }
+
+  .data-table-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* ---------- Code + key/value blocks ---------- */
+
+.inline-code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  word-break: break-all;
+}
+
+.code-block {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.kv-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.kv-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 180px) minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  .kv-key {
+    color: var(--muted);
+  }
+}
+
 /* ---------- Tabs ---------- */
 
 .tab-bar {
   display: flex;
+  align-items: center;
   gap: 20px;
   border-bottom: 1px solid var(--border);
+
+  .spacer {
+    flex: 1;
+  }
 }
 
 .tab-bar-item {
@@ -345,7 +653,9 @@
   font-size: 0.84375rem;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover:not(:disabled) {
     color: var(--text);

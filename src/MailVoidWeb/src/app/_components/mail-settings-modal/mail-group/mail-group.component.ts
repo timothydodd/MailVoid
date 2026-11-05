@@ -13,303 +13,311 @@ import {
   User,
 } from '../../../_services/api/mail.service';
 import { AuthService } from '../../../_services/auth-service';
+import { initialsFor } from '../../../_services/mail-format';
 @Component({
   selector: 'app-mail-group',
   imports: [LucideDynamicIcon, FormsModule, SelectComponent, FormField],
   template: `
-    <div class="mail-group-layout">
-      <!-- Header with create button -->
-      <div class="section-header">
-        <div class="header-left">
-          <h4 class="section-title">Mail Groups</h4>
-          <span class="groups-count">{{ mailGroups().length }} groups</span>
+    <section class="settings-section">
+      <div class="settings-section-head">
+        <div>
+          <h4>
+            Mail groups
+            <span class="count-pill count-pill-muted">{{ mailGroups().length }}</span>
+          </h4>
+          <p>Groups are created automatically when mail arrives for a new subdomain, or you can add one here.</p>
         </div>
         @if (!creatingGroup()) {
-          <button class="btn btn-primary btn-sm" (click)="showCreateForm()">
+          <button type="button" class="btn btn-sm" (click)="showCreateForm()">
             <svg lucideIcon="plus" size="14"></svg>
-            Create Group
+            New group
           </button>
         }
       </div>
 
-      <!-- Create Group Inline Form -->
       @if (creatingGroup()) {
-        <div class="inline-form">
-          <div class="inline-form-header">
-            <h5>Create New Mail Group</h5>
-            <button class="btn btn-icon" (click)="cancelCreate()" title="Close">
-              <svg lucideIcon="x" size="16"></svg>
+        <form class="settings-subform" (submit)="$event.preventDefault(); createGroup()">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="subdomain">Subdomain</label>
+              <input
+                id="subdomain"
+                type="text"
+                class="form-control"
+                [formField]="createGroupForm.subdomain"
+                placeholder="e.g. support"
+              />
+              @if (
+                (createSubmitted() || createGroupForm.subdomain().touched()) && createGroupForm.subdomain().invalid()
+              ) {
+                <div class="text-danger">
+                  @for (error of createGroupForm.subdomain().errors(); track error.kind) {
+                    <div>{{ error.message }}</div>
+                  }
+                </div>
+              }
+            </div>
+            <div class="form-group">
+              <label for="description">Description</label>
+              <input
+                id="description"
+                type="text"
+                class="form-control"
+                [formField]="createGroupForm.description"
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-sm" (click)="cancelCreate()">Cancel</button>
+            <button
+              type="submit"
+              class="btn btn-primary btn-sm"
+              [disabled]="createGroupForm().invalid() || isLoading()"
+            >
+              {{ isLoading() ? 'Creating…' : 'Create group' }}
             </button>
           </div>
-          <div class="inline-form-body">
-            <div class="form-row">
-              <div class="form-group">
-                <label for="subdomain" class="form-label">Subdomain</label>
-                <input
-                  id="subdomain"
-                  type="text"
-                  class="form-control"
-                  [formField]="createGroupForm.subdomain"
-                  placeholder="e.g., support, sales"
-                />
-                @if ((createSubmitted() || createGroupForm.subdomain().touched()) && createGroupForm.subdomain().invalid()) {
-                  <div class="text-danger">
-                    @for (error of createGroupForm.subdomain().errors(); track error.kind) {
-                      <div>{{ error.message }}</div>
-                    }
-                  </div>
-                }
-              </div>
-              <div class="form-group">
-                <label for="description" class="form-label">Description</label>
-                <input
-                  id="description"
-                  type="text"
-                  class="form-control"
-                  [formField]="createGroupForm.description"
-                  placeholder="Optional description"
-                />
-              </div>
-              <div class="form-group form-actions-inline">
-                <button type="button" class="btn btn-secondary btn-sm" (click)="cancelCreate()">Cancel</button>
+        </form>
+      }
+
+      <div class="data-table groups-table">
+        <div class="data-table-head">
+          <span>Subdomain</span>
+          <span>Description</span>
+          <span>Retention</span>
+          <span>Status</span>
+          <span></span>
+        </div>
+        @for (group of mailGroups(); track group.id) {
+          <div class="data-table-row" [class.expanded]="expandedGroupId() === group.id">
+            <span class="group-name cell-ellipsis">{{ group.subdomain || 'Unknown' }}</span>
+            <span class="text-muted cell-ellipsis">{{ group.description || '—' }}</span>
+            <span>{{ getRetentionLabel(group) }}</span>
+            <span class="group-badges">
+              @if (group.isOwner) {
+                <span class="badge badge-accent">Owner</span>
+              }
+              @if (!group.isOwner && authService.isAdmin()) {
+                <span class="badge badge-muted">Admin</span>
+              }
+              @if (group.isUserPrivate) {
+                <span class="badge badge-warning">Private</span>
+              }
+              @if (group.isHidden) {
+                <span class="badge badge-muted">Hidden</span>
+              }
+            </span>
+            <div class="data-table-actions">
+              <button
+                type="button"
+                class="icon-btn icon-btn-sm"
+                (click)="toggleHidden(group)"
+                [attr.aria-label]="group.isHidden ? 'Show in mailbox list' : 'Hide from mailbox list'"
+                [title]="group.isHidden ? 'Show in mailbox list' : 'Hide from mailbox list'"
+              >
+                <svg [lucideIcon]="group.isHidden ? 'eye' : 'eye-off'" size="14"></svg>
+              </button>
+              <button
+                type="button"
+                class="icon-btn icon-btn-sm"
+                [class.active]="expandedGroupId() === group.id"
+                (click)="toggleExpand(group)"
+                aria-label="Edit group"
+                title="Edit"
+              >
+                <svg lucideIcon="square-pen" size="14"></svg>
+              </button>
+              @if (!group.isUserPrivate) {
                 <button
                   type="button"
-                  class="btn btn-primary btn-sm"
-                  [disabled]="createGroupForm().invalid() || isLoading()"
-                  (click)="createGroup()"
+                  class="icon-btn icon-btn-sm"
+                  (click)="manageUsers(group)"
+                  aria-label="Share group"
+                  title="Share"
                 >
-                  {{ isLoading() ? 'Creating...' : 'Create' }}
+                  <svg lucideIcon="share-2" size="14"></svg>
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      }
-
-      <!-- Groups Table -->
-      @if (mailGroups().length === 0) {
-        <div class="empty-state">
-          <svg lucideIcon="mail" size="36" class="empty-icon"></svg>
-          <p class="empty-message">No mail groups yet. Groups are created automatically when emails arrive or you can create one manually.</p>
-        </div>
-      } @else {
-        <div class="groups-table">
-          <div class="table-header">
-            <div class="col-subdomain">Subdomain</div>
-            <div class="col-description">Description</div>
-            <div class="col-retention">Retention</div>
-            <div class="col-status">Status</div>
-            <div class="col-actions">Actions</div>
-          </div>
-          @for (group of mailGroups(); track group.id) {
-            <div class="table-row" [class.expanded]="expandedGroupId() === group.id">
-              <div class="col-subdomain">
-                <span class="subdomain-name">{{ group.subdomain || 'Unknown' }}</span>
-              </div>
-              <div class="col-description">
-                <span class="description-text">{{ group.description || '--' }}</span>
-              </div>
-              <div class="col-retention">
-                <span class="retention-text">{{ getRetentionLabel(group) }}</span>
-              </div>
-              <div class="col-status">
                 @if (group.isOwner) {
-                  <span class="badge badge-owner">Owner</span>
-                }
-                @if (!group.isOwner && authService.isAdmin()) {
-                  <span class="badge badge-admin">Admin</span>
-                }
-                @if (group.isUserPrivate) {
-                  <span class="badge badge-private">Private</span>
-                }
-                @if (group.isHidden) {
-                  <span class="badge badge-secondary">Hidden</span>
-                }
-              </div>
-              <div class="col-actions">
-                <button
-                  class="btn btn-icon-sm"
-                  (click)="toggleHidden(group)"
-                  [title]="group.isHidden ? 'Show in mailbox list' : 'Hide from mailbox list'"
-                >
-                  <svg [lucideIcon]="group.isHidden ? 'eye' : 'eye-off'" size="14"></svg>
-                </button>
-                <button class="btn btn-icon-sm" (click)="toggleExpand(group)" title="Edit">
-                  <svg lucideIcon="square-pen" size="14"></svg>
-                </button>
-                @if (!group.isUserPrivate) {
-                  <button class="btn btn-icon-sm" (click)="manageUsers(group)" title="Share">
-                    <svg lucideIcon="share-2" size="14"></svg>
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-sm icon-btn-danger"
+                    (click)="deleteGroup(group)"
+                    aria-label="Delete group"
+                    title="Delete"
+                  >
+                    <svg lucideIcon="trash-2" size="14"></svg>
                   </button>
-                  @if (group.isOwner) {
-                    <button class="btn btn-icon-sm btn-icon-danger" (click)="deleteGroup(group)" title="Delete">
-                      <svg lucideIcon="trash" size="14"></svg>
-                    </button>
-                  }
                 }
-              </div>
+              }
             </div>
+          </div>
 
-            <!-- Inline Edit Panel -->
-            @if (expandedGroupId() === group.id) {
-              <div class="expand-panel">
-                <div class="expand-panel-content">
-                  <div class="edit-fields">
-                    <div class="form-group">
-                      <label class="form-label">Description</label>
-                      <input type="text" class="form-control" [formField]="editGroupForm.description" placeholder="Group description" />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Retention (days)</label>
-                      <div class="retention-input">
-                        <input
-                          type="number"
-                          class="form-control"
-                          [formField]="editGroupForm.retentionDays"
-                          placeholder="0 = no deletion"
-                        />
-                        <span class="retention-hint">
-                          @if (editGroupModel().retentionDays === 0 || editGroupModel().retentionDays === null) {
-                            No auto-deletion
-                          } @else {
-                            Auto-delete after {{ editGroupModel().retentionDays }} days
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="expand-panel-actions">
-                    <button class="btn btn-secondary btn-sm" (click)="cancelEdit()">Cancel</button>
-                    <button
-                      class="btn btn-primary btn-sm"
-                      [disabled]="editGroupForm().invalid() || isLoading()"
-                      (click)="saveGroup()"
-                    >
-                      {{ isLoading() ? 'Saving...' : 'Save' }}
-                    </button>
-                  </div>
+          @if (expandedGroupId() === group.id) {
+            <form class="data-table-detail" (submit)="$event.preventDefault(); saveGroup()">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label [attr.for]="'desc-' + group.id">Description</label>
+                  <input
+                    [id]="'desc-' + group.id"
+                    type="text"
+                    class="form-control"
+                    [formField]="editGroupForm.description"
+                    placeholder="Group description"
+                  />
+                </div>
+                <div class="form-group">
+                  <label [attr.for]="'ret-' + group.id">Retention (days)</label>
+                  <input
+                    [id]="'ret-' + group.id"
+                    type="number"
+                    class="form-control"
+                    [formField]="editGroupForm.retentionDays"
+                    placeholder="0 = keep forever"
+                  />
+                  <span class="form-text">
+                    @if (editGroupModel().retentionDays === 0 || editGroupModel().retentionDays === null) {
+                      Mail is kept until you delete it.
+                    } @else {
+                      Mail is deleted after {{ editGroupModel().retentionDays }} days.
+                    }
+                  </span>
                 </div>
               </div>
-            }
+              <div class="form-actions">
+                <button type="button" class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-sm"
+                  [disabled]="editGroupForm().invalid() || isLoading()"
+                >
+                  {{ isLoading() ? 'Saving…' : 'Save' }}
+                </button>
+              </div>
+            </form>
           }
-        </div>
-      }
+        } @empty {
+          <div class="data-table-empty">No mail groups yet.</div>
+        }
+      </div>
+    </section>
 
-      <!-- Admin: Browse All Groups -->
-      @if (authService.isAdmin()) {
-        <div class="section-header" style="margin-top: 24px;">
-          <div class="header-left">
-            <h4 class="section-title">All Groups</h4>
-            <span class="groups-count">Admin</span>
+    @if (authService.isAdmin()) {
+      <section class="settings-section">
+        <div class="settings-section-head">
+          <div>
+            <h4>All groups <span class="badge badge-muted">Admin</span></h4>
+            <p>Every group on this server. Join one to see its mail.</p>
           </div>
           @if (!browsingAllGroups()) {
-            <button class="btn btn-secondary btn-sm" (click)="loadAllGroups()">
+            <button type="button" class="btn btn-sm" (click)="loadAllGroups()">
               <svg lucideIcon="eye" size="14"></svg>
               Browse
             </button>
           } @else {
-            <button class="btn btn-secondary btn-sm" (click)="browsingAllGroups.set(false)">
+            <button type="button" class="btn btn-sm" (click)="browsingAllGroups.set(false)">
               <svg lucideIcon="eye-off" size="14"></svg>
               Hide
             </button>
           }
         </div>
         @if (browsingAllGroups()) {
-          <div class="groups-table">
-            <div class="table-header">
-              <div class="col-subdomain">Subdomain</div>
-              <div class="col-description">Owner</div>
-              <div class="col-retention">Status</div>
-              <div class="col-actions">Actions</div>
+          <div class="data-table all-groups-table">
+            <div class="data-table-head">
+              <span>Subdomain</span>
+              <span>Owner</span>
+              <span>Status</span>
+              <span></span>
             </div>
             @for (group of allGroups(); track group.id) {
-              <div class="table-row">
-                <div class="col-subdomain">
-                  <span class="subdomain-name">{{ group.subdomain || 'Unknown' }}</span>
-                </div>
-                <div class="col-description">
-                  <span class="description-text">{{ group.ownerUserName }}</span>
-                </div>
-                <div class="col-retention">
+              <div class="data-table-row">
+                <span class="group-name cell-ellipsis">{{ group.subdomain || 'Unknown' }}</span>
+                <span class="text-muted cell-ellipsis">{{ group.ownerUserName }}</span>
+                <span>
                   @if (group.hasAccess) {
-                    <span class="badge badge-owner">Joined</span>
+                    <span class="badge badge-success">Joined</span>
                   }
-                </div>
-                <div class="col-actions">
+                </span>
+                <div class="data-table-actions">
                   @if (!group.hasAccess) {
-                    <button class="btn btn-primary btn-sm" (click)="joinGroup(group)" [disabled]="isLoading()">
+                    <button type="button" class="btn btn-sm" (click)="joinGroup(group)" [disabled]="isLoading()">
                       <svg lucideIcon="plus" size="14"></svg>
                       Join
                     </button>
                   } @else if (!group.isOwner) {
-                    <button class="btn btn-secondary btn-sm" (click)="leaveGroup(group)" [disabled]="isLoading()">
+                    <button type="button" class="btn btn-sm" (click)="leaveGroup(group)" [disabled]="isLoading()">
                       <svg lucideIcon="log-out" size="14"></svg>
                       Leave
                     </button>
                   }
                 </div>
               </div>
+            } @empty {
+              <div class="data-table-empty">No groups.</div>
             }
           </div>
         }
-      }
+      </section>
+    }
 
-      <!-- User Management Panel (overlay) -->
-      @if (managingUsers() && selectedGroup()) {
-        <div class="slide-panel-overlay" (click)="closeUserManagement()"></div>
-        <div class="slide-panel">
-          <div class="slide-panel-header">
-            <div>
-              <h5>Share Access</h5>
-              <span class="slide-panel-subtitle">{{ selectedGroup()?.subdomain }}</span>
-            </div>
-            <button class="btn btn-icon" (click)="closeUserManagement()" title="Close">
-              <svg lucideIcon="x" size="16"></svg>
+    <!-- Share panel (slide-over) -->
+    @if (managingUsers() && selectedGroup()) {
+      <div class="slide-panel-overlay" (click)="closeUserManagement()"></div>
+      <div class="slide-panel" role="dialog" aria-modal="true" aria-label="Share access">
+        <div class="slide-panel-header">
+          <div>
+            <h5>Share access</h5>
+            <span class="slide-panel-subtitle">{{ selectedGroup()?.subdomain }}</span>
+          </div>
+          <button type="button" class="icon-btn" (click)="closeUserManagement()" aria-label="Close" title="Close">
+            <svg lucideIcon="x" size="18"></svg>
+          </button>
+        </div>
+        <div class="slide-panel-body">
+          <div class="add-user-row">
+            <rd-select
+              [(ngModel)]="selectedUserId"
+              [items]="availableUsers()"
+              bindLabel="userName"
+              bindValue="id"
+              [placeholder]="'Select user'"
+              [searchable]="true"
+              class="user-select"
+            ></rd-select>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="!selectedUserId || isLoading()"
+              (click)="addUser()"
+            >
+              Add
             </button>
           </div>
-          <div class="slide-panel-body">
-            <div class="add-user-row">
-              <rd-select
-                [(ngModel)]="selectedUserId"
-                [items]="availableUsers()"
-                bindLabel="userName"
-                bindValue="id"
-                [placeholder]="'Select user'"
-                [searchable]="true"
-                class="user-select"
-              ></rd-select>
-              <button class="btn btn-primary btn-sm" [disabled]="!selectedUserId || isLoading()" (click)="addUser()">
-                <svg lucideIcon="plus" size="14"></svg>
-                Add
+
+          @for (groupUser of groupUsers(); track groupUser.id) {
+            <div class="shared-user">
+              <span class="avatar-initials">{{ initials(groupUser.user.userName) }}</span>
+              <div class="shared-user-info">
+                <span class="shared-user-name">{{ groupUser.user.userName }}</span>
+                <span class="text-muted">Added {{ formatDate(groupUser.grantedAt) }}</span>
+              </div>
+              <button
+                type="button"
+                class="icon-btn icon-btn-sm icon-btn-danger"
+                (click)="removeUser(groupUser)"
+                [disabled]="isLoading()"
+                aria-label="Remove access"
+                title="Remove access"
+              >
+                <svg lucideIcon="x" size="14"></svg>
               </button>
             </div>
-
-            @if (groupUsers().length === 0) {
-              <p class="text-muted no-users-text">No users have been granted access.</p>
-            } @else {
-              <div class="shared-users-list">
-                @for (groupUser of groupUsers(); track groupUser.id) {
-                  <div class="shared-user-item">
-                    <div class="shared-user-info">
-                      <span class="shared-user-name">{{ groupUser.user.userName }}</span>
-                      <span class="shared-user-date">Added {{ formatDate(groupUser.grantedAt) }}</span>
-                    </div>
-                    <button
-                      class="btn btn-icon-sm btn-icon-danger"
-                      (click)="removeUser(groupUser)"
-                      title="Remove access"
-                      [disabled]="isLoading()"
-                    >
-                      <svg lucideIcon="x" size="14"></svg>
-                    </button>
-                  </div>
-                }
-              </div>
-            }
-          </div>
+          } @empty {
+            <p class="side-empty">Nobody else has access yet.</p>
+          }
         </div>
-      }
-    </div>
+      </div>
+    }
   `,
   styleUrl: './mail-group.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -342,17 +350,23 @@ export class MailGroupComponent {
   createGroupModel = signal<{ subdomain: string; description: string }>({ subdomain: '', description: '' });
   createGroupForm = form(this.createGroupModel, (path) => {
     required(path.subdomain, { message: 'Subdomain is required' });
-    pattern(path.subdomain, /^[a-z0-9-]+$/, { message: 'Subdomain may only contain lowercase letters, numbers and hyphens' });
+    pattern(path.subdomain, /^[a-z0-9-]+$/, {
+      message: 'Subdomain may only contain lowercase letters, numbers and hyphens',
+    });
   });
   createSubmitted = signal(false);
 
-  editGroupModel = signal<{ description: string; retentionDays: number | null }>({ description: '', retentionDays: null });
+  editGroupModel = signal<{ description: string; retentionDays: number | null }>({
+    description: '',
+    retentionDays: null,
+  });
   editGroupForm = form(this.editGroupModel, (path) => {
     min(path.retentionDays, 0, { message: 'Retention cannot be negative' });
     max(path.retentionDays, 365, { message: 'Retention cannot exceed 365 days' });
   });
 
   selectedUserId: string | null = null;
+  initials = initialsFor;
 
   constructor() {
     this.loadMailGroups();

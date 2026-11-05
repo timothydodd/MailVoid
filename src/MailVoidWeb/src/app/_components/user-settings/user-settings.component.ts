@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../_services/auth-service';
 import { ModalContainerService, ModalLayoutComponent } from '@rd-ui';
 import { UserManagementComponent } from '../user-management/user-management.component';
@@ -9,71 +8,70 @@ import { ChangePasswordComponent } from './change-password/change-password.compo
 @Component({
   selector: 'app-user-settings',
   standalone: true,
-  imports: [FormsModule, ChangePasswordComponent, ApiKeysComponent, UserManagementComponent, ModalLayoutComponent],
+  imports: [ChangePasswordComponent, ApiKeysComponent, UserManagementComponent, ModalLayoutComponent],
   template: ` <rd-modal-layout>
-    <div slot="header" class="settings-header">
-      <h3 class="settings-title">User Settings</h3>
-      <p class="settings-subtitle">Manage your account and system settings</p>
+    <div slot="header">
+      <h3 class="settings-title">Settings</h3>
+      <p class="settings-subtitle">Your account, API keys and users</p>
     </div>
 
-    <div slot="body" class="user-settings-container">
-      <!-- Sub Header with Navigation Tabs -->
-      <div class="settings-subheader">
-        <div class="settings-nav">
-          <button class="nav-tab" [class.active]="activeTab() === 'account'" (click)="setActiveTab('account')">
+    <div slot="body" class="settings-body">
+      @if (isAdmin()) {
+        <div class="tab-bar" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            class="tab-bar-item"
+            [class.active]="activeTab() === 'account'"
+            [attr.aria-selected]="activeTab() === 'account'"
+            (click)="activeTab.set('account')"
+          >
             Account
           </button>
-          @if (isAdmin()) {
-            <button class="nav-tab" [class.active]="activeTab() === 'users'" (click)="setActiveTab('users')">
-              Manage Users
-            </button>
-          }
+          <button
+            type="button"
+            role="tab"
+            class="tab-bar-item"
+            [class.active]="activeTab() === 'users'"
+            [attr.aria-selected]="activeTab() === 'users'"
+            (click)="activeTab.set('users')"
+          >
+            Users
+          </button>
         </div>
-      </div>
+      }
 
-      <!-- Content Sections -->
-      <div class="settings-content">
-        @if (activeTab() === 'account') {
-          <div class="account-section">
-            <h4>Change Password</h4>
-            @if (changePassword()) {
-              <app-change-password (saveEvent)="changePassword.set(false)"></app-change-password>
-            } @else {
-              <button class="btn btn-primary" (click)="changePassword.set(true)">Change Password</button>
+      @if (activeTab() === 'account') {
+        <section class="settings-section">
+          <div class="settings-section-head">
+            <div>
+              <h4>Password</h4>
+              <p>Change the password you sign in with.</p>
+            </div>
+            @if (!changePassword()) {
+              <button type="button" class="btn btn-sm" (click)="changePassword.set(true)">Change password</button>
             }
           </div>
-          <div class="account-section">
-            <h4>API Keys</h4>
-            <app-api-keys></app-api-keys>
-          </div>
-        }
-        @if (activeTab() === 'users' && isAdmin()) {
-          <app-user-management></app-user-management>
-        }
-      </div>
-    </div>
-
-    <div slot="footer">
-      @if (errorMessage()) {
-        <div class="text-danger">{{ errorMessage() }}</div>
+          @if (changePassword()) {
+            <app-change-password (saveEvent)="changePassword.set(false)" (cancelEvent)="changePassword.set(false)" />
+          }
+        </section>
+        <app-api-keys class="settings-section" />
+      }
+      @if (activeTab() === 'users' && isAdmin()) {
+        <app-user-management />
       }
     </div>
   </rd-modal-layout>`,
-  styleUrl: './user-settings.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UserSettingsComponent {
   authService = inject(AuthService);
-  errorMessage = signal('');
   changePassword = signal(false);
   activeTab = signal<'account' | 'users'>('account');
 
   static show(modalContainerService: ModalContainerService) {
     return modalContainerService.openComponent(UserSettingsComponent);
-  }
-
-  setActiveTab(tab: 'account' | 'users') {
-    this.activeTab.set(tab);
   }
 
   isAdmin(): boolean {
