@@ -1,0 +1,94 @@
+/* Settings modals (mail settings, user settings): header, stacked section cards. */
+
+.settings-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-subtitle {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  > .tab-bar {
+    margin: -8px 0 4px;
+  }
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  > div {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+
+  h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+}
+
+/* A boxed sub-form inside a section (create group, change password). */
+.settings-subform {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+/* Collapsible help text ("How to use a key"). */
+.disclosure {
+  summary {
+    color: var(--accent);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  &[open] summary {
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-section {
+    padding: 16px;
+  }
+}

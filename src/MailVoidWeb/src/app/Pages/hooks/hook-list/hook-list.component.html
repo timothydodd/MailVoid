@@ -1,0 +1,42 @@
+<div class="grid-list-head hl-row">
+  @for (col of columns; track col.key) {
+    <button
+      type="button"
+      class="grid-list-sort"
+      [class.active]="sortColumn() === col.key"
+      [class.grid-list-end]="col.key === 'createdOn'"
+      [class.hl-type]="col.key === 'contentType'"
+      (click)="sort.emit(col.key)"
+      [attr.aria-label]="'Sort by ' + col.label"
+    >
+      {{ col.label }}
+      @if (sortColumn() === col.key) {
+        <svg [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="13"></svg>
+      }
+    </button>
+  }
+</div>
+
+@if (loading()) {
+  <div class="list-status">Loading webhooks…</div>
+} @else if (error()) {
+  <div class="list-status list-status-error">Failed to load webhooks. Please try again.</div>
+} @else if (webhooks()?.length) {
+  @for (hook of webhooks(); track hook.id) {
+    <button type="button" class="grid-list-row hl-row" [class.open]="hook.id === openId()" (click)="open.emit(hook.id)">
+      <span class="method-badge method-{{ hook.httpMethod.toLowerCase() }}">{{ hook.httpMethod }}</span>
+      <span class="hl-path">
+        <span class="cell-ellipsis">{{ hook.path }}{{ hook.queryString || '' }}</span>
+        @if (showBucket()) {
+          <span class="hl-bucket cell-ellipsis">{{ hook.bucketName }}</span>
+        }
+      </span>
+      <span class="hl-type cell-ellipsis">{{ hook.contentType || '—' }}</span>
+      <time class="cell-time" [attr.datetime]="hook.createdOn" [attr.title]="hook.createdOn | date: 'medium'">
+        {{ shortDate(hook.createdOn) }}
+      </time>
+    </button>
+  }
+} @else {
+  <div class="list-status">No webhooks captured yet.</div>
+}

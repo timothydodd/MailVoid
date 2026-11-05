@@ -1,5 +1,3 @@
-/* Layout Components - Reusable layout patterns */
-
 /* Centered Container */
 .centered-container {
   display: flex;
@@ -31,7 +29,7 @@
 .auth-card {
   width: 100%;
   max-width: 400px;
-  background-color:var(--bGLight);
+  background-color: var(--bGLight);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 4px 12px var(--shadow-color);
@@ -241,152 +239,48 @@
   .auth-container {
     padding: 0.5rem;
   }
-  
+
   .auth-header {
     padding: 1.5rem 1rem 1rem;
   }
-  
+
   .auth-body {
     padding: 1.5rem 1rem;
   }
-  
+
   .auth-title {
     font-size: 1.25rem;
   }
-  
+
   .dashboard-container {
     flex-direction: column;
   }
-  
+
   .dashboard-sidebar {
     width: 100%;
     order: 2;
   }
-  
+
   .dashboard-main {
     order: 1;
   }
-  
+
   .two-column,
   .three-column {
     grid-template-columns: 1fr;
   }
-  
+
   .hero-title {
     font-size: 2rem;
   }
-  
+
   .hero-subtitle {
     font-size: 1rem;
   }
-  
+
   .split-layout {
     flex-direction: column;
   }
-}
-
-/* User Management Layout */
-.user-management {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  padding: 1rem 0;
-}
-
-.create-user-section {
-  background-color: var(--bGLight);
-  padding: 1.5rem;
-}
-
-.create-form { 
-  width: 100%; 
-}
-
-.form-row { 
-  display: grid;
-  gap: 1rem;
-  align-items: end;
-  grid-template-columns: 2fr 2fr 1fr auto; 
-}
-
-.users-table {
-  display: flex;
-  flex-direction: column;
-}
-
-.table-grid {
-  display: grid;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-}
-
-.table-grid.header {
-  grid-template-columns: 2fr 1fr 1fr 1.5fr 2fr;
-}
-
-.table-grid.row {
-  grid-template-columns: 2fr 1fr 1fr 1.5fr 2fr;
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.2s ease;
-  
-  &:hover { 
-    background-color: var(--bGLight); 
-  }
-  
-  &:last-child { 
-    border-bottom: none; 
-  }
-}
-
-.username { 
-  font-weight: 500; 
-}
-
-/* Groups Grid */
-.groups-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem;
-  padding: 1rem;
-}
-
-.groups-container {
-  background-color: var(--bGDark);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.groups-count {
-  color: var(--comment);
-  font-size: 0.875rem;
-  background-color: var(--bGLighter);
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-}
-
-/* Sidebar card (hooks page) */
-.sidebar-card {
-  display: flex;
-  flex-direction: column;
-  background-color:var(--bGLight);
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-  box-shadow: 2px 4px 15px var(--shadow-color);
-}
-
-.sidebar-header {
-  background-color: var(--bGDark);
-  border-bottom: 2px solid var(--border-color);
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: 60px;
-}
-
-.sidebar-body {
-  padding: 0.5rem;
 }
 
 @media (max-width: 480px) {
@@ -395,36 +289,17 @@
   .content-wide {
     padding: 1rem;
   }
-  
+
   .page-header {
     padding: 1rem;
   }
-  
+
   .hero-section {
     padding: 2rem 1rem;
   }
-  
+
   .feature-grid {
     grid-template-columns: 1fr;
     padding: 1rem;
   }
-  
-  .form-row { 
-    grid-template-columns: 1fr; 
-  }
-
-  .table-grid.header { 
-    display: none; 
-  }
-
-  .table-grid.row {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-  }
-
-  .groups-grid {
-    grid-template-columns: 1fr;
-    padding: 0.75rem;
-  }
-
 }

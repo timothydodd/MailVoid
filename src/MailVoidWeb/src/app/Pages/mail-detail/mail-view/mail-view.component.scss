@@ -106,41 +106,6 @@
   word-break: break-word;
 }
 
-.mv-headers {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-}
-
-.mv-header-row {
-  display: grid;
-  grid-template-columns: minmax(110px, 180px) minmax(0, 1fr);
-  gap: 12px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  word-break: break-word;
-  white-space: pre-wrap;
-
-  &:last-child {
-    border-bottom: 0;
-  }
-}
-
-.mv-raw {
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--text-2);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
 @media (max-width: 640px) {
   .mv-header {
     padding: 16px 16px 0;

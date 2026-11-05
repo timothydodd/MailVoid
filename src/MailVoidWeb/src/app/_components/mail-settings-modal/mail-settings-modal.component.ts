@@ -7,20 +7,13 @@ import { MailGroupComponent } from './mail-group/mail-group.component';
   imports: [MailGroupComponent, ModalLayoutComponent],
   template: `
     <rd-modal-layout>
-      <div slot="header" class="settings-header">
-        <h3 class="settings-title">Mail Settings</h3>
-        <p class="settings-subtitle">Manage your mail groups</p>
+      <div slot="header">
+        <h3 class="settings-title">Mail settings</h3>
+        <p class="settings-subtitle">Mail groups, retention and sharing</p>
       </div>
-
-      <div slot="body" class="mail-settings-container">
-        <!-- Content -->
-        <div class="settings-content">
-          <app-mail-group></app-mail-group>
-        </div>
-      </div>
+      <div slot="body"><app-mail-group /></div>
     </rd-modal-layout>
   `,
-  styleUrl: './mail-settings-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MailSettingsModalComponent {

@@ -15,11 +15,19 @@ interface ChangePasswordModel {
   standalone: true,
   imports: [FormField],
   template: `
-    <div class="flex-column gap10">
+    <form class="settings-subform" (submit)="submit($event)">
       <div class="form-group">
-        <label for="op">Old Password</label>
-        <input [formField]="changePasswordForm.oldPassword" type="password" class="form-control" id="op" />
-        @if ((submitted() || changePasswordForm.oldPassword().touched()) && changePasswordForm.oldPassword().invalid()) {
+        <label for="op">Current password</label>
+        <input
+          [formField]="changePasswordForm.oldPassword"
+          type="password"
+          class="form-control"
+          id="op"
+          autocomplete="current-password"
+        />
+        @if (
+          (submitted() || changePasswordForm.oldPassword().touched()) && changePasswordForm.oldPassword().invalid()
+        ) {
           <div class="text-danger">
             @for (error of changePasswordForm.oldPassword().errors(); track error.kind) {
               <div>{{ error.message }}</div>
@@ -28,9 +36,17 @@ interface ChangePasswordModel {
         }
       </div>
       <div class="form-group">
-        <label for="np">New Password</label>
-        <input [formField]="changePasswordForm.newPassword" type="password" class="form-control" id="np" autocomplete="new-password" />
-        @if ((submitted() || changePasswordForm.newPassword().touched()) && changePasswordForm.newPassword().invalid()) {
+        <label for="np">New password</label>
+        <input
+          [formField]="changePasswordForm.newPassword"
+          type="password"
+          class="form-control"
+          id="np"
+          autocomplete="new-password"
+        />
+        @if (
+          (submitted() || changePasswordForm.newPassword().touched()) && changePasswordForm.newPassword().invalid()
+        ) {
           <div class="text-danger">
             @for (error of changePasswordForm.newPassword().errors(); track error.kind) {
               <div>{{ error.message }}</div>
@@ -39,9 +55,17 @@ interface ChangePasswordModel {
         }
       </div>
       <div class="form-group">
-        <label for="np2">Confirm New Password</label>
-        <input [formField]="changePasswordForm.newPassword2" type="password" class="form-control" id="np2" autocomplete="new-password" />
-        @if ((submitted() || changePasswordForm.newPassword2().touched()) && changePasswordForm.newPassword2().invalid()) {
+        <label for="np2">Confirm new password</label>
+        <input
+          [formField]="changePasswordForm.newPassword2"
+          type="password"
+          class="form-control"
+          id="np2"
+          autocomplete="new-password"
+        />
+        @if (
+          (submitted() || changePasswordForm.newPassword2().touched()) && changePasswordForm.newPassword2().invalid()
+        ) {
           <div class="text-danger">
             @for (error of changePasswordForm.newPassword2().errors(); track error.kind) {
               <div>{{ error.message }}</div>
@@ -49,11 +73,14 @@ interface ChangePasswordModel {
           </div>
         }
       </div>
-      <button class="btn btn-primary" (click)="submit()">Save</button>
       @if (errorMessage()) {
-        <div class="text-danger">{{ errorMessage() }}</div>
+        <div class="message message-error">{{ errorMessage() }}</div>
       }
-    </div>
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="cancelEvent.emit()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save password</button>
+      </div>
+    </form>
   `,
   styleUrl: './change-password.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,6 +91,7 @@ export class ChangePasswordComponent {
   errorMessage = signal('');
   submitted = signal(false);
   saveEvent = output();
+  cancelEvent = output();
 
   model = signal<ChangePasswordModel>({ oldPassword: '', newPassword: '', newPassword2: '' });
   changePasswordForm = form(this.model, (path) => {
@@ -81,7 +109,8 @@ export class ChangePasswordComponent {
     });
   });
 
-  submit() {
+  submit(event: Event) {
+    event.preventDefault();
     if (this.changePasswordForm().invalid()) {
       this.submitted.set(true);
       this.errorMessage.set('Please correct the errors');
@@ -99,10 +128,10 @@ export class ChangePasswordComponent {
           this.saveEvent.emit();
         },
         error: (error) => {
-          this.toastr.error('Password changed Failed');
+          this.toastr.error('Password change failed');
           const message =
             error.status == 401
-              ? 'Invalid UserName or Password'
+              ? 'Current password is incorrect'
               : error.status == 400 && typeof error.error === 'string' && error.error
                 ? error.error // server-side password rule, e.g. minimum length
                 : 'An error occurred';

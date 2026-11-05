@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -7,9 +7,12 @@ import { ConfirmDialogService, ToastService } from '@rd-ui';
 import { auditTime, catchError, filter, forkJoin, map, Observable, of, Subject, switchMap } from 'rxjs';
 import { WebhookBucket, WebhookListItem, WebhookService } from '../../_services/api/webhook.service';
 import { SignalRService } from '../../services/signalr.service';
+import { shortMailDate } from '../../_services/mail-format';
+import { MobileMenuService } from '../../_services/mobile-menu.service';
 import { HookDetailComponent } from './hook-detail/hook-detail.component';
+import { HookListComponent, HookSortColumn } from './hook-list/hook-list.component';
 
-type SortColumn = 'httpMethod' | 'path' | 'contentType' | 'createdOn';
+type SortColumn = HookSortColumn;
 type SortDirection = 'asc' | 'desc';
 
 // Large page used to pull a bucket's full history when aggregating the "All" view.
@@ -29,165 +32,148 @@ interface FetchResult {
 @Component({
   selector: 'app-hooks',
   standalone: true,
-  imports: [CommonModule, LucideDynamicIcon, HookDetailComponent],
+  imports: [DatePipe, LucideDynamicIcon, HookDetailComponent, HookListComponent],
   host: {
     '(document:keydown.arrowdown)': 'onArrow($event, 1)',
     '(document:keydown.arrowup)': 'onArrow($event, -1)',
     '(document:keydown.escape)': 'selectWebhook(null)',
   },
   template: `
-    <div class="hooks-container">
-      <!-- Left Sidebar -->
-      <div class="hooks-sidebar">
-        <div class="sidebar-card">
-          <div class="sidebar-header">
-            <h3>Buckets</h3>
-            <button
-              class="btn btn-icon"
-              [class.active]="selectedBucket() === null"
-              (click)="selectBucket(null)"
-              title="Show all webhooks"
-            >
-              <svg lucideIcon="inbox" size="20"></svg>
-            </button>
-          </div>
-          <div class="sidebar-body">
-            @if (buckets()?.length) {
-              <ul class="bucket-list">
-                @for (bucket of buckets(); track bucket.id) {
-                  <li
-                    class="bucket-item"
-                    role="button"
-                    tabindex="0"
-                    [class.selected]="selectedBucket() === bucket.name"
-                    (click)="selectBucket(bucket.name)"
-                    (keydown.enter)="selectBucket(bucket.name)"
-                    (keydown.space)="$event.preventDefault(); selectBucket(bucket.name)"
-                  >
-                    <svg lucideIcon="folder" size="16"></svg>
-                    <span class="bucket-name">{{ bucket.name }}</span>
-                    @if (bucket.lastActivity) {
-                      <span class="bucket-activity">{{ bucket.lastActivity | date: 'short' }}</span>
-                    }
-                  </li>
-                }
-              </ul>
-            } @else {
-              <p class="no-buckets">No buckets yet. Send a webhook to create one.</p>
-            }
-          </div>
+    <div class="app-layout">
+      <aside class="app-sidebar side-nav" [class.open]="menuOpen()" aria-label="Buckets">
+        <div class="app-sidebar-mobile-head">
+          <span>Buckets</span>
+          <button type="button" class="icon-btn" (click)="menuOpen.set(false)" aria-label="Close buckets">
+            <svg lucideIcon="x" size="18"></svg>
+          </button>
         </div>
-      </div>
-
-      <!-- List -->
-      <div class="hooks-content">
-        <div class="content-header">
-          <div class="content-title">
-            <h2>{{ selectedBucket() ?? 'All Webhooks' }}</h2>
-            @if (selectedBucket()) {
-              <div class="endpoint-row">
-                <code class="endpoint-url">{{ endpointUrl() }}</code>
-                <button class="copy-btn" (click)="copyEndpointUrl()" [title]="copyTooltip()">
-                  <svg lucideIcon="copy" size="14"></svg>
-                </button>
-              </div>
-            }
-          </div>
-          <div class="content-actions">
-            @if (totalCount() > 0) {
-              <span class="count-label">{{ totalCount() }} captured</span>
-            }
-            <button class="btn btn-outline btn-sm btn-purge" (click)="purge()" [disabled]="totalCount() === 0">
-              <svg lucideIcon="trash-2" size="14"></svg>
-              Purge history
-            </button>
-          </div>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                @for (col of columns; track col.key) {
-                  <th class="sortable" [class.optional]="col.optional" (click)="toggleSort(col.key)">
-                    {{ col.label }}
-                    @if (sortColumn() === col.key) {
-                      <svg [lucideIcon]="sortDirection() === 'asc' ? 'chevron-up' : 'chevron-down'" size="14"></svg>
-                    }
-                  </th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              @if (loading()) {
-                <tr class="read">
-                  <td colspan="4" class="table-status">Loading webhooks...</td>
-                </tr>
-              } @else if (error()) {
-                <tr class="read">
-                  <td colspan="4" class="table-status table-status-error">
-                    Failed to load webhooks. Please try again.
-                  </td>
-                </tr>
-              } @else if (paginatedWebhooks()?.length) {
-                @for (webhook of paginatedWebhooks(); track webhook.id) {
-                  <tr
-                    class="read"
-                    role="button"
-                    tabindex="0"
-                    [class.selected]="webhook.id === selectedId()"
-                    (click)="selectWebhook(webhook.id)"
-                    (keydown.enter)="selectWebhook(webhook.id)"
-                    (keydown.space)="$event.preventDefault(); selectWebhook(webhook.id)"
-                  >
-                    <td>
-                      <span class="method-badge method-{{ webhook.httpMethod.toLowerCase() }}">{{
-                        webhook.httpMethod
-                      }}</span>
-                    </td>
-                    <td class="path-cell">
-                      {{ webhook.path }}{{ webhook.queryString || '' }}
-                      @if (!selectedBucket()) {
-                        <span class="row-bucket">{{ webhook.bucketName }}</span>
-                      }
-                    </td>
-                    <td class="optional">{{ webhook.contentType || '-' }}</td>
-                    <td class="date-cell">{{ webhook.createdOn | date: 'short' }}</td>
-                  </tr>
-                }
-              } @else {
-                <tr class="read">
-                  <td colspan="4" class="table-status">No webhooks captured yet</td>
-                </tr>
+        <div class="side-nav-body">
+          <button
+            type="button"
+            class="side-item"
+            [class.selected]="selectedBucket() === null"
+            (click)="selectBucket(null)"
+          >
+            <svg lucideIcon="inbox" size="16"></svg>
+            <span class="side-item-label">All webhooks</span>
+          </button>
+          <div class="side-section">
+            <div class="side-section-label">
+              <span class="side-section-title">Buckets</span>
+              @if (buckets()?.length) {
+                <span class="side-section-meta">{{ buckets()?.length }}</span>
               }
-            </tbody>
-          </table>
+            </div>
+            @for (bucket of buckets() ?? []; track bucket.id) {
+              <button
+                type="button"
+                class="side-item"
+                [class.selected]="selectedBucket() === bucket.name"
+                (click)="selectBucket(bucket.name)"
+              >
+                <svg lucideIcon="folder" size="16"></svg>
+                <span class="side-item-label">{{ bucket.name }}</span>
+                @if (bucket.lastActivity) {
+                  <span class="side-item-meta" [attr.title]="bucket.lastActivity | date: 'medium'">{{
+                    shortDate(bucket.lastActivity)
+                  }}</span>
+                }
+              </button>
+            } @empty {
+              <p class="side-empty">No buckets yet. Send a webhook to create one.</p>
+            }
+          </div>
+        </div>
+      </aside>
+
+      @if (menuOpen()) {
+        <div class="app-sidebar-backdrop" (click)="menuOpen.set(false)"></div>
+      }
+
+      <main class="app-main">
+        <div class="page-toolbar">
+          <div class="page-toolbar-title">
+            <h1 [title]="selectedBucket() ?? 'All webhooks'">{{ selectedBucket() ?? 'All webhooks' }}</h1>
+            <p>{{ subtitle() }}</p>
+          </div>
+          <button type="button" class="btn-quiet btn-quiet-danger" (click)="purge()" [disabled]="totalCount() === 0">
+            <svg lucideIcon="trash-2" size="14"></svg>
+            Purge history
+          </button>
+          <button
+            type="button"
+            class="icon-btn icon-btn-bordered"
+            (click)="reload()"
+            aria-label="Refresh"
+            title="Refresh"
+          >
+            <svg lucideIcon="refresh-cw" size="15"></svg>
+          </button>
         </div>
 
-        @if (totalPages() > 1) {
-          <div class="pagination-controls">
-            <div>
-              <button class="btn" (click)="previousPage()" [disabled]="currentPage() === 1">
-                <svg lucideIcon="chevron-left" size="14"></svg>
-                Previous
-              </button>
-              <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
-              <button class="btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
-                Next
-                <svg lucideIcon="chevron-right" size="14"></svg>
-              </button>
-            </div>
+        @if (selectedBucket()) {
+          <div class="notice-bar">
+            <svg lucideIcon="webhook" size="14"></svg>
+            <span class="notice-bar-text">
+              Send requests to <code class="inline-code endpoint">{{ endpointUrl() }}</code>
+            </span>
+            <button type="button" class="link-btn" (click)="copyEndpointUrl()">{{ copyLabel() }}</button>
           </div>
         }
-      </div>
+
+        <div class="list-card">
+          <app-hook-list
+            [webhooks]="paginatedWebhooks()"
+            [loading]="loading()"
+            [error]="error()"
+            [showBucket]="!selectedBucket()"
+            [sortColumn]="sortColumn()"
+            [sortDirection]="sortDirection()"
+            [openId]="selectedId()"
+            (sort)="toggleSort($event)"
+            (open)="selectWebhook($event)"
+          />
+          @if (totalCount() > 0) {
+            <div class="list-footer">
+              <span>{{ rangeLabel() }}</span>
+              @if (totalPages() > 1) {
+                <div class="list-footer-actions">
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-bordered"
+                    (click)="previousPage()"
+                    [disabled]="currentPage() === 1"
+                    aria-label="Previous page"
+                  >
+                    <svg lucideIcon="chevron-left" size="15"></svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-bordered"
+                    (click)="nextPage()"
+                    [disabled]="currentPage() === totalPages()"
+                    aria-label="Next page"
+                  >
+                    <svg lucideIcon="chevron-right" size="15"></svg>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </main>
     </div>
 
     <!-- Detail: slide-over panel above the list; click outside or Esc closes it. -->
     @if (selectedId(); as id) {
       <div class="slide-panel-overlay" (click)="selectWebhook(null)"></div>
       <app-hook-detail
-        class="hooks-detail slide-panel"
+        class="slide-panel slide-panel-wide"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Webhook"
         [webhookId]="id"
+        [position]="openPosition()"
         [hasPrevious]="hasPrevious()"
         [hasNext]="hasNext()"
         (previous)="step(-1)"
@@ -207,13 +193,11 @@ export class HooksComponent {
   private signalRService = inject(SignalRService);
   private confirmDialog = inject(ConfirmDialogService);
   private toast = inject(ToastService);
+  private mobileMenu = inject(MobileMenuService);
 
-  readonly columns: { key: SortColumn; label: string; optional?: boolean }[] = [
-    { key: 'httpMethod', label: 'Method' },
-    { key: 'path', label: 'Path' },
-    { key: 'contentType', label: 'Content-Type', optional: true },
-    { key: 'createdOn', label: 'Received' },
-  ];
+  shortDate = shortMailDate;
+  // Phones: the bucket sidebar is a drawer toggled from the nav bar.
+  menuOpen = signal(false);
 
   buckets = signal<WebhookBucket[] | null>(null);
   // Full dataset for the current view (a bucket's page, or all buckets aggregated).
@@ -221,7 +205,7 @@ export class HooksComponent {
   // Both are driven by the URL (?bucket=…&id=…) so selection survives reloads and the back button.
   selectedBucket = signal<string | null>(null);
   selectedId = signal<number | null>(null);
-  copyTooltip = signal<string>('Copy URL');
+  copyLabel = signal('Copy URL');
   loading = signal(false);
   error = signal(false);
 
@@ -240,6 +224,19 @@ export class HooksComponent {
   pageSize = 20;
 
   totalPages = computed(() => Math.ceil(this.totalCount() / this.pageSize));
+
+  subtitle = computed(() => {
+    const n = this.totalCount();
+    if (this.loading() && !this.webhooks()) return 'Loading…';
+    return n === 0 ? 'Nothing captured yet' : `${n} captured`;
+  });
+
+  rangeLabel = computed(() => {
+    const total = this.totalCount();
+    const start = (this.currentPage() - 1) * this.pageSize + 1;
+    const end = Math.min(start + this.pageSize - 1, total);
+    return `${start}–${end} of ${total}`;
+  });
 
   sortedWebhooks = computed(() => {
     const webhooks = this.webhooks();
@@ -282,6 +279,11 @@ export class HooksComponent {
   private selectedIndex = computed(() => {
     const id = this.selectedId();
     return id === null ? -1 : (this.paginatedWebhooks() ?? []).findIndex((w) => w.id === id);
+  });
+  openPosition = computed(() => {
+    const index = this.selectedIndex();
+    if (index < 0) return '';
+    return `${(this.currentPage() - 1) * this.pageSize + index + 1} of ${this.totalCount()}`;
   });
   hasPrevious = computed(() => this.selectedIndex() > 0 || (this.selectedIndex() === 0 && this.currentPage() > 1));
   hasNext = computed(() => {
@@ -342,8 +344,11 @@ export class HooksComponent {
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       const id = Number(params.get('id'));
       this.selectedBucket.set(params.get('bucket') || null);
+      this.menuOpen.set(false);
       this.selectedId.set(Number.isInteger(id) && id > 0 ? id : null);
     });
+
+    this.mobileMenu.menuToggled.pipe(takeUntilDestroyed()).subscribe(() => this.menuOpen.update((open) => !open));
 
     // Load webhooks when the selected bucket changes. The initial "All" view fetch
     // also loads the bucket list, so no separate bucket request is needed on init.
@@ -417,11 +422,17 @@ export class HooksComponent {
     );
   }
 
+  reload() {
+    this.fetchWebhooks();
+    this.refreshBuckets();
+  }
+
   refreshBuckets() {
     this.bucketRefreshRequests.next();
   }
 
   selectBucket(name: string | null) {
+    this.menuOpen.set(false);
     if (name === this.selectedBucket()) return;
     // Switching bucket also drops the open webhook.
     this.router.navigate([], { relativeTo: this.route, queryParams: { bucket: name, id: null } });
@@ -540,8 +551,8 @@ export class HooksComponent {
 
   copyEndpointUrl() {
     navigator.clipboard.writeText(this.endpointUrl()).then(() => {
-      this.copyTooltip.set('Copied!');
-      setTimeout(() => this.copyTooltip.set('Copy URL'), 2000);
+      this.copyLabel.set('Copied!');
+      setTimeout(() => this.copyLabel.set('Copy URL'), 2000);
     });
   }
 }

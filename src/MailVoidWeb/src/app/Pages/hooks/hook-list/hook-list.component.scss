@@ -1,0 +1,38 @@
+:host {
+  display: block;
+}
+
+// Columns: method | path (+ bucket) | content type | received. Basics are the shared .grid-list-*.
+.hl-row {
+  --cols: 64px minmax(0, 2.4fr) minmax(0, 1fr) 92px;
+}
+
+.hl-path {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.hl-bucket {
+  font-family: var(--font-sans);
+  font-size: 0.71875rem;
+  color: var(--muted);
+}
+
+.hl-type {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+@media (max-width: 768px) {
+  .hl-row {
+    --cols: 64px minmax(0, 1fr) auto;
+  }
+
+  .hl-type {
+    display: none;
+  }
+}
