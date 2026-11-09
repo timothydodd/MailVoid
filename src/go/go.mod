@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/andybalholm/brotli v1.2.6
-	github.com/emersion/go-smtp v0.25.0
+	github.com/emersion/go-smtp v0.25.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/jhillyerd/enmime v1.3.0
