@@ -1,15 +1,45 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
 version: 2
 updates:
-  - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/src/MailVoidWeb" # Location of package manifests
+  - package-ecosystem: npm
+    directory: /src/MailVoidWeb
     schedule:
-      interval: "weekly"
-  - package-ecosystem: "gomod"
-    directory: "/src/go"
+      interval: weekly
+    groups:
+      # Angular packages must move together; single-package bumps break peer deps.
+      angular:
+        patterns:
+          - "@angular/*"
+          - "ng-packagr"
+      npm-dev:
+        dependency-type: development
+        exclude-patterns:
+          - "@angular/*"
+          - "ng-packagr"
+          - "typescript"
+      npm-prod:
+        dependency-type: production
+        exclude-patterns:
+          - "@angular/*"
+    ignore:
+      # TypeScript majors are pinned by Angular's supported range.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: gomod
+    directory: /src/go
     schedule:
-      interval: "weekly"
+      interval: weekly
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /src/go
+    schedule:
+      interval: weekly
