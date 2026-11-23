@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 
 # Stay on 3.22 (supported until May 2027): on 3.24 certbot-dns-cloudflare pulls in the
 # new Cloudflare Python SDK, which adds ~65 MB to the image.
-FROM alpine:3.22
+FROM alpine:3.24
 # certbot + Cloudflare DNS plugin for the Let's Encrypt integration (LetsEncrypt:Enabled).
 RUN apk add --no-cache ca-certificates tzdata certbot certbot-dns-cloudflare \
     # Same UID as the .NET images' "app" user so existing volumes keep their permissions.
